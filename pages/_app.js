@@ -1,0 +1,67 @@
+import { HeroUIProvider } from "@heroui/system";
+import DefaultLayout from "@/layouts/default";
+import { useRouter } from "next/router";
+import dynamic from "next/dynamic";
+import { useEffect } from "react";
+import { LanguageProvider } from "../context/LanguageContext";
+import { UserProvider, useUser } from "../context/UserContext";
+import { GoogleOAuthProvider } from '@react-oauth/google'; // ✅ Import GoogleOAuthProvider
+import { RegisteredUserProvider } from "../context/RegisteredUserContext"; // ✅ Import RegisteredUserProvider
+import { toRolePath } from "../utils/adminPermissions";
+import '../styles/globals.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import Toast from "../components/Toast";
+
+
+const Snackbar = dynamic(() => import('@/components/utils/Snackbar'), { ssr: false });
+
+/**
+ * Admin panel URL by logged in role:
+ * /admin/... (super admin), /seller/..., /broker/..., /staff/...
+ * - HeroUI <Link> navigates straight to the role URL
+ * - any other link / redirect to a wrong prefix is replaced with the role URL
+ */
+function RoleAwareProviders({ children }) {
+  const router = useRouter();
+  const { user, authLoading } = useUser();
+
+  useEffect(() => {
+    if (authLoading || !user || !router.isReady) return;
+
+    const rolePath = toRolePath(user, router.asPath);
+
+    if (rolePath !== router.asPath) {
+      router.replace(rolePath);
+    }
+  }, [authLoading, user, router.isReady, router.asPath]);
+
+  return (
+    <HeroUIProvider navigate={(path) => router.push(toRolePath(user, path))}>
+      {children}
+    </HeroUIProvider>
+  );
+}
+
+function App({ Component, pageProps, websiteData }) {
+  const getLayout = Component.getLayout || ((page) => page);
+
+
+  return (
+      <LanguageProvider>
+        <UserProvider>
+          <RegisteredUserProvider>
+            <RoleAwareProviders>
+              <DefaultLayout websiteData={websiteData}>
+                 <Toast />
+              {getLayout(<Component {...pageProps} />)}
+              </DefaultLayout>
+              <Snackbar />
+            </RoleAwareProviders>
+          </RegisteredUserProvider>
+        </UserProvider>
+      </LanguageProvider>
+  );
+}
+
+
+export default App;
