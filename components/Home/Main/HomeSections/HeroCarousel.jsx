@@ -32,67 +32,70 @@ const BannerImage = ({ banner, first }) => (
 
 // initialBanners: from server (pages/index.jsx). null -> load in browser.
 const HeroCarousel = ({ initialBanners = null }) => {
-  const [banners, setBanners] = useState(() =>
-    Array.isArray(initialBanners)
-      ? initialBanners.length > 0 ? initialBanners : fallbackBanners
-      : null
-  );
+    const [banners, setBanners] = useState(() =>
+        Array.isArray(initialBanners)
+            ? initialBanners.length > 0 ? initialBanners : fallbackBanners
+            : null
+    );
 
-  useEffect(() => {
-    if (banners) return;
+    useEffect(() => {
+        if (banners) return;
 
-    getBanners()
-      .then((res) => {
-        const list = res?.data?.banners;
-        setBanners(Array.isArray(list) && list.length > 0 ? list : fallbackBanners);
-      })
-      .catch((error) => {
-        console.error("Failed to fetch banners:", error);
-        setBanners(fallbackBanners);
-      });
-  }, [banners]);
+        getBanners()
+            .then((res) => {
+                const list = res?.data?.banners;
+                setBanners(Array.isArray(list) && list.length > 0 ? list : fallbackBanners);
+            })
+            .catch((error) => {
+                console.error("Failed to fetch banners:", error);
+                setBanners(fallbackBanners);
+            });
+    }, [banners]);
 
-  return (
-    <>
-        <section className="w-full bg-[#e9edf3]" style={{ aspectRatio: BANNER_RATIO }}>
-            {/* Loading: same size placeholder */}
-            {!banners && <div className="h-full w-full animate-pulse bg-[#e9edf3]" />}
+    return (
+        <>
+            <section
+                className="w-full bg-[#e9edf3]"
+                style={{ height: "calc(100vh - 82.64px)" }}
+            >
+                {/* Loading: same size placeholder */}
+                {!banners && <div className="h-full w-full animate-pulse bg-[#e9edf3]" />}
 
-            {banners && (
-                <Swiper
-                    navigation={banners.length > 1}
-                    modules={[Navigation, Autoplay]}
-                    slidesPerView={1}
-                    spaceBetween={0}
-                    loop={banners.length > 1}
-                    autoplay={{
-                    delay: 5000,
-                    disableOnInteraction: false,
-                }}
-                    className="heroSwiper h-full"
-                >
-                    {banners.map((banner, index) => (
-                        <SwiperSlide key={banner.id} className="h-full">
-                            {banner.link ? (
-                                <NextLink
-                                    href={banner.link}
-                                    className="block h-full"
-                                    {...(/^https?:\/\//.test(banner.link)
-                                        ? { target: "_blank", rel: "noopener noreferrer" }
-                                        : {})}
-                                >
+                {banners && (
+                    <Swiper
+                        navigation={banners.length > 1}
+                        modules={[Navigation, Autoplay]}
+                        slidesPerView={1}
+                        spaceBetween={0}
+                        loop={banners.length > 1}
+                        autoplay={{
+                            delay: 5000,
+                            disableOnInteraction: false,
+                        }}
+                        className="heroSwiper h-full"
+                    >
+                        {banners.map((banner, index) => (
+                            <SwiperSlide key={banner.id} className="h-full">
+                                {banner.link ? (
+                                    <NextLink
+                                        href={banner.link}
+                                        className="block h-full"
+                                        {...(/^https?:\/\//.test(banner.link)
+                                            ? { target: "_blank", rel: "noopener noreferrer" }
+                                            : {})}
+                                    >
+                                        <BannerImage banner={banner} first={index === 0} />
+                                    </NextLink>
+                                ) : (
                                     <BannerImage banner={banner} first={index === 0} />
-                                </NextLink>
-                            ) : (
-                                <BannerImage banner={banner} first={index === 0} />
-                            )}
-                        </SwiperSlide>
-                    ))}
-                </Swiper>
-            )}
-        </section>
-    </>
-  );
+                                )}
+                            </SwiperSlide>
+                        ))}
+                    </Swiper>
+                )}
+            </section>
+        </>
+    );
 };
 
 export default HeroCarousel;
