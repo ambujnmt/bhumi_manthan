@@ -645,3 +645,29 @@ export const searchProperties = (params, signal) => searchGet("properties", para
 
 // { latitude, longitude, radius, type } -> { city, locality, nearby_localities } (404 = nothing near)
 export const getNearMe = (params, signal) => searchGet("near-me", params, signal);
+
+// Fetch project details using project slug
+export const getProjectDetails = async (slug) => {
+    try {
+        if (!slug) {
+            throw new Error("Project slug is required.");
+        }
+
+        const response = await fetch(
+            `${BASE_URL}projects/detail/${encodeURIComponent(slug)}`
+        );
+
+        const result = await response.json();
+
+        if (!response.ok || !result.status) {
+            throw new Error(
+                result.message
+            );
+        }
+
+        return result.data.project;
+    } catch (error) {
+        console.error("Get project details error:", error);
+        throw error;
+    }
+};

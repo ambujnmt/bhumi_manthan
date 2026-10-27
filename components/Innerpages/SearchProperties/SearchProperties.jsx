@@ -5,7 +5,7 @@ import SearchBar from './SearchBar';
 import SearchPropertiesLeftCol from './SearchPropertiesLeftCol';
 import SearchPropertiesRightCol from './SearchPropertiesRightCol';
 import useSearchFilters from '../../../utils/useSearchFilters';
-
+import HeroCarousel from '../../Home/Main/HomeSections/HeroCarousel'
 const TAB_HEADINGS = {
     buy: { crumb: "Buy Properties", title: "Properties for Sale" },
     rent: { crumb: "Rent Properties", title: "Properties for Rent" },
@@ -24,7 +24,10 @@ export default function SearchProperties() {
 
     return (
         <>
-            <section className="mt-[10px]">
+            <section>
+                <div>
+                    <HeroCarousel/>
+                </div>
               <div className="bg-[#eaeff5] py-10">
                 <div className="container">
                     <div className="grid grid-cols-12 gap-4">
