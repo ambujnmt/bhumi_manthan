@@ -671,3 +671,128 @@ export const getProjectDetails = async (slug) => {
         throw error;
     }
 };
+
+// Fetch admin events
+export const getAdminEvents = async (page = 1) => {
+  const token = Cookies.get("accessToken");
+
+  const response = await fetch(
+    `${BASE_URL}admin/events/all?page=${page}`,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok || !result?.status) {
+    throw new Error(
+      result?.message
+    );
+  }
+
+  return result;
+};
+
+// add event
+export const addAdminEvent = async (payload) => {
+  const token = Cookies.get("accessToken");
+
+  const response = await fetch(`${BASE_URL}admin/events/add`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: payload, 
+  });
+
+  const result = await response.json();
+
+  if (!response.ok || !result?.status) {
+    const validationErrors = result?.errors
+      ? Object.values(result.errors).flat().join(" ")
+      : "";
+
+    throw new Error(
+      validationErrors || result?.message
+    );
+  }
+
+  return result;
+};
+
+// detail event
+export const getAdminEventById = async (id) => {
+    const token = Cookies.get("accessToken");
+
+    const response = await fetch(
+        `${BASE_URL}admin/events/view/${id}`,
+        {
+            method: "GET",
+            headers: {
+                Accept: "application/json",
+                ...(token
+                    ? { Authorization: `Bearer ${token}` }
+                    : {}),
+            },
+        }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result?.status) {
+        throw new Error(
+            result?.message
+        );
+    }
+
+    return result;
+};
+
+// update event 
+export const updateAdminEvent = async (id, formData) => {
+    const token = Cookies.get("accessToken");
+
+    const response = await fetch(`${BASE_URL}admin/events/update/${id}`, {
+        method: "POST",
+        headers: {
+            Accept: "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result?.status) {
+        throw new Error(result?.message);
+    }
+
+    return result;
+};
+
+// delete event 
+export const deleteAdminEvent = async (id) => {
+    const token = Cookies.get("accessToken");
+
+    const response = await fetch(`${BASE_URL}admin/events/delete/${id}`, {
+        method: "DELETE",
+        headers: {
+            Accept: "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result?.status) {
+        throw new Error(result?.message);
+    }
+
+    return result;
+};
