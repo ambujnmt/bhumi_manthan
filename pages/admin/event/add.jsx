@@ -10,7 +10,7 @@ export default function LocationManagement() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   return (
-       <PrivateRoute allowedRoles={["super_admin"]} permission="locations.view">
+       <PrivateRoute allowedRoles={["super_admin"]} permission="events.create">
       <div className="flex h-screen overflow-hidden">
 
         {/* Overlay for mobile */}

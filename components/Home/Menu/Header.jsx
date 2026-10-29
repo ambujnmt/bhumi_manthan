@@ -715,22 +715,22 @@ const handleLogout = () => {
                           }`}
                       >
                         <Link
-                          href="#"
+                          href="/web/events"
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-[var(--primary-color)] transition-colors whitespace-normal break-words"
                         >
-                          Dropdown 1
+                          Events
                         </Link>
                         <Link
-                          href="#"
+                          href="/web/plans"
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-[var(--primary-color)] transition-colors whitespace-normal break-words"
                         >
-                          Dropdown 2
+                          Pricing Plans
                         </Link>
                         <Link
-                          href="#"
+                          href="/web/blog"
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-[var(--primary-color)] transition-colors whitespace-normal break-words"
                         >
-                          Dropdown 3
+                          Blogs
                         </Link>
                       </div>
                     </div>
@@ -1057,9 +1057,9 @@ const handleLogout = () => {
                 className={`overflow-hidden transition-all duration-300 ease-in-out bg-gray-50 ${openMainTab === "admission" ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
                   }`}
               >
-                <Link href="#" className="block py-3 pl-4 text-sm text-gray-700">Dropdown 1</Link>
-                <Link href="#" className="block py-3 pl-4 text-sm text-gray-700">Dropdown 2</Link>
-                <Link href="#" className="block py-3 pl-4 text-sm text-gray-700">Dropdown 3</Link>
+                <Link href="/web/events" onClick={() => setMobileOpen(false)} className="block py-3 pl-4 text-sm text-gray-700">Events</Link>
+                <Link href="/web/plans" onClick={() => setMobileOpen(false)} className="block py-3 pl-4 text-sm text-gray-700">Pricing Plans</Link>
+                <Link href="/web/blog" onClick={() => setMobileOpen(false)} className="block py-3 pl-4 text-sm text-gray-700">Blogs</Link>
               </div>
             </div>
             {/* // More TAB */}

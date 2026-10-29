@@ -36,6 +36,8 @@ const ADMIN_PAGES = [
   ["blogs.view", "/admin/blog/blogList"],
   ["locations.view", "/admin/location/locationList"],
   ["banners.view", "/admin/banner/bannerList"],
+  ["events.view", "/admin/event/listing"],
+  ["plans.view", "/admin/plan/listing"],
   ["settings.view", "/admin/settings/siteSettings"],
 ];
 

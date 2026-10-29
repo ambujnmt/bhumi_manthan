@@ -5,12 +5,12 @@ import Footer from "@/components/Admin/Dashboard/Menu/Footer";
 import PrivateRoute from "../../../components/PrivateRoute/PrivateRoute";
 import Listing from "../../../components/Admin/Plan/Listing";
 
-export default function LocationManagement() {
+export default function PlanListing() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   return (
-       <PrivateRoute allowedRoles={["super_admin"]} permission="locations.view">
+       <PrivateRoute allowedRoles={["super_admin"]} permission="plans.view">
       <div className="flex h-screen overflow-hidden">
 
         {/* Overlay for mobile */}
