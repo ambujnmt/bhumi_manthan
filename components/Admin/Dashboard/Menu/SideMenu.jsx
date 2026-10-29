@@ -910,7 +910,7 @@ export default function SideMenu({
           )}
 
           {/* Events */}
-          {can('event.view') && (
+          {can('events.view') && (
             <Link
               href="/admin/event/listing"
               onClick={toggleMenu}
@@ -971,7 +971,7 @@ export default function SideMenu({
 
 {/* Plan */}
 
-{can('plan.view') && (
+{can('plans.view') && (
   <Link
     href="/admin/plan/listing"
     onClick={toggleMenu}

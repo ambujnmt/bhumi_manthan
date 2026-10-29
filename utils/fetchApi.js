@@ -673,11 +673,11 @@ export const getProjectDetails = async (slug) => {
 };
 
 // Fetch admin events
-export const getAdminEvents = async (page = 1) => {
+export const getAdminEvents = async (page = 1, perPage = 10) => {
   const token = Cookies.get("accessToken");
 
   const response = await fetch(
-    `${BASE_URL}admin/events/all?page=${page}`,
+    `${BASE_URL}admin/events/all?page=${page}&per_page=${perPage}`,
     {
       method: "GET",
       headers: {
@@ -795,4 +795,117 @@ export const deleteAdminEvent = async (id) => {
     }
 
     return result;
+};
+
+// Plan API errors -> one message (validation errors joined)
+const planApiError = (result) => {
+  const validationErrors = result?.errors
+    ? Object.values(result.errors).flat().join(" ")
+    : "";
+
+  return new Error(validationErrors || result?.message || "Something went wrong.");
+};
+
+const planRequest = async (path, options = {}) => {
+  const token = Cookies.get("accessToken");
+
+  const response = await fetch(`${BASE_URL}admin/plans/${path}`, {
+    ...options,
+    headers: {
+      Accept: "application/json",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  const result = await response.json();
+
+  if (!response.ok || !result?.status) {
+    throw planApiError(result);
+  }
+
+  return result;
+};
+
+// list plans
+export const getAdminPlans = () => planRequest("all");
+
+// add plan
+export const addAdminPlan = (payload) =>
+  planRequest("add", { method: "POST", body: JSON.stringify(payload) });
+
+// detail plan
+export const getAdminPlanById = (id) => planRequest(`view/${id}`);
+
+// update plan
+export const updateAdminPlan = (id, payload) =>
+  planRequest(`update/${id}`, { method: "POST", body: JSON.stringify(payload) });
+
+// delete plan
+export const deleteAdminPlan = (id) =>
+  planRequest(`delete/${id}`, { method: "DELETE" });
+
+// website events (active only)
+export const getEvents = async (limit = 10) => {
+  const response = await fetch(`${BASE_URL}events?limit=${limit}`, {
+    headers: { Accept: "application/json" },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.message);
+  }
+
+  return data;
+};
+
+// website event detail (slug or id)
+export const getEventDetail = async (slug) => {
+  const response = await fetch(`${BASE_URL}events/${slug}`, {
+    headers: { Accept: "application/json" },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.message);
+  }
+
+  return data;
+};
+
+// website pricing plans (active only, sorted)
+export const getPlans = async () => {
+  const response = await fetch(`${BASE_URL}plans`, {
+    headers: { Accept: "application/json" },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.message);
+  }
+
+  return data;
+};
+
+// event form options (types, footfall, highlights)
+export const getAdminEventOptions = async () => {
+  const token = Cookies.get("accessToken");
+
+  const response = await fetch(`${BASE_URL}admin/events/options`, {
+    headers: {
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  const result = await response.json();
+
+  if (!response.ok || !result?.status) {
+    throw new Error(result?.message);
+  }
+
+  return result;
 };

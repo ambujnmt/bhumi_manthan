@@ -7,6 +7,7 @@ import ExploreProperties from './HomeSections/ExploreProperties';
 import PremiumLuxury from './HomeSections/PremiumLuxury';
 import MiddleColumn from './HomeSections/MiddleColumn';
 import HomeTestimonial from './HomeSections/HomeTestimonial';
+import UpcomingEvents from './HomeSections/UpcomingEvents';
 import Blogs from './HomeSections/Blogs';
 import MobileApp from './HomeSections/MobileApp';
 import StickyLoginForm from '../../Innerpages/StickyLoginForm';
@@ -29,6 +30,7 @@ export default function Body({ banners = null, listings = null }) {
       <PremiumLuxury loading={loading} properties={luxury.items} nearby={luxury.nearby} />
       <MiddleColumn />
       <HomeTestimonial />
+      <UpcomingEvents />
       <Blogs />
       <MobileApp />
     </>
