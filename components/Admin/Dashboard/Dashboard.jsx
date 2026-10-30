@@ -10,7 +10,7 @@ import {
   FiArrowDownRight,
   FiMapPin,
   FiMessageSquare,
-  FiPlus,
+  FiMessageCircle,
   FiChevronRight,
 } from "react-icons/fi";
 import {
@@ -21,7 +21,9 @@ import { BiBuildingHouse } from "react-icons/bi";
 import { MdOutlineApartment } from "react-icons/md";
 import { getDashboard } from "../../../utils/adminFetchApi"
 import { formatPropertyPrice, imageFallback } from "../../../utils/formatPrice";
-import { useAdminPermission } from "../../../utils/adminPermissions";
+import { hasAdminAccess } from "../../../utils/adminPermissions";
+import { useUser } from "../../../context/UserContext";
+import { subscribeChatUnread } from "../../../utils/firebaseChat";
 
 /*
 |--------------------------------------------------------------------------
@@ -88,10 +90,20 @@ const formatDate = (value) => {
 };
 
 export default function Dashboard() {
-  const can = useAdminPermission();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState(new Date().getFullYear());
+
+  // Chat button (header) with live unread count
+  const { user } = useUser();
+  const canChat = hasAdminAccess(user);
+  const [chatUnread, setChatUnread] = useState(0);
+
+  useEffect(() => {
+    if (!canChat) return;
+
+    return subscribeChatUnread(setChatUnread);
+  }, [canChat]);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -150,15 +162,20 @@ export default function Dashboard() {
         </div>
 
         <div className="flex items-center gap-3">
-          {can("properties.create") && (
+          {canChat && (
             <NextLink
-              href="/admin/propertyManagement/createProperty"
-              className="flex h-10 items-center gap-2 rounded-lg bg-[#E87722] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#d96818]"
+              href="/admin/chat"
+              className="relative flex h-10 items-center gap-2 rounded-lg bg-[#E87722] px-4 text-sm font-semibold text-white no-underline shadow-sm transition hover:bg-[#d96818]"
             >
-              <FiPlus size={16} />
+              <FiMessageCircle size={16} />
               <span className="hidden sm:inline">
-                Add Property
+                Chat
               </span>
+              {chatUnread > 0 && (
+                <span className="absolute -right-2 -top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-white px-1 text-[11px] font-bold text-[#E87722] shadow ring-2 ring-[#E87722]">
+                  {chatUnread > 99 ? "99+" : chatUnread}
+                </span>
+              )}
             </NextLink>
           )}
         </div>

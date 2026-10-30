@@ -1,6 +1,5 @@
 import NextLink from "next/link";
 import React, { useEffect, useState } from 'react'
-import { FiArrowRight } from "react-icons/fi";
 import { FaArrowRight } from "react-icons/fa";
 import { getBlogs } from "../../../../utils/fetchApi";
 
@@ -46,12 +45,10 @@ export default function Blogs() {
                         Stay ahead with smart property trends, regulatory updates and investment advice
                     </p>
                 </div>
-                <NextLink
-                    href="/web/blog"
-                    className="flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800 shrink-0 whitespace-nowrap"
-                >
-                    View All News Blogs
-                    <FiArrowRight className="text-base" />
+                <NextLink href="/web/blog" className="shrink-0 no-underline">
+                    <h6 className="text-[var(--text-color3)] text-[15px] font-semibold flex items-center hover:text-[var(--primary-color)] whitespace-nowrap">
+                        View All News Blogs &nbsp; <FaArrowRight />
+                    </h6>
                 </NextLink>
             </div>
 

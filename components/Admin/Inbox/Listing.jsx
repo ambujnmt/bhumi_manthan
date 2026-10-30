@@ -336,9 +336,9 @@ export default function Listing({ type = "contact" }) {
                                                     {(config.name(item) || item.email || "?").trim().charAt(0)}
                                                 </span>
                                                 <div className="leading-tight">
-                                                    <p className={`text-[#1A1F36] ${item.is_read ? "font-medium" : "font-bold"}`}>
+                                                    <b className={`text-[#1A1F36] ${item.is_read ? "font-medium" : "font-bold"}`}>
                                                         {config.name(item) || "-"}
-                                                    </p>
+                                                    </b>
                                                     <p className="mt-0.5 text-xs text-[#62748E]">
                                                         {item.phone} · {item.email}
                                                     </p>

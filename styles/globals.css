@@ -43,6 +43,14 @@ html, body{
   font-size: 16px;
   font-weight: semibold;
 }
+/* Remove Bootstrap default "ol, ul { padding-left: 2rem }" everywhere.
+   body prefix -> beats Bootstrap (loaded after this file in _app.js);
+   blog / CMS content below keeps its own padding (#inner-content-block rules are stronger) */
+body ol,
+body ul {
+  padding-left: 0;
+}
+
 #inner-content-block ul {
   list-style: disc;
 }

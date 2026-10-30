@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import PageTitle from "../../Breadcrumb/PageTitle";
-import { Spinner, Link } from "@heroui/react";
+import { Link } from "@heroui/react";
 import { useRouter } from "next/router";
 import { getPropertyDetail } from "../../../utils/adminFetchApi";
+import { getCachedProperty, saveCachedProperty } from "../../../utils/adminPropertyCache";
 import { RichTextContent } from "../../RichTextEditor/RichTextEditor";
 import {
     FaMapMarkerAlt,
@@ -28,15 +29,22 @@ export default function Detail() {
 
     const { id } = router.query;
 
-    const [property, setProperty] = useState(null);
-    const [loading, setLoading] = useState(true);
+    // Property from listing page shows right away; fresh data loads in background
+    const [property, setProperty] = useState(() => getCachedProperty(id));
+    const [loading, setLoading] = useState(() => !getCachedProperty(id));
     const [error, setError] = useState("");
 
     useEffect(() => {
         if (!router.isReady || !id) return;
 
+        const cached = getCachedProperty(id);
+
+        if (cached) {
+            setProperty(cached);
+            setLoading(false);
+        }
+
         const fetchPropertyDetail = async () => {
-            setLoading(true);
             setError("");
 
             try {
@@ -52,7 +60,8 @@ export default function Detail() {
                     res?.data?.property
                 ) {
                     setProperty(res.data.property);
-                } else {
+                    saveCachedProperty(res.data.property);
+                } else if (!cached) {
                     setError(
                         res?.message ||
                         "Property not found."
@@ -64,10 +73,13 @@ export default function Detail() {
                     error
                 );
 
-                setError(
-                    error?.message ||
-                    "Something went wrong while fetching property."
-                );
+                // Keep showing the cached property if the refresh fails
+                if (!cached) {
+                    setError(
+                        error?.message ||
+                        "Something went wrong while fetching property."
+                    );
+                }
             } finally {
                 setLoading(false);
             }
@@ -98,8 +110,22 @@ export default function Detail() {
                     title="Property Detail"
                 />
 
-                <div className="flex justify-center items-center py-24">
-                    <Spinner size="lg" />
+                {/* Placeholder (first open, nothing cached yet) */}
+                <div className="mt-6 grid animate-pulse grid-cols-1 gap-6 lg:grid-cols-3">
+                    <div className="space-y-4 lg:col-span-2">
+                        <div className="h-72 rounded-xl bg-gray-200" />
+                        <div className="space-y-3 rounded-xl bg-white p-5 shadow-sm">
+                            <div className="h-5 w-1/2 rounded bg-gray-200" />
+                            <div className="h-3 w-4/5 rounded bg-gray-100" />
+                            <div className="h-3 w-3/5 rounded bg-gray-100" />
+                        </div>
+                    </div>
+                    <div className="space-y-3 rounded-xl bg-white p-5 shadow-sm">
+                        <div className="h-6 w-2/5 rounded bg-gray-200" />
+                        <div className="h-3 w-full rounded bg-gray-100" />
+                        <div className="h-3 w-4/5 rounded bg-gray-100" />
+                        <div className="h-3 w-3/5 rounded bg-gray-100" />
+                    </div>
                 </div>
             </div>
         );

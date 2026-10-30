@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { Spinner, Tooltip, Link, Button } from "@heroui/react";
-import { FaPen } from "react-icons/fa";
+import { Tooltip, Link, Button } from "@heroui/react";
+import { FaCheck, FaHeadset, FaPen, FaPlus } from "react-icons/fa";
 import { FaRegTrashCan } from "react-icons/fa6";
 import PageTitle from "../../Breadcrumb/PageTitle";
 import { actionButtonClass } from "../actionButtonClass";
@@ -25,11 +25,35 @@ const formatPrice = (price) =>
     maximumFractionDigits: 0,
   });
 
+// Last loaded plans: cards show right away (no loader), fresh data loads in background
+const PLANS_CACHE_KEY = "admin_plans";
+let plansCache = null;
+
+const readPlansCache = () => {
+  if (plansCache) return plansCache;
+
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(PLANS_CACHE_KEY));
+    if (Array.isArray(saved)) plansCache = saved;
+  } catch (e) { }
+
+  return plansCache;
+};
+
+const savePlansCache = (plans) => {
+  plansCache = plans;
+
+  try {
+    sessionStorage.setItem(PLANS_CACHE_KEY, JSON.stringify(plans));
+  } catch (e) { }
+};
+
 export default function Listing() {
   const can = useAdminPermission();
 
-  const [plans, setPlans] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [plans, setPlans] = useState(() => readPlansCache() || []);
+  // Placeholder cards only on the very first load (nothing cached yet)
+  const [loading, setLoading] = useState(() => !readPlansCache());
   const [error, setError] = useState("");
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -38,18 +62,22 @@ export default function Listing() {
 
   // Fetch plans
   const fetchPlans = useCallback(async () => {
-    setLoading(true);
     setError("");
 
     try {
       const res = await getAdminPlans();
+      const list = Array.isArray(res?.data?.plans) ? res.data.plans : [];
 
-      setPlans(Array.isArray(res?.data?.plans) ? res.data.plans : []);
+      setPlans(list);
+      savePlansCache(list);
     } catch (err) {
       console.error("Failed to fetch plans:", err);
 
-      setPlans([]);
-      setError(err?.message || "Unable to load plans.");
+      // Keep showing cached cards if the refresh fails
+      if (!readPlansCache()) {
+        setPlans([]);
+        setError(err?.message || "Unable to load plans.");
+      }
     } finally {
       setLoading(false);
     }
@@ -105,181 +133,191 @@ export default function Listing() {
         title="Plan Management"
       />
 
-      {/* Page summary */}
-      <div className="mt-6 mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-[#1A1F36]">
-            Plans List
-          </h2>
-
-          <p className="mt-1 text-xs text-[#62748E]">
-            Total plans: {plans.length}
-          </p>
-        </div>
-
-        {can("plans.create") && (
+      {/* Add plan */}
+      {can("plans.create") && (
+        <div className="mt-6 mb-5 flex justify-end">
           <Link
             href="/admin/plan/add"
             className="flex h-10 items-center gap-2 rounded-lg bg-[#E87722] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#d96818]"
           >
-            <span className="text-lg leading-none">+</span>
+            <FaPlus size={12} />
             <span>Add Plan</span>
           </Link>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Plans table */}
-      <div className="w-full overflow-auto rounded-xl bg-white shadow">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="whitespace-nowrap px-4 py-3 text-left">Plan</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left">Price</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left">Listings</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left">Features</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left">Order</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left">Status</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left">Action</th>
-            </tr>
-          </thead>
+      {/* Plans cards */}
+      {loading ? (
+        <div className={`${can("plans.create") ? "" : "mt-6"} grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3`}>
+          {[1, 2, 3].map((key) => (
+            <div key={key} className="animate-pulse overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+              <div className="h-1.5 bg-gray-200" />
+              <div className="p-6">
+                <div className="h-4 w-1/3 rounded bg-gray-200" />
+                <div className="mt-6 h-9 w-1/2 rounded bg-gray-200" />
+                <div className="mt-6 h-16 rounded-xl bg-gray-100" />
+                <div className="mt-6 space-y-3">
+                  <div className="h-3 w-4/5 rounded bg-gray-100" />
+                  <div className="h-3 w-3/5 rounded bg-gray-100" />
+                  <div className="h-3 w-2/3 rounded bg-gray-100" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <div className="mt-6 rounded-2xl bg-white px-4 py-10 text-center text-red-600 shadow-sm">
+          <p>{error}</p>
 
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={7}>
-                  <div className="flex items-center justify-center py-16">
-                    <Spinner size="md" />
-                  </div>
-                </td>
-              </tr>
-            ) : error ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-red-600">
-                  <p>{error}</p>
+          <button
+            type="button"
+            onClick={fetchPlans}
+            className="mt-3 rounded-lg bg-[#E87722] px-4 py-2 text-white"
+          >
+            Try Again
+          </button>
+        </div>
+      ) : plans.length > 0 ? (
+        <div className={`${can("plans.create") ? "" : "mt-6"} grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3`}>
+          {plans.map((plan) => {
+            const included = featureRows(plan.features, PLAN_FEATURES).filter((row) => row.enabled);
 
-                  <button
-                    type="button"
-                    onClick={fetchPlans}
-                    className="mt-3 rounded-lg bg-[#E87722] px-4 py-2 text-white"
-                  >
-                    Try Again
-                  </button>
-                </td>
-              </tr>
-            ) : plans.length > 0 ? (
-              plans.map((plan) => (
-                <tr key={plan.id} className="border-t transition hover:bg-gray-50">
-                  {/* Plan */}
-                  <td className="min-w-[200px] px-4 py-3">
-                    <p className="font-semibold text-[#1A1F36]">{plan.name || "-"}</p>
+            return (
+              <div
+                key={plan.id}
+                className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-orange-200 hover:shadow-xl ${plan.is_active ? "border-gray-100" : "border-gray-100 opacity-75"}`}
+              >
+                {/* Top accent */}
+                <div className={`h-1.5 ${plan.is_active ? "bg-gradient-to-r from-[#E87722] to-[#f5a35c]" : "bg-gray-300"}`} />
 
-                    {plan.description && (
-                      <p className="mt-1 max-w-[260px] text-xs text-[#62748E] line-clamp-2">
-                        {plan.description}
-                      </p>
-                    )}
+                <div className="flex flex-1 flex-col p-6">
+                  {/* Name + status */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-lg font-bold text-[#1A1F36]">
+                        {plan.name || "-"}
+                      </h3>
 
-                    {plan.support_level && (
-                      <p className="mt-1 text-xs text-[#283A86]">
-                        Support: {plan.support_level}
-                      </p>
-                    )}
-                  </td>
-
-                  {/* Price */}
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <p className="font-semibold text-[#1A1F36]">{formatPrice(plan.price)}</p>
-                    <p className="mt-1 text-xs text-[#62748E]">
-                      {BILLING_LABELS[plan.billing_period] || plan.billing_period}
-                    </p>
-                  </td>
-
-                  {/* Listings */}
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <p className="font-semibold text-[#1A1F36]">{plan.total_listings} total</p>
-                    <p className="mt-1 text-xs text-[#62748E]">
-                      {plan.paid_listings} paid · {plan.free_listings} free
-                    </p>
-                  </td>
-
-                  {/* Features */}
-                  <td className="min-w-[200px] px-4 py-3">
-                    {(() => {
-                      const included = featureRows(plan.features, PLAN_FEATURES).filter((row) => row.enabled);
-
-                      return included.length ? (
-                        <ul className="list-disc space-y-0.5 pl-4 text-xs text-[#62748E]">
-                          {included.slice(0, 3).map((row) => (
-                            <li key={row.key}>{row.label}</li>
-                          ))}
-                          {included.length > 3 && (
-                            <li className="list-none text-[#E87722]">
-                              +{included.length - 3} more
-                            </li>
-                          )}
-                        </ul>
-                      ) : (
-                        "-"
-                      );
-                    })()}
-                  </td>
-
-                  {/* Sort order */}
-                  <td className="whitespace-nowrap px-4 py-3">{plan.sort_order}</td>
-
-                  {/* Status */}
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${plan.is_active
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                        }`}
-                    >
-                      {plan.is_active ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-
-                  {/* Actions */}
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      {can("plans.edit") && (
-                        <Tooltip content="Update Plan">
-                          <Link
-                            href={`/admin/plan/update/${plan.id}`}
-                            className={actionButtonClass}
-                            aria-label={`Edit ${plan.name}`}
-                          >
-                            <FaPen size={13} />
-                          </Link>
-                        </Tooltip>
-                      )}
-
-                      {can("plans.delete") && (
-                        <Tooltip content="Delete Plan">
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(plan)}
-                            className={actionButtonClass}
-                            aria-label={`Delete ${plan.name}`}
-                          >
-                            <FaRegTrashCan size={14} />
-                          </button>
-                        </Tooltip>
+                      {plan.support_level && (
+                        <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[#283A86]">
+                          <FaHeadset size={11} />
+                          {plan.support_level} support
+                        </p>
                       )}
                     </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={7} className="py-10 text-center text-gray-500">
-                  No plans found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+
+                    <span
+                      className={`inline-flex flex-shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${plan.is_active
+                        ? "bg-green-50 text-green-700"
+                        : "bg-gray-100 text-gray-500"
+                        }`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${plan.is_active ? "bg-green-500" : "bg-gray-400"}`} />
+                      {plan.is_active ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+
+                  {/* Price */}
+                  <div className="mt-5 flex items-end gap-1.5">
+                    <span className="text-3xl font-extrabold tracking-tight text-[#1A1F36]">
+                      {formatPrice(plan.price)}
+                    </span>
+                    <span className="pb-1 text-sm text-[#62748E]">
+                      {BILLING_LABELS[plan.billing_period] || plan.billing_period}
+                    </span>
+                  </div>
+
+                  {plan.description && (
+                    <p className="mt-2 text-sm leading-relaxed text-[#62748E] line-clamp-2">
+                      {plan.description}
+                    </p>
+                  )}
+
+                  {/* Listings */}
+                  <div className="mt-5 grid grid-cols-3 divide-x divide-orange-100 rounded-xl bg-orange-50/60 py-3 text-center">
+                    {[
+                      ["Total", plan.total_listings],
+                      ["Paid", plan.paid_listings],
+                      ["Free", plan.free_listings],
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <p className="text-lg font-bold text-[#E87722]">{value ?? 0}</p>
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-[#62748E]">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Features */}
+                  <div className="mt-5 flex-1">
+                    <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#62748E]">
+                      What's included
+                    </p>
+
+                    {included.length ? (
+                      <ul className="space-y-2.5 text-sm text-[#1A1F36]">
+                        {included.slice(0, 5).map((row) => (
+                          <li key={row.key} className="flex items-start gap-2.5">
+                            <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-green-600">
+                              <FaCheck size={8} />
+                            </span>
+                            <span>{row.label}</span>
+                          </li>
+                        ))}
+                        {included.length > 5 && (
+                          <li className="pl-6 text-xs font-medium text-[#E87722]">
+                            +{included.length - 5} more features
+                          </li>
+                        )}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-[#62748E]">No features added</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer: order + actions */}
+                <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/60 px-6 py-3">
+                  <span className="text-xs text-[#62748E]">
+                    Display order <span className="ml-1 rounded-md bg-white px-2 py-0.5 font-semibold text-[#1A1F36] shadow-sm">{plan.sort_order}</span>
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    {can("plans.edit") && (
+                      <Tooltip content="Update Plan">
+                        <Link
+                          href={`/admin/plan/update/${plan.id}`}
+                          className={`${actionButtonClass} bg-white`}
+                          aria-label={`Edit ${plan.name}`}
+                        >
+                          <FaPen size={13} />
+                        </Link>
+                      </Tooltip>
+                    )}
+
+                    {can("plans.delete") && (
+                      <Tooltip content="Delete Plan">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(plan)}
+                          className={`${actionButtonClass} bg-white`}
+                          aria-label={`Delete ${plan.name}`}
+                        >
+                          <FaRegTrashCan size={14} />
+                        </button>
+                      </Tooltip>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="mt-6 flex flex-col items-center rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-14 text-center">
+          <p className="text-base font-semibold text-[#1A1F36]">No plans yet</p>
+          <p className="mt-1 text-sm text-[#62748E]">Create your first plan to show it here.</p>
+        </div>
+      )}
 
       <Tmodal
         isOpen={isDeleteModalOpen}

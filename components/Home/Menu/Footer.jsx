@@ -1,13 +1,20 @@
 import NextLink from "next/link";
 import React, { useEffect, useState } from 'react'
 
-import { FiChevronRight } from "react-icons/fi";
+import { FiChevronRight, FiSend, FiPhone, FiMail, FiClock } from "react-icons/fi";
 import { FaFacebookF, FaInstagram, FaYoutube } from "react-icons/fa";
 import { FaLinkedinIn } from "react-icons/fa6";
 import { Link } from '@heroui/react';
 import { FaXTwitter } from "react-icons/fa6";
-import { getFooter } from "../../../utils/fetchApi";
+import { getFooter, subscribeNewsletter } from "../../../utils/fetchApi";
 import { mergeFooter } from "../../../utils/footerDefaults";
+
+// Round icon before phone / email / hours
+const ContactIcon = ({ Icon }) => (
+  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-[var(--primary-color)]">
+    <Icon className="w-3.5 h-3.5" />
+  </span>
+);
 
 const socialIcons = [
   { key: "facebook", Icon: FaFacebookF, label: "Facebook" },
@@ -33,15 +40,41 @@ export default function Footer() {
       .catch((error) => console.error("Failed to fetch footer:", error));
   }, []);
 
+  // Subscribe (last footer column)
+  const [subscribeEmail, setSubscribeEmail] = useState("");
+  const [subscribing, setSubscribing] = useState(false);
+  const [subscribeResult, setSubscribeResult] = useState(null); // { ok, message }
+
+  const handleSubscribe = async (event) => {
+    event.preventDefault();
+
+    const email = subscribeEmail.trim();
+    if (!email || subscribing) return;
+
+    setSubscribing(true);
+    setSubscribeResult(null);
+
+    const res = await subscribeNewsletter(email);
+
+    setSubscribeResult({ ok: Boolean(res?.status), message: res?.message || "Something went wrong. Please try again." });
+    if (res?.status) setSubscribeEmail("");
+    setSubscribing(false);
+  };
+
   // Major Cities chosen by admin (Site Settings → Footer)
   const cities = Array.isArray(footer.cities) ? footer.cities : [];
   const socials = socialIcons.filter(({ key }) => footer.social?.[key]);
-  const { address, phone, email, hours } = footer.contact || {};
+  // address is not shown in footer (Contact Us page still shows it)
+  const { phone, email, hours } = footer.contact || {};
 
   return (
     <footer className="w-full bg-[#1A2340] text-gray-200">
       <div className="container py-12">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-10">
+        {/* Desktop: logo column + link columns (equal) + wider subscribe column */}
+        <div
+          className="grid grid-cols-2 sm:grid-cols-3 lg:[grid-template-columns:1.3fr_repeat(var(--link-cols),minmax(0,1fr))_1.6fr] gap-x-8 gap-y-10"
+          style={{ "--link-cols": Math.max((footer.columns || []).length, 1) }}
+        >
           {/* About Us */}
           <div className="col-span-2 sm:col-span-1">
             <img
@@ -99,26 +132,15 @@ export default function Footer() {
             </div>
           ))}
 
-          {/* Contact Us */}
+          {/* Subscribe + contact */}
           <div className="col-span-2 sm:col-span-3 lg:col-span-1">
             <h6 className="text-[#fff] font-bold text-[15px] mb-4 uppercase">
-              Contact Us
+              Subscribe for latest updates
             </h6>
             <ul className="space-y-3">
-              {address && (
-                <li className="flex items-start gap-2.5 text-sm text-gray-200">
-                  <Link
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#fff]/80 text-[13px] font-normal hover:text-[var(--primary-color)] transition-colors"
-                  >
-                    {address}
-                  </Link>
-                </li>
-              )}
               {phone && (
-                <li className="flex items-start gap-2.5 text-sm text-gray-200">
+                <li className="flex items-center gap-2.5 text-sm text-gray-200">
+                  <ContactIcon Icon={FiPhone} />
                   <Link
                     href={`tel:${phone.replace(/[^\d+]/g, "")}`}
                     className="text-[#fff]/80 text-[13px] font-normal hover:text-[var(--primary-color)] transition-colors break-all"
@@ -128,7 +150,8 @@ export default function Footer() {
                 </li>
               )}
               {email && (
-                <li className="flex items-start gap-2.5 text-sm text-gray-200">
+                <li className="flex items-center gap-2.5 text-sm text-gray-200">
+                  <ContactIcon Icon={FiMail} />
                   <Link
                     href={`mailto:${email}`}
                     className="text-[#fff]/80 text-[13px] font-normal hover:text-[var(--primary-color)] transition-colors break-all"
@@ -139,12 +162,41 @@ export default function Footer() {
               )}
               {hours && (
                 <li className="flex items-start gap-2.5 text-sm text-[15px] text-white font-normal hover:text-white">
-                  <span className="leading-relaxed text-[#fff]/80 text-[13px]">
+                  <ContactIcon Icon={FiClock} />
+                  <span className="pt-1 leading-relaxed text-[#fff]/80 text-[13px]">
                     {hours}
                   </span>
                 </li>
               )}
             </ul>
+
+            {/* Subscribe */}
+            <div className="mt-6">
+              <form onSubmit={handleSubscribe} className="flex overflow-hidden rounded-lg bg-white/10 ring-1 ring-white/20 focus-within:ring-[var(--primary-color)]">
+                <input
+                  type="email"
+                  required
+                  value={subscribeEmail}
+                  onChange={(e) => setSubscribeEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  aria-label="Email for newsletter"
+                  className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[13px] text-white placeholder:text-white/50 outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={subscribing}
+                  aria-label="Subscribe"
+                  className="flex shrink-0 items-center gap-1.5 bg-[var(--primary-color)] px-3.5 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+                >
+                  {subscribing ? "..." : <><FiSend className="w-3.5 h-3.5" /> <span className="hidden sm:inline lg:hidden xl:inline">Subscribe</span></>}
+                </button>
+              </form>
+              {subscribeResult && (
+                <p className={`mt-2 mb-0 text-[12px] ${subscribeResult.ok ? "text-green-300" : "text-red-300"}`}>
+                  {subscribeResult.message}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -31,6 +31,7 @@ const ADMIN_PAGES = [
   ["properties.view", "/admin/propertyManagement/propertyList"],
   ["enquiries.view", "/admin/enquiry/enquiryList"],
   ["contact_messages.view", "/admin/contact/contactList"],
+  ["subscribers.view", "/admin/subscriber/subscriberList"],
   ["users.view", "/admin/user/userManagement"],
   ["projects.view", "/admin/project/projectList"],
   ["blogs.view", "/admin/blog/blogList"],
