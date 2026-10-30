@@ -52,6 +52,8 @@ export default function Header({ menuOpen, toggleMenu }) {
   const userName = user?.name || "Super Admin";
   const userEmail = user?.email || "";
   const userPhone = user?.phone || "";
+  // super_admin -> "super admin", broker, seller, staff (capitalized by CSS)
+  const userRole = (user?.role || "super_admin").replace(/_/g, " ");
 
   const userAvatar =
     user?.avatar ||
@@ -356,7 +358,7 @@ export default function Header({ menuOpen, toggleMenu }) {
                       </p>
 
                       <p className="mb-0 text-[11px] capitalize text-white/60">
-                        Admin
+                        {userRole}
                       </p>
                     </div>
                   </div>

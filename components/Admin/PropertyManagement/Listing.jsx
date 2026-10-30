@@ -8,23 +8,24 @@ import PageTitle from "../../Breadcrumb/PageTitle";
 import { Link, Spinner, Tooltip } from "@heroui/react";
 import { deleteProperty, getAdminProperties } from "../../../utils/adminFetchApi";
 import { showToast } from "../../../store/toast";
+import { saveCachedProperties } from "../../../utils/adminPropertyCache";
 import Pagination from "../../Pagination/Pagination";
-import { AiOutlineEye } from "react-icons/ai";
 import { FaPen, FaRegImage } from "react-icons/fa";
+import { LuCopy, LuEye, LuHouse, LuMapPin } from "react-icons/lu";
+
+// Property ID chip click -> copy plain ID
+const copyPropertyId = async (id) => {
+    try {
+        await navigator.clipboard.writeText(String(id));
+        showToast("Property ID copied.");
+    } catch (error) {
+        showToast("Unable to copy Property ID.", "error");
+    }
+};
 import { FaRegTrashCan } from "react-icons/fa6";
 import Tmodal from "../../Tmodal/Tmodal";
 import { FiPlus, FiSearch } from "react-icons/fi";
-
-// First few words only (full text shows on hover)
-const shortText = (text, words = 3) => {
-    const parts = String(text || "").trim().split(/\s+/).filter(Boolean);
-
-    if (parts.length === 0) return "-";
-
-    return parts.length > words
-        ? `${parts.slice(0, words).join(" ").replace(/,$/, "")}...`
-        : parts.join(" ");
-};
+import { LuBath, LuBedDouble, LuCar, LuRuler } from "react-icons/lu";
 
 export default function Listing() {
     const can = useAdminPermission();
@@ -43,7 +44,7 @@ export default function Listing() {
 
     // Pagination
     const [pageIndex, setPageIndex] = useState(0);
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(12);
 
     // Fetch Properties
     useEffect(() => {
@@ -55,6 +56,7 @@ export default function Listing() {
 
                 if (res?.status && Array.isArray(res?.data?.properties)) {
                     setProperties(res.data.properties);
+                    saveCachedProperties(res.data.properties);
                 } else {
                     setProperties([]);
                 }
@@ -121,9 +123,9 @@ export default function Listing() {
     };
 
     const sizePerPageList = [
-        { text: "10", value: 10 },
-        { text: "25", value: 25 },
-        { text: "50", value: 50 },
+        { text: "12", value: 12 },
+        { text: "24", value: 24 },
+        { text: "48", value: 48 },
     ];
 
     // Delete Click
@@ -185,7 +187,7 @@ export default function Listing() {
             />
 
             {/* Search + Actions */}
-            <div className="mt-6 mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-4 mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="relative w-full sm:max-w-sm">
                     <FiSearch
                         size={16}
@@ -240,205 +242,202 @@ export default function Listing() {
                 </div>
             </div>
 
-            <div className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            {/* Count */}
+            {!loading && (
+                <p className="mb-2 text-sm text-[#62748E]">
+                    {filteredProperties.length > 0
+                        ? `Showing ${pageIndex * pageSize + 1}–${Math.min((pageIndex + 1) * pageSize, filteredProperties.length)} of ${filteredProperties.length} properties`
+                        : ""}
+                </p>
+            )}
 
-                <div className="overflow-x-auto">
-                    <table className="w-full min-w-[680px] text-sm">
-
-                        <thead className="bg-gray-50 text-xs uppercase tracking-wide text-[#62748E]">
-                            <tr>
-                                <th className="w-[150px] px-4 py-3 text-left font-semibold">Property</th>
-                                <th className="px-4 py-3 text-left font-semibold">Property ID</th>
-                                <th className="px-4 py-3 text-left font-semibold">Location</th>
-                                <th className="px-4 py-3 text-left font-semibold">Price & Status</th>
-                                <th className="px-4 py-3 text-left font-semibold">Added By</th>
-                                {/* Action column stays visible on the right while the table scrolls sideways */}
-                                <th className="sticky right-0 z-10 w-[130px] bg-gray-50 px-4 py-3 text-left font-semibold shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)]">Action</th>
-                            </tr>
-                        </thead>
-
-                        {loading ? (
-                            <tbody>
-                                <tr>
-                                    <td colSpan="6">
-                                        <div className="flex justify-center items-center py-16">
-                                            <Spinner size="md" />
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        ) : (
-                            <tbody>
-
-                                {currentPageProperties.length > 0 ? (
-                                    currentPageProperties.map((property) => (
-                                        <tr
-                                            key={property.id}
-                                            className="border-t border-gray-100 align-middle transition hover:bg-orange-50/40"
-                                        >
-
-                                            {/* Property: banner image + name below */}
-                                            <td className="px-4 py-3">
-                                                <div className="w-[118px]">
-                                                    {/* Image + listing tag (Sale / Rent ...) on top */}
-                                                    <div className="relative w-[110px]">
-                                                    {property.main_image ? (
-                                                        <img
-                                                            src={property.main_image}
-                                                            alt={property.title || "Property"}
-                                                            className="h-[70px] w-[110px] rounded-md border border-gray-200 object-cover"
-                                                        />
-                                                    ) : (
-                                                        <div className="flex h-[70px] w-[110px] items-center justify-center rounded-md border border-dashed border-gray-300 bg-gray-50 text-gray-400">
-                                                            <FaRegImage size={20} />
-                                                        </div>
-                                                    )}
-
-                                                    {property.listing_type && (
-                                                        <span className="absolute left-1 top-1 max-w-[100px] truncate rounded bg-[#E87722] px-1.5 py-0.5 text-[10px] font-bold uppercase leading-tight tracking-wide text-white shadow">
-                                                            {property.listing_type}
-                                                        </span>
-                                                    )}
-                                                    </div>
-
-                                                    <div
-                                                        className="mt-1.5 truncate text-sm font-semibold text-[#001737]"
-                                                        title={property.title || ""}
-                                                    >
-                                                        {property.title || "-"}
-                                                    </div>
-
-                                                    <div className="truncate text-xs text-[#62748E]">
-                                                        {[property.configuration, property.property_type]
-                                                            .filter(Boolean)
-                                                            .join(" · ") || "-"}
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            {/* Property ID */}
-                                            <td className="px-4 py-3 whitespace-nowrap">
-                                                <span className="rounded-md bg-gray-100 px-2 py-1 font-mono text-xs text-[#1A1F36]">
-                                                    {property.property_id || "-"}
-                                                </span>
-                                            </td>
-
-                                            {/* Location */}
-                                            <td
-                                                className="px-4 py-3"
-                                                title={[property.location, property.city, property.state]
-                                                    .filter(Boolean)
-                                                    .join(", ")}
-                                            >
-                                                <div className="max-w-[140px] truncate text-[#1A1F36]">
-                                                    {shortText(property.location)}
-                                                </div>
-
-                                                <div className="max-w-[140px] truncate text-xs text-[#62748E]">
-                                                    {property.city || "-"}
-                                                </div>
-                                            </td>
-
-                                            {/* Price & Status */}
-                                            <td className="px-4 py-3 whitespace-nowrap">
-                                                <div className="font-semibold text-[#001737]">
-                                                    {property.price
-                                                        ? `₹${Number(property.price).toLocaleString("en-IN")}`
-                                                        : "-"}
-                                                </div>
-
-                                                <span
-                                                    className={`mt-1.5 inline-block rounded-full px-3 py-1 text-xs font-semibold capitalize
-                                                    ${property.status
-                                                            ?.toLowerCase()
-                                                            .includes("ready")
-                                                            ? "bg-green-100 text-green-700"
-                                                            : "bg-gray-100 text-gray-600"
-                                                        }`}
-                                                >
-                                                    {property.status || "-"}
-                                                </span>
-                                            </td>
-
-                                            {/* Added By (created_by) */}
-                                            <td className="px-4 py-3 whitespace-nowrap">
-                                                <AddedBy creator={property.creator} />
-                                            </td>
-
-                                            {/* Actions */}
-                                            <td className="sticky right-0 z-10 whitespace-nowrap bg-white px-4 py-3 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)]">
-                                                <div className="flex items-center gap-2">
-
-                                                    <Tooltip content="View Property Detail">
-                                                        <Link
-                                                            href={`/admin/propertyManagement/propertyDetail/${property.id}`}
-                                                            className={actionButtonClass}
-                                                            aria-label="View property"
-                                                        >
-                                                            <AiOutlineEye size={18} />
-                                                        </Link>
-                                                    </Tooltip>
-
-                                                    {!showDeleted && (
-                                                        <>
-                                                            {can('properties.edit') && (
-                                                            <Tooltip content="Update Property">
-                                                                <Link
-                                                                    href={`/admin/propertyManagement/propertyUpdate/${property.id}`}
-                                                                    className={actionButtonClass}
-                                                                    aria-label="Update property"
-                                                                >
-                                                                    <FaPen size={13} />
-                                                                </Link>
-                                                            </Tooltip>
-                                                            )}
-
-                                                            {can('properties.delete') && (
-                                                            <Tooltip content="Delete Property">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleDeleteClick(property)}
-                                                                    className={actionButtonClass}
-                                                                    aria-label="Delete property"
-                                                                >
-                                                                    <FaRegTrashCan size={14} />
-                                                                </button>
-                                                            </Tooltip>
-                                                            )}
-                                                        </>
-                                                    )}
-
-                                                </div>
-                                            </td>
-
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td
-                                            colSpan="6"
-                                            className="py-12 text-center text-[#62748E]"
-                                        >
-                                            {showDeleted ? "No deleted properties found" : "No properties found"}
-                                        </td>
-                                    </tr>
-                                )}
-
-                            </tbody>
-                        )}
-
-                    </table>
+            {/* Property cards (3 per row) */}
+            {loading ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    {[1, 2, 3, 4, 5, 6].map((key) => (
+                        <div key={key} className="animate-pulse overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+                            <div className="h-44 bg-gray-200" />
+                            <div className="space-y-3 p-4">
+                                <div className="h-5 w-1/3 rounded bg-gray-200" />
+                                <div className="h-4 w-4/5 rounded bg-gray-200" />
+                                <div className="h-3 w-2/3 rounded bg-gray-100" />
+                                <div className="h-3 w-1/2 rounded bg-gray-100" />
+                                <div className="h-9 rounded bg-gray-100" />
+                            </div>
+                        </div>
+                    ))}
                 </div>
+            ) : currentPageProperties.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    {currentPageProperties.map((property) => {
+                        const address = [property.location, property.city, property.state]
+                            .filter(Boolean)
+                            .join(", ");
+                        const isReady = property.status?.toLowerCase().includes("ready");
 
-                {/* Pagination */}
-                <div className="border-t border-gray-100 p-3">
+                        return (
+                            <div
+                                key={property.id}
+                                className="flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
+                            >
+                                {/* Image + badges */}
+                                <div className="relative h-44 w-full shrink-0 bg-gray-100">
+                                    {property.main_image ? (
+                                        <img
+                                            src={property.main_image}
+                                            alt={property.title || "Property"}
+                                            className="h-full w-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-gray-300">
+                                            <FaRegImage size={36} />
+                                        </div>
+                                    )}
+
+                                    {property.status && (
+                                        <span
+                                            className={`absolute left-2.5 top-2.5 max-w-[60%] truncate rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize text-white shadow ${isReady ? "bg-green-700" : "bg-[#E87722]"}`}
+                                        >
+                                            {property.status}
+                                        </span>
+                                    )}
+
+                                    {property.property_type && (
+                                        <span className="absolute right-2.5 top-2.5 max-w-[40%] truncate rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold capitalize text-[#1A1F36] shadow">
+                                            {property.property_type}
+                                        </span>
+                                    )}
+
+                                </div>
+
+                                <div className="flex flex-1 flex-col px-4 pt-3 pb-3">
+                                    {/* Price */}
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="mb-0 truncate text-base font-bold leading-tight text-[#1A1F36]">
+                                            {property.price ? (
+                                                <>
+                                                    <span className="mr-0.5 text-[#E87722]">₹</span>
+                                                    {Number(property.price).toLocaleString("en-IN")}
+                                                </>
+                                            ) : (
+                                                "Price on request"
+                                            )}
+                                        </p>
+
+                                        {/* Property ID */}
+                                        {property.property_id && (
+                                            <button
+                                                type="button"
+                                                onClick={() => copyPropertyId(property.property_id)}
+                                                className="flex shrink-0 items-center gap-1 rounded-md bg-orange-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-[#E87722] transition hover:bg-orange-100"
+                                                title="Click to copy Property ID"
+                                            >
+                                                {property.property_id}
+                                                <LuCopy size={11} />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Title */}
+                                    <p
+                                        className="mb-0 mt-0.5 flex items-center gap-1.5 text-sm font-medium text-[#001737]"
+                                        title={property.title || ""}
+                                    >
+                                        <LuHouse size={14} className="shrink-0 text-[#E87722]" />
+                                        <span className="truncate">{property.title || "-"}</span>
+                                    </p>
+
+                                    {/* Address */}
+                                    <p className="mb-0 mt-1.5 flex items-center gap-1.5 text-[13px] text-[#62748E]" title={address}>
+                                        <LuMapPin size={14} className="shrink-0 text-[#E87722]" />
+                                        <span className="truncate">{address || "-"}</span>
+                                    </p>
+
+                                    {/* Beds / baths / parking / area */}
+                                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[#62748E]">
+                                        <span className="flex items-center gap-1.5" title="Bedrooms">
+                                            <LuBedDouble size={16} className="text-[#62748E]" />
+                                            {property.bedrooms ?? 0}
+                                        </span>
+                                        <span className="flex items-center gap-1.5" title="Bathrooms">
+                                            <LuBath size={16} className="text-[#62748E]" />
+                                            {property.bathrooms ?? 0}
+                                        </span>
+                                        <span className="flex items-center gap-1.5" title="Parking">
+                                            <LuCar size={16} className="text-[#62748E]" />
+                                            {property.parking ?? 0}
+                                        </span>
+                                        {property.super_area && (
+                                            <span className="flex items-center gap-1.5" title="Super area">
+                                                <LuRuler size={15} className="text-[#62748E]" />
+                                                {property.super_area}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Added by */}
+                                    <div className="mt-3 border-t border-gray-100 pt-2">
+                                        <p className="mb-0 text-[11px] text-[#62748E]">Added by</p>
+                                        <AddedBy creator={property.creator} />
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="mt-2 flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            {!showDeleted && can('properties.edit') && (
+                                                <Tooltip content="Update Property">
+                                                    <Link
+                                                        href={`/admin/propertyManagement/propertyUpdate/${property.id}`}
+                                                        className={actionButtonClass}
+                                                        aria-label="Update property"
+                                                    >
+                                                        <FaPen size={13} />
+                                                    </Link>
+                                                </Tooltip>
+                                            )}
+
+                                            {!showDeleted && can('properties.delete') && (
+                                                <Tooltip content="Delete Property">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteClick(property)}
+                                                        className={actionButtonClass}
+                                                        aria-label="Delete property"
+                                                    >
+                                                        <FaRegTrashCan size={14} />
+                                                    </button>
+                                                </Tooltip>
+                                            )}
+                                        </div>
+
+                                        <Link
+                                            href={`/admin/propertyManagement/propertyDetail/${property.id}`}
+                                            className="flex h-8 items-center gap-1.5 rounded-lg bg-[#E87722] px-4 text-sm font-semibold text-white transition hover:bg-[#d96818]"
+                                        >
+                                            <LuEye size={15} />
+                                            View
+                                        </Link>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                <div className="rounded-xl border border-dashed border-gray-300 bg-white py-14 text-center text-[#62748E]">
+                    {showDeleted ? "No deleted properties found" : "No properties found"}
+                </div>
+            )}
+
+            {/* Pagination */}
+            {!loading && filteredProperties.length > 0 && (
+                <div className="mt-4 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
                     <Pagination
                         tableProps={tableProps}
                         sizePerPageList={sizePerPageList}
                     />
                 </div>
-
-            </div>
+            )}
 
             {/* Delete Modal */}
             <Tmodal

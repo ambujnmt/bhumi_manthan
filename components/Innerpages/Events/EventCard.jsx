@@ -17,7 +17,7 @@ export default function EventCard({ event }) {
                 <img
                     src={event.image || "/assets/img/blog-img1.png"}
                     alt={event.title}
-                    className={`h-52 w-full object-cover transition duration-500 group-hover:scale-105 ${upcoming ? "" : "grayscale-[50%]"}`}
+                    className={`h-48 w-full object-cover transition duration-500 group-hover:scale-105 ${upcoming ? "" : "grayscale-[50%]"}`}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0" />
 
@@ -44,30 +44,30 @@ export default function EventCard({ event }) {
                 )}
             </NextLink>
 
-            <div className="flex flex-1 flex-col p-5">
-                <h3 className="mb-0 text-[18px] font-bold leading-snug text-[var(--text-color1)] line-clamp-2">
-                    <NextLink href={href} className="no-underline transition-colors hover:text-[var(--primary-color)]">
+            <div className="flex flex-1 flex-col px-4 pb-4 pt-3.5">
+                <h3 className="mb-0 text-[17px] font-bold leading-snug text-[var(--text-color1)] line-clamp-2">
+                    <NextLink href={href} className="text-[var(--text-color1)] no-underline transition-colors hover:text-[var(--primary-color)]">
                         {event.title}
                     </NextLink>
                 </h3>
 
                 {event.organizer_name && (
-                    <p className="mb-0 mt-1 text-[13px] text-[var(--text-color2)] line-clamp-1">
+                    <p className="mb-0 mt-0.5 text-[13px] text-[var(--text-color2)] line-clamp-1">
                         By <span className="font-semibold text-[var(--text-color3)]">{event.organizer_name}</span>
                     </p>
                 )}
 
-                <div className="mt-4 space-y-2 text-[13px] text-[var(--text-color2)]">
+                <div className="mt-3 space-y-1.5 text-[13px] text-[var(--text-color2)]">
                     <p className="mb-0 flex items-center gap-2.5">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-[var(--primary-color)]">
-                            <FaClock size={12} />
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-orange-50 text-[var(--primary-color)]">
+                            <FaClock size={11} />
                         </span>
                         {formatEventTime(event.start_time)} - {formatEventTime(event.end_time)}
                     </p>
                     {venue && (
                         <p className="mb-0 flex items-center gap-2.5">
-                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-[var(--primary-color)]">
-                                <FaMapMarkerAlt size={12} />
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-orange-50 text-[var(--primary-color)]">
+                                <FaMapMarkerAlt size={11} />
                             </span>
                             <span className="line-clamp-1">{venue}</span>
                         </p>
@@ -75,25 +75,26 @@ export default function EventCard({ event }) {
                 </div>
 
                 {highlights.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-1.5">
+                    <div className="mt-3 flex flex-wrap gap-1.5">
                         {highlights.map((label) => (
-                            <span key={label} className="rounded-full bg-[#EEF4FB] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-color3)]">
+                            <span key={label} className="rounded-full bg-[#EEF4FB] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--text-color3)]">
                                 {label}
                             </span>
                         ))}
                     </div>
                 )}
 
-                <div className="flex-1" />
+                {/* pushes footer to bottom (cards in a row stay equal), min 14px gap */}
+                <div className="min-h-[14px] flex-1" />
 
-                <div className="mt-4 flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
-                    <span className="flex items-center gap-1.5 text-[12px] text-[var(--text-color2)]">
-                        {event.expected_footfall_label && (
-                            <>
-                                <FaUsers className="text-[var(--primary-color)]" /> {event.expected_footfall_label}
-                            </>
-                        )}
-                    </span>
+                <div className="flex items-center justify-between gap-3 border-t border-gray-100 pt-3">
+                    {event.expected_footfall_label ? (
+                        <span className="flex items-center gap-1.5 text-[12px] text-[var(--text-color2)]">
+                            <FaUsers className="text-[var(--primary-color)]" /> {event.expected_footfall_label}
+                        </span>
+                    ) : (
+                        <span />
+                    )}
 
                     <NextLink
                         href={href}

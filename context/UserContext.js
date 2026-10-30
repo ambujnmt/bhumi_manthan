@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Cookies from "js-cookie";
+import { resetFirebaseChat } from "../utils/firebaseChat";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -177,6 +178,9 @@ export const UserProvider = ({ children }) => {
   // ------------------------------------------------
 
   const logout = () => {
+    // Chat: sign out of Firebase so next login gets its own chats
+    resetFirebaseChat();
+
     // First clear React state
     setUser(null);
     setAccessToken(null);

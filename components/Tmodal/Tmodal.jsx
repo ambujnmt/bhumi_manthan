@@ -7,7 +7,8 @@ import {
   ModalFooter
 } from "@heroui/react";
 
-export default function Tmodal({ isOpen, onClose, title, children, footer, classNames, size = "md" }) {
+// noScroll: content fits as is, no scrollbar inside the modal
+export default function Tmodal({ isOpen, onClose, title, children, footer, classNames, size = "md", noScroll = false }) {
   return (
    <Modal
   backdrop="opaque"
@@ -17,15 +18,15 @@ export default function Tmodal({ isOpen, onClose, title, children, footer, class
   placement="auto"   // ✅ IMPORTANT (instead of center)
   scrollBehavior="inside"  // ✅ allows internal scrolling
   classNames={{
-    base: "my-auto",   // ✅ removes top gap issue on mobile
+    base: `my-auto ${classNames?.base || ""}`,   // ✅ removes top gap issue on mobile (+ custom width etc.)
     wrapper: "items-start sm:items-center", // ✅ top align mobile
   }}
 >
-      <ModalContent className="max-h-[90vh] overflow-y-auto">
+      <ModalContent className={noScroll ? "overflow-hidden" : "max-h-[90vh] overflow-y-auto"}>
         {() => (
           <>
             {title && <ModalHeader className="flex flex-col gap-1">{title}</ModalHeader>}
-            <ModalBody>{children}</ModalBody>
+            <ModalBody className={noScroll ? "overflow-visible" : undefined}>{children}</ModalBody>
             {footer && <ModalFooter>{footer}</ModalFooter>}
           </>
         )}

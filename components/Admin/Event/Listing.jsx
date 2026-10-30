@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import NextLink from "next/link";
 import { Spinner, Tooltip } from "@heroui/react";
-import { FaPen, FaRegEye } from "react-icons/fa";
+import { FaMapMarkerAlt, FaPen, FaRegCalendarAlt, FaRegEye } from "react-icons/fa";
 import { FaRegTrashCan } from "react-icons/fa6";
 import PageTitle from "../../Breadcrumb/PageTitle";
 import { actionButtonClass } from "../actionButtonClass";
@@ -39,11 +39,35 @@ const statusOf = (event) => {
     return ["Upcoming", "bg-green-100 text-green-700"];
 };
 
+// Last loaded events: cards show right away (no loader), fresh data loads in background
+const EVENTS_CACHE_KEY = "admin_events";
+let eventsCache = null;
+
+const readEventsCache = () => {
+    if (eventsCache) return eventsCache;
+
+    try {
+        const saved = JSON.parse(sessionStorage.getItem(EVENTS_CACHE_KEY));
+        if (Array.isArray(saved)) eventsCache = saved;
+    } catch (e) { }
+
+    return eventsCache;
+};
+
+const saveEventsCache = (events) => {
+    eventsCache = events;
+
+    try {
+        sessionStorage.setItem(EVENTS_CACHE_KEY, JSON.stringify(events));
+    } catch (e) { }
+};
+
 export default function Listing() {
     const can = useAdminPermission();
 
-    const [events, setEvents] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [events, setEvents] = useState(() => readEventsCache() || []);
+    // Placeholder cards only on the very first load (nothing cached yet)
+    const [loading, setLoading] = useState(() => !readEventsCache());
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState("all");
 
@@ -52,8 +76,6 @@ export default function Listing() {
     const [deleteLoading, setDeleteLoading] = useState(false);
 
     const fetchEvents = async () => {
-        setLoading(true);
-
         try {
             const res = await getAdminEvents(1, PER_PAGE);
             const list = res?.data?.data;
@@ -62,7 +84,9 @@ export default function Listing() {
         } catch (error) {
             console.error("Failed to fetch events:", error);
             showToast(error?.message || "Failed to load events.", "error");
-            setEvents([]);
+
+            // Keep showing cached cards if the refresh fails
+            if (!readEventsCache()) setEvents([]);
         } finally {
             setLoading(false);
         }
@@ -71,6 +95,11 @@ export default function Listing() {
     useEffect(() => {
         fetchEvents();
     }, []);
+
+    // Save loaded / deleted list for the next visit
+    useEffect(() => {
+        if (!loading) saveEventsCache(events);
+    }, [events, loading]);
 
     const handleDeleteConfirm = async () => {
         if (!selectedEvent?.id) return;
@@ -108,9 +137,6 @@ export default function Listing() {
             event.creator?.name,
         ].some((value) => String(value || "").toLowerCase().includes(term));
     });
-
-    const colCount = 6;
-    const thClass = "px-4 py-3 text-left whitespace-nowrap";
 
     return (
         <div>
@@ -164,123 +190,145 @@ export default function Listing() {
                 </div>
             </div>
 
-            <div className="w-full bg-white rounded-xl shadow overflow-auto">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-100">
-                        <tr>
-                            {/* w-full: this column takes the extra width */}
-                            <th className={`${thClass} w-full`}>Event</th>
-                            <th className={thClass}>Date & Time</th>
-                            <th className={thClass}>Venue</th>
-                            <th className={thClass}>Added By</th>
-                            <th className={thClass}>Status</th>
-                            <th className={thClass}>Action</th>
-                        </tr>
-                    </thead>
+            {/* Events cards */}
+            {loading ? (
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    {[1, 2, 3, 4].map((key) => (
+                        <div key={key} className="animate-pulse overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+                            <div className="h-44 bg-gray-200" />
+                            <div className="space-y-3 p-4">
+                                <div className="h-3 w-1/4 rounded-full bg-gray-200" />
+                                <div className="h-4 w-4/5 rounded bg-gray-200" />
+                                <div className="h-3 w-1/2 rounded bg-gray-100" />
+                                <div className="h-3 w-2/3 rounded bg-gray-100" />
+                                <div className="h-3 w-3/5 rounded bg-gray-100" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : visibleEvents.length > 0 ? (
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    {visibleEvents.map((event) => {
+                        const [statusLabel, statusClass] = statusOf(event);
 
-                    <tbody>
-                        {loading ? (
-                            <tr>
-                                <td colSpan={colCount}>
-                                    <div className="flex justify-center items-center py-16">
-                                        <Spinner size="md" />
-                                    </div>
-                                </td>
-                            </tr>
-                        ) : visibleEvents.length > 0 ? (
-                            visibleEvents.map((event) => {
-                                const [statusLabel, statusClass] = statusOf(event);
+                        return (
+                            <div
+                                key={event.id}
+                                className="flex flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                            >
+                                {/* Image + status / multiple images badges */}
+                                <div className="relative h-44 w-full shrink-0 bg-gray-100">
+                                    <img
+                                        src={event.image || EVENT_FALLBACK_IMAGE}
+                                        alt={event.title}
+                                        className="h-full w-full object-cover"
+                                    />
 
-                                return (
-                                    <tr key={event.id} className="border-t align-middle">
-                                        <td className="px-4 py-2.5">
-                                            <div className="min-w-0 leading-tight">
-                                                {/* Banner above the name */}
-                                                <img
-                                                    src={event.image || EVENT_FALLBACK_IMAGE}
-                                                    alt={event.title}
-                                                    className="mb-2 h-16 w-28 rounded-md border border-gray-200 object-cover"
-                                                />
+                                    <span className={`absolute left-3 top-3 rounded-full px-3 py-1 text-xs font-semibold shadow-sm ${statusClass}`}>
+                                        {statusLabel}
+                                    </span>
 
-                                                <p className="max-w-[280px] truncate font-semibold text-[#1A1F36]" title={event.title}>
-                                                    {event.title || "-"}
-                                                </p>
-                                                <p className="mt-0.5 max-w-[280px] truncate text-xs text-[#62748E]">
-                                                    {[event.event_type_label, event.organizer_name && `By ${event.organizer_name}`]
-                                                        .filter(Boolean)
-                                                        .join(" · ") || "-"}
-                                                </p>
-                                            </div>
-                                        </td>
+                                    {event.images?.length > 1 && (
+                                        <span className="absolute bottom-3 right-3 rounded bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white">
+                                            +{event.images.length - 1} photos
+                                        </span>
+                                    )}
+                                </div>
 
-                                        <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="flex flex-1 flex-col px-4 py-4">
+                                    {event.event_type_label && (
+                                        <span className="mb-2 inline-block max-w-full self-start truncate rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-[#E87722]">
+                                            {event.event_type_label}
+                                        </span>
+                                    )}
+
+                                    <h3
+                                        className="break-words text-[15px] font-semibold leading-snug text-[#1A1F36]"
+                                        style={{
+                                            display: "-webkit-box",
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: "vertical",
+                                            overflow: "hidden",
+                                        }}
+                                        title={event.title}
+                                    >
+                                        {event.title || "-"}
+                                    </h3>
+
+                                    {event.organizer_name && (
+                                        <p className="mt-1 truncate text-xs text-[#62748E]" title={event.organizer_name}>
+                                            By {event.organizer_name}
+                                        </p>
+                                    )}
+
+                                    {/* Date & time */}
+                                    <div className="mt-3 flex items-start gap-2 text-xs">
+                                        <FaRegCalendarAlt className="mt-0.5 shrink-0 text-[#E87722]" />
+                                        <div className="min-w-0">
                                             <p className="text-[#1A1F36]">{formatEventDateRange(event) || "-"}</p>
-                                            <p className="mt-0.5 text-xs text-[#62748E]">
+                                            <p className="mt-0.5 text-[#62748E]">
                                                 {formatEventTime(event.start_time)} - {formatEventTime(event.end_time)}
                                             </p>
-                                        </td>
+                                        </div>
+                                    </div>
 
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            <p className="max-w-[200px] truncate text-[#1A1F36]" title={event.location || ""}>
+                                    {/* Venue */}
+                                    <div className="mt-2 flex items-start gap-2 text-xs">
+                                        <FaMapMarkerAlt className="mt-0.5 shrink-0 text-[#E87722]" />
+                                        <div className="min-w-0">
+                                            <p className="truncate text-[#1A1F36]" title={event.location || ""}>
                                                 {event.location || "-"}
                                             </p>
-                                            <p className="mt-0.5 text-xs text-[#62748E]">{eventCityState(event) || "-"}</p>
-                                        </td>
+                                            <p className="mt-0.5 text-[#62748E]">{eventCityState(event) || "-"}</p>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            <AddedBy creator={event.creator} />
-                                        </td>
+                                {/* Footer: added by + actions */}
+                                <div className="flex items-center justify-between gap-2 border-t border-gray-100 px-4 py-3">
+                                    <div className="min-w-0">
+                                        <AddedBy creator={event.creator} />
+                                    </div>
 
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusClass}`}>
-                                                {statusLabel}
-                                            </span>
-                                        </td>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        {can("events.view") && (
+                                            <Tooltip content="View Event">
+                                                <NextLink href={`/admin/event/detail/${event.id}`} className={actionButtonClass}>
+                                                    <FaRegEye size={18} />
+                                                </NextLink>
+                                            </Tooltip>
+                                        )}
 
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            <div className="flex items-center gap-2">
-                                                {can("events.view") && (
-                                                    <Tooltip content="View Event">
-                                                        <NextLink href={`/admin/event/detail/${event.id}`} className={actionButtonClass}>
-                                                            <FaRegEye size={18} />
-                                                        </NextLink>
-                                                    </Tooltip>
-                                                )}
+                                        {can("events.edit") && (
+                                            <Tooltip content="Update Event">
+                                                <NextLink href={`/admin/event/update/${event.id}`} className={actionButtonClass}>
+                                                    <FaPen size={13} />
+                                                </NextLink>
+                                            </Tooltip>
+                                        )}
 
-                                                {can("events.edit") && (
-                                                    <Tooltip content="Update Event">
-                                                        <NextLink href={`/admin/event/update/${event.id}`} className={actionButtonClass}>
-                                                            <FaPen size={13} />
-                                                        </NextLink>
-                                                    </Tooltip>
-                                                )}
-
-                                                {can("events.delete") && (
-                                                    <Tooltip content="Delete Event">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setSelectedEvent(event)}
-                                                            className={actionButtonClass}
-                                                        >
-                                                            <FaRegTrashCan size={14} />
-                                                        </button>
-                                                    </Tooltip>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        ) : (
-                            <tr>
-                                <td colSpan={colCount} className="text-center py-6 text-gray-500">
-                                    No events found.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                                        {can("events.delete") && (
+                                            <Tooltip content="Delete Event">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedEvent(event)}
+                                                    className={actionButtonClass}
+                                                >
+                                                    <FaRegTrashCan size={14} />
+                                                </button>
+                                            </Tooltip>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                <div className="rounded-xl bg-white py-10 text-center text-gray-500 shadow">
+                    No events found.
+                </div>
+            )}
 
             {/* Delete Modal */}
             <Tmodal

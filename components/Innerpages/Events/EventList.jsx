@@ -69,13 +69,13 @@ function EventIcon({ event, index = 0, className = "" }) {
     );
 }
 
-// Days / hours / minutes until the event starts (client only, avoids hydration mismatch)
+// Days / hours / minutes / seconds until the event starts (client only, avoids hydration mismatch)
 function Countdown({ event }) {
     const [now, setNow] = useState(null);
 
     useEffect(() => {
         setNow(Date.now());
-        const timer = setInterval(() => setNow(Date.now()), 30000);
+        const timer = setInterval(() => setNow(Date.now()), 1000);
 
         return () => clearInterval(timer);
     }, []);
@@ -101,6 +101,7 @@ function Countdown({ event }) {
         ["Days", Math.floor(diff / 86400000)],
         ["Hours", Math.floor((diff % 86400000) / 3600000)],
         ["Mins", Math.floor((diff % 3600000) / 60000)],
+        ["Secs", Math.floor((diff % 60000) / 1000)],
     ];
 
     return (

@@ -15,6 +15,7 @@ import { useUser } from "../../../context/UserContext";
 import { Tooltip } from "@heroui/react";
 import { FaRegTrashCan } from "react-icons/fa6";
 import Tmodal from "../../Tmodal/Tmodal";
+import DetailModal from "./DetailModal";
 
 // Roles that can get admin panel access through an admin role
 const PANEL_ROLES = ["staff", "seller", "broker"];
@@ -24,6 +25,12 @@ const USER_ROLES = [
     { value: "seller", label: "Seller" },
     { value: "broker", label: "Broker" },
     { value: "staff", label: "Staff (Admin Panel)" },
+];
+
+// Tabs: customers alone, everyone else (broker / seller / staff / admin) together
+const USER_TABS = [
+    { key: "customers", label: "Customers", match: (u) => u?.role === "customer" },
+    { key: "team", label: "Broker / Seller / Staff", match: (u) => u?.role !== "customer" },
 ];
 
 const initialStaffForm = {
@@ -48,6 +55,7 @@ export default function Listing() {
     const [adminRoles, setAdminRoles] = useState([]);
 
     const [roleUser, setRoleUser] = useState(null);
+    const [viewUser, setViewUser] = useState(null); // View -> detail modal
     const [roleForm, setRoleForm] = useState({ role: "customer", admin_role_id: "" });
     const [staffModalOpen, setStaffModalOpen] = useState(false);
     const [staffForm, setStaffForm] = useState(initialStaffForm);
@@ -72,6 +80,9 @@ const [deleteLoading, setDeleteLoading] = useState(false);
     const [showDeleted, setShowDeleted] = useState(false);
     // search
     const [search, setSearch] = useState("");
+    // customers / team tab
+    const [tab, setTab] = useState(USER_TABS[0].key);
+    const activeTab = USER_TABS.find((item) => item.key === tab) || USER_TABS[0];
 
     // pagination state
     const [pageIndex, setPageIndex] = useState(0);
@@ -104,7 +115,7 @@ useEffect(() => {
 
     // 🔎 SEARCH FILTER
 const filteredUsers = useMemo(() => {
-    const userList = Array.isArray(users) ? users : [];
+    const userList = (Array.isArray(users) ? users : []).filter(activeTab.match);
 
     if (!search) return userList;
 
@@ -113,7 +124,7 @@ const filteredUsers = useMemo(() => {
             .toLowerCase()
             .includes(search.toLowerCase())
     );
-}, [users, search]);
+}, [users, search, activeTab]);
 
     // 📄 PAGINATION CALC
     const pageCount = Math.ceil(filteredUsers.length / pageSize);
@@ -329,8 +340,39 @@ const handleDeleteConfirm = async () => {
                 title="User Management"
             />
 
+            {/* Tabs */}
+            <div className="mt-6 flex gap-1 overflow-x-auto border-b border-gray-200">
+                {USER_TABS.map((item) => {
+                    const count = (Array.isArray(users) ? users : []).filter(item.match).length;
+                    const isActive = item.key === tab;
+
+                    return (
+                        <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => {
+                                setTab(item.key);
+                                setPageIndex(0);
+                            }}
+                            className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
+                                isActive
+                                    ? "border-[#E87722] text-[#E87722]"
+                                    : "border-transparent text-[#62748E] hover:text-[#1A1F36]"
+                            }`}
+                        >
+                            {item.label}
+                            {!loading && (
+                                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${isActive ? "bg-orange-100 text-[#E87722]" : "bg-gray-100 text-[#62748E]"}`}>
+                                    {count}
+                                </span>
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+
             {/* Search */}
-            <div className="mt-6 mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-4 mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <input
                     type="text"
                     placeholder="Search by name or email..."
@@ -343,7 +385,7 @@ const handleDeleteConfirm = async () => {
                 />
 
                 <div className="flex flex-wrap gap-2">
-                {isSuperAdmin && !showDeleted && (
+                {isSuperAdmin && !showDeleted && tab === "team" && (
                     <button
                         type="button"
                         onClick={openStaffModal}
@@ -458,12 +500,13 @@ const handleDeleteConfirm = async () => {
 
                                                 {/* 👁 View User */}
                                                 <Tooltip content="View User Detail">
-                                                    <Link
-                                                        href={`/admin/user/userDetail/${user.id}`}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setViewUser(user)}
                                                         className={actionButtonClass}
                                                     >
                                                         <AiOutlineEye size={18} />
-                                                    </Link>
+                                                    </button>
                                                 </Tooltip>
 
                                                 {showDeleted ? (
@@ -523,7 +566,9 @@ const handleDeleteConfirm = async () => {
                                 ) : (
                                     <tr>
                                         <td colSpan={colCount} className="text-center py-6 text-gray-500">
-                                            {showDeleted ? "No deleted users found" : "No users found"}
+                                            {showDeleted
+                                                ? `No deleted ${tab === "customers" ? "customers" : "broker / seller / staff"} found`
+                                                : `No ${tab === "customers" ? "customers" : "broker / seller / staff"} found`}
                                         </td>
                                     </tr>
                                 )}
@@ -543,6 +588,9 @@ const handleDeleteConfirm = async () => {
 
 
             </div>
+
+            {/* View User Modal */}
+            <DetailModal user={viewUser} onClose={() => setViewUser(null)} />
 
             {/* Assign Role Modal */}
             <Tmodal

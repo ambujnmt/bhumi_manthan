@@ -26,6 +26,7 @@
     "chart.js": "^4.5.1",
     "clsx": "2.1.1",
     "country-state-city": "^3.2.1",
+    "firebase": "^11.10.0",
     "framer-motion": "^11.18.2",
     "intl-messageformat": "^10.5.0",
     "js-cookie": "^3.0.5",

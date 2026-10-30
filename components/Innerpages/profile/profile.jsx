@@ -2,12 +2,38 @@
 
 import React, { useEffect, useState } from "react";
 import { Spinner } from "@heroui/react";
+import { useRouter } from "next/router";
 import { getProfile } from "../../../utils/fetchApi";
+import { subscribeChatUnread } from "../../../utils/firebaseChat";
+import ChatBox from "../../Admin/Chat/ChatBox";
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // ?tab=chat opens Messages directly
+  const router = useRouter();
+  const tab = router.query.tab === "chat" ? "chat" : "profile";
+  const [chatUnread, setChatUnread] = useState(0);
+
+  const changeTab = (key) => {
+    const { tab: _tab, ...query } = router.query;
+
+    router.replace(
+      { pathname: router.pathname, query: key === "chat" ? { ...query, tab: "chat" } : query },
+      undefined,
+      { shallow: true }
+    );
+  };
+
+  // Unread chat count (Messages tab badge)
+  useEffect(() => {
+    if (!profile) return;
+
+    // Live from Firestore
+    return subscribeChatUnread(setChatUnread);
+  }, [profile]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -83,10 +109,42 @@ export default function Profile() {
         </h1>
 
         <p className="mt-2 text-[#62748E]">
-          View your personal account information.
+          {tab === "chat"
+            ? "Chat with admin, brokers and sellers."
+            : "View your personal account information."}
         </p>
       </div>
 
+      {/* Tabs: Profile / Messages */}
+      <div className="mb-6 flex gap-2">
+        {[
+          ["profile", "Profile"],
+          ["chat", "Messages"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => changeTab(key)}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+              tab === key
+                ? "bg-[#E87722] text-white"
+                : "border border-gray-200 bg-white text-[#62748E] hover:text-[#E87722]"
+            }`}
+          >
+            {label}
+            {key === "chat" && chatUnread > 0 && (
+              <span className={`rounded-full px-1.5 text-[11px] font-bold ${tab === key ? "bg-white text-[#E87722]" : "bg-[#E87722] text-white"}`}>
+                {chatUnread > 99 ? "99+" : chatUnread}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {tab === "chat" ? (
+        <ChatBox embedded isCustomer={profile?.role === "customer"} />
+      ) : (
+      <>
       {/* Profile Card */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
 
@@ -241,6 +299,8 @@ export default function Profile() {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

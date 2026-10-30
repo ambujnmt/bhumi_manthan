@@ -1,6 +1,6 @@
 import NextLink from "next/link";
 import React, { useEffect, useState } from 'react'
-import { FiArrowRight } from "react-icons/fi";
+import { FaArrowRight } from "react-icons/fa";
 import { getEvents } from "../../../../utils/fetchApi";
 import EventCard from "../../../Innerpages/Events/EventCard";
 import { splitEvents } from "../../../Innerpages/Events/eventUtils";
@@ -41,12 +41,10 @@ export default function UpcomingEvents() {
                         Meet builders, explore new launches and get expert advice in person
                     </p>
                 </div>
-                <NextLink
-                    href="/web/events"
-                    className="flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800 shrink-0 whitespace-nowrap"
-                >
-                    View All Events
-                    <FiArrowRight className="text-base" />
+                <NextLink href="/web/events" className="shrink-0 no-underline">
+                    <h6 className="text-[var(--text-color3)] text-[15px] font-semibold flex items-center hover:text-[var(--primary-color)] whitespace-nowrap">
+                        View All Events &nbsp; <FaArrowRight />
+                    </h6>
                 </NextLink>
             </div>
 

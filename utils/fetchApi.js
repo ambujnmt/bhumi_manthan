@@ -426,6 +426,32 @@ export const submitContactForm = async (payload) => {
   }
 };
 
+// Footer "Subscribe" form
+export const subscribeNewsletter = async (email) => {
+  try {
+    const response = await fetch(`${BASE_URL}subscribe`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (response.status === 429) {
+      return { status: false, message: "Too many requests. Please try again in a minute." };
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Subscribe error:", error);
+
+    return { status: false, message: "Something went wrong. Please try again." };
+  }
+};
+
 // Property detail "Enquire Now" form
 export const submitEnquiryForm = async (payload) => {
   try {

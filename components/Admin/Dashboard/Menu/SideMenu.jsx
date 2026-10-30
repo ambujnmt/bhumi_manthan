@@ -9,10 +9,16 @@ import { HiMenu } from "react-icons/hi";
 import { FaBuilding, FaCity, FaClipboardList, FaCog, FaEnvelope, FaImages, FaMapMarkedAlt, FaNewspaper, FaUser, FaUserShield } from 'react-icons/fa';
 import { RxDotFilled } from "react-icons/rx";
 import { BsChatDotsFill } from "react-icons/bs";
+import { FiMail } from "react-icons/fi";
 import { getInboxCounts } from "../../../../utils/adminFetchApi";
 import { useUser } from "../../../../context/UserContext";
-import { hasPermission, PANEL_URL_PREFIX } from "../../../../utils/adminPermissions";
+import { hasAdminAccess, hasPermission, PANEL_URL_PREFIX } from "../../../../utils/adminPermissions";
+import { subscribeChatUnread } from "../../../../utils/firebaseChat";
 import Tmodal from "../../../Tmodal/Tmodal";
+
+// Menu scroll position: every admin page mounts its own SideMenu,
+// so keep it between pages (menu does not jump back to top on click)
+let savedMenuScroll = 0;
 
 export default function SideMenu({
   isCollapsed,
@@ -29,6 +35,11 @@ export default function SideMenu({
   const homePageRef = useRef(null);
   const formRef = useRef(null);
   const hoverTimeoutRef = useRef(null);
+  const menuScrollRef = useRef(null);
+
+  useEffect(() => {
+    if (menuScrollRef.current) menuScrollRef.current.scrollTop = savedMenuScroll;
+  }, []);
 
   // /seller/..., /broker/..., /staff/... are the same /admin pages (role URL)
   const pathname = (usePathname() || '').replace(PANEL_URL_PREFIX, '/admin');
@@ -85,6 +96,17 @@ export default function SideMenu({
   }, [pathname, canSeeMessages]);
 
 
+
+  // Unread chat messages (Chat menu badge)
+  const canChat = hasAdminAccess(user);
+  const [chatUnread, setChatUnread] = useState(0);
+
+  useEffect(() => {
+    if (!canChat) return;
+
+    // Live from Firestore
+    return subscribeChatUnread(setChatUnread);
+  }, [canChat]);
 
   /*
   |--------------------------------------------------------------------------
@@ -170,6 +192,8 @@ export default function SideMenu({
   const isBannerActive = isActive('/admin/banner');
   const isContactActive = isActive('/admin/contact');
   const isEnquiryActive = isActive('/admin/enquiry');
+  const isSubscriberActive = isActive('/admin/subscriber');
+  const isChatActive = isActive('/admin/chat');
   const isRoleActive = isActive('/admin/role');
   const isEventActive = isActive('/admin/event');
   const isPlanActive = isActive('/admin/plan');
@@ -363,6 +387,8 @@ export default function SideMenu({
     MENU
 ================================================================ */}
       <div
+        ref={menuScrollRef}
+        onScroll={(e) => { savedMenuScroll = e.currentTarget.scrollTop; }}
         className="
     flex-1
     overflow-y-auto
@@ -1085,6 +1111,137 @@ export default function SideMenu({
 
               {!isCollapsed && isEnquiryActive && (
                 <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+
+
+          {/* newsletter subscribers (footer Subscribe) */}
+          {can('subscribers.view') && (
+            <Link
+              href="/admin/subscriber/subscriberList"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-2
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2.5
+        transition-all
+        duration-200
+        ${isSubscriberActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FiMail
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isSubscriberActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Subscribers
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isSubscriberActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+
+
+          {/* Chat with customers (every admin panel user) */}
+          {canChat && (
+            <Link
+              href="/admin/chat"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-2
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2.5
+        transition-all
+        duration-200
+        ${isChatActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          relative
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <BsChatDotsFill
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isChatActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {isCollapsed && chatUnread > 0 && (
+                  <span className="absolute -right-2 -top-2 h-2.5 w-2.5 rounded-full bg-[#E87722]" />
+                )}
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Chat
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && chatUnread > 0 ? (
+                <span className="rounded-full bg-[#E87722] px-2 py-0.5 text-[11px] font-bold text-white">
+                  {chatUnread > 99 ? '99+' : chatUnread}
+                </span>
+              ) : (
+                !isCollapsed && isChatActive && (
+                  <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+                )
               )}
             </Link>
           )}
