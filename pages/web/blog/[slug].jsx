@@ -1,11 +1,22 @@
 import BlogDetail from "@/components/Innerpages/BlogDetail/BlogDetail";
 import Header from "../../../components/Home/Menu/Header";
 import Footer from "../../../components/Home/Menu/Footer";
+import MetaTags from "../../../components/Head/MetaTags";
 import { getBlogDetail, getBlogs } from "../../../utils/fetchApi";
+import { SITE_NAME, buildBlogSeo } from "../../../utils/seo";
 
 export default function blogDetail({ blog, moreBlogs }) {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+
     return (
         <>
+            <MetaTags
+                {...buildBlogSeo(blog)}
+                siteName={SITE_NAME}
+                type="article"
+                image={blog.image}
+                canonical={siteUrl ? `${siteUrl}/web/blog/${blog.slug}` : undefined}
+            />
             <Header />
             <BlogDetail blog={blog} moreBlogs={moreBlogs} />
             <Footer />

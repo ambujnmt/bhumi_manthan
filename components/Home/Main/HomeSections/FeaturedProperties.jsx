@@ -1,10 +1,10 @@
 import React from 'react'
 import { Link } from "@heroui/react";
 import { FaArrowRight } from "react-icons/fa";
-import { CiHeart } from "react-icons/ci";
 import { FiMapPin, FiNavigation } from "react-icons/fi";
 import { formatDistance, formatPropertyPrice, imageFallback } from "../../../../utils/formatPrice";
 import SectionSkeleton from "./SectionSkeleton";
+import WishlistButton from "../../../Common/WishlistButton";
 
 const badgeColors = {
     FEATURED: "bg-[#22C55E]",
@@ -93,9 +93,7 @@ export default function FeaturedProperties({ loading = false, properties = [], n
                                                 <div className={`absolute top-[10px] left-[10px] text-white px-2 py-1 rounded-md ${badgeColors[badge] || "bg-[var(--primary-color)]"}`}>
                                                     <p className="text-[11px] font-bold mb-0">{badge}</p>
                                                 </div>
-                                                <div className="absolute top-[10px] right-[10px] w-[30px] h-[30px] p-[4px] bg-black/40 text-[#fff] rounded-full flex items-center justify-center cursor-pointer hover:bg-[var(--primary-color)] hover:text-[#fff] transition-all duration-500 ease-in-out">
-                                                    <CiHeart />
-                                                </div>
+                                                <WishlistButton propertyId={property.id} className="absolute top-[10px] right-[10px]" />
                                                 {distance && (
                                                     <div className="absolute bottom-[10px] left-[10px] inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white">
                                                         <FiNavigation size={10} /> {distance}

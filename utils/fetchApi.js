@@ -242,6 +242,24 @@ export const getBanners = async () => {
   return data;
 };
 
+// bhumi-youtuber-video-list (frontend - only active)
+export const getYoutuberVideos = async () => {
+  const response = await fetch(`${BASE_URL}youtuber-videos`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.message);
+  }
+
+  return data;
+};
+
 // bhumi-project-list (frontend - New Launch & Premium Projects)
 export const getProjects = async (limit = 5) => {
   const response = await fetch(`${BASE_URL}projects?limit=${limit}`, {
@@ -871,6 +889,58 @@ export const updateAdminPlan = (id, payload) =>
 export const deleteAdminPlan = (id) =>
   planRequest(`delete/${id}`, { method: "DELETE" });
 
+// Property categories (admin): groups (Residential ...) with sub categories
+const propertyCategoryRequest = async (path, options = {}) => {
+  const token = Cookies.get("accessToken");
+
+  const response = await fetch(`${BASE_URL}admin/property-categories/${path}`, {
+    ...options,
+    headers: {
+      Accept: "application/json",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  const result = await response.json();
+
+  if (!response.ok || !result?.status) {
+    throw planApiError(result);
+  }
+
+  return result;
+};
+
+// list categories
+export const getAdminPropertyCategories = () => propertyCategoryRequest("all");
+
+// add group (no parent_id) / sub category (parent_id)
+export const addAdminPropertyCategory = (payload) =>
+  propertyCategoryRequest("add", { method: "POST", body: JSON.stringify(payload) });
+
+// update category
+export const updateAdminPropertyCategory = (id, payload) =>
+  propertyCategoryRequest(`update/${id}`, { method: "POST", body: JSON.stringify(payload) });
+
+// delete category (group deletes its sub categories too)
+export const deleteAdminPropertyCategory = (id) =>
+  propertyCategoryRequest(`delete/${id}`, { method: "DELETE" });
+
+// website property categories (active only)
+export const getPropertyCategories = async () => {
+  const response = await fetch(`${BASE_URL}property-categories`, {
+    headers: { Accept: "application/json" },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.message);
+  }
+
+  return data;
+};
+
 // website events (active only)
 export const getEvents = async (limit = 10) => {
   const response = await fetch(`${BASE_URL}events?limit=${limit}`, {
@@ -935,3 +1005,75 @@ export const getAdminEventOptions = async () => {
 
   return result;
 };
+
+
+/*
+|--------------------------------------------------------------------------
+| Wishlist (logged in customer)
+|--------------------------------------------------------------------------
+*/
+const wishlistRequest = async (path, options = {}) => {
+  try {
+    const response = await fetch(`${BASE_URL}wishlist${path}`, {
+      cache: "no-store",
+      ...options,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Cookies.get("accessToken")}`,
+      },
+    });
+
+    const result = await response.json();
+
+    return response.ok ? result : { status: false, message: result?.message || "Something went wrong. Please try again." };
+  } catch (error) {
+    return { status: false, message: "Something went wrong. Please try again." };
+  }
+};
+
+export const getWishlist = (page = 1) => wishlistRequest(`?page=${page}`);
+
+export const getWishlistIds = () => wishlistRequest("/ids");
+
+export const addToWishlist = (propertyId) =>
+  wishlistRequest("/add", { method: "POST", body: JSON.stringify({ property_id: propertyId }) });
+
+export const removeFromWishlist = (propertyId) =>
+  wishlistRequest(`/remove/${propertyId}`, { method: "DELETE" });
+
+/*
+|--------------------------------------------------------------------------
+| Compare (logged in user) - one list per property type, max 3 in each
+|--------------------------------------------------------------------------
+*/
+const compareRequest = async (path, options = {}) => {
+  try {
+    const response = await fetch(`${BASE_URL}compare${path}`, {
+      cache: "no-store",
+      ...options,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Cookies.get("accessToken")}`,
+      },
+    });
+
+    const result = await response.json();
+
+    return response.ok ? result : { status: false, message: result?.message || "Something went wrong. Please try again." };
+  } catch (error) {
+    return { status: false, message: "Something went wrong. Please try again." };
+  }
+};
+
+export const getCompareList = () => compareRequest("/list");
+
+export const getCompareTable = (propertyType) =>
+  compareRequest(`?property_type=${encodeURIComponent(propertyType)}`);
+
+export const addToCompare = (propertyId) =>
+  compareRequest("/add", { method: "POST", body: JSON.stringify({ property_id: propertyId }) });
+
+export const removeFromCompare = (propertyId) =>
+  compareRequest(`/remove/${propertyId}`, { method: "DELETE" });

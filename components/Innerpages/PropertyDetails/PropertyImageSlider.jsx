@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { FreeMode, Navigation, Thumbs } from "swiper/modules";
+import { FaVideo } from "react-icons/fa";
+import PropertyVideoPlayer from "./PropertyVideo";
 
 import "swiper/css";
 import "swiper/css/free-mode";
@@ -13,8 +15,17 @@ export default function PropertyImageSlider({
   images = [],
   height = 350,
   mobileHeight = 280,
+  video = null,
+  title = "",
 }) {
   const [thumbsSwiper, setThumbsSwiper] = useState(null);
+  const [playing, setPlaying] = useState(false);
+  const videoSrc = video?.src;
+
+  // Opening another property (Similar Properties) goes back to its images
+  useEffect(() => {
+    setPlaying(false);
+  }, [videoSrc]);
 
   const toCss = (value) =>
     typeof value === "number" ? `${value}px` : value;
@@ -32,7 +43,7 @@ export default function PropertyImageSlider({
     };
   }, [thumbsSwiper]);
 
-  if (slides.length === 0) {
+  if (slides.length === 0 && !video) {
     return (
       <div
         className="flex w-full items-center justify-center rounded-2xl bg-gray-100 text-gray-500"
@@ -95,6 +106,15 @@ export default function PropertyImageSlider({
         }
       `}</style>
 
+      <div className="relative mb-3 w-full">
+      {slides.length === 0 ? (
+        <div
+          className="flex w-full items-center justify-center rounded-2xl bg-gray-100 text-gray-500"
+          style={{ height: toCss(mobileHeight) }}
+        >
+          No property images available
+        </div>
+      ) : (
       <Swiper
         style={{
           "--swiper-navigation-color": "#fff",
@@ -112,7 +132,7 @@ export default function PropertyImageSlider({
               : null,
         }}
         modules={[FreeMode, Navigation, Thumbs]}
-        className="property-main-slider mb-3 w-full overflow-hidden rounded-2xl"
+        className="property-main-slider w-full overflow-hidden rounded-2xl"
       >
         {slides.map((src, index) => (
           <SwiperSlide key={`${src}-${index}`}>
@@ -124,8 +144,40 @@ export default function PropertyImageSlider({
           </SwiperSlide>
         ))}
       </Swiper>
+      )}
+
+      {video && !playing && (
+        video.type === "link" ? (
+          <a
+            href={video.src}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Watch video in a new tab"
+            title="Watch video"
+            className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-white no-underline transition-colors hover:bg-[var(--primary-color)] hover:text-white"
+          >
+            <FaVideo size={16} aria-hidden="true" />
+          </a>
+        ) : (
+          <button
+            type="button"
+            aria-label="Play video"
+            title="Play video"
+            onClick={() => setPlaying(true)}
+            className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-[var(--primary-color)]"
+          >
+            <FaVideo size={16} aria-hidden="true" />
+          </button>
+        )
+      )}
+
+      {video && playing && (
+        <PropertyVideoPlayer video={video} title={title} onClose={() => setPlaying(false)} />
+      )}
+      </div>
 
       {slides.length > 1 && (
+        <div onClickCapture={() => setPlaying(false)}>
         <Swiper
           onSwiper={setThumbsSwiper}
           loop={slides.length > 1}
@@ -153,6 +205,7 @@ export default function PropertyImageSlider({
             </SwiperSlide>
           ))}
         </Swiper>
+        </div>
       )}
     </div>
   );

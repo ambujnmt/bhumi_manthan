@@ -35,5 +35,8 @@ export const getChatFirebaseToken = () => chatRequest("firebase-token");
 export const getChatContacts = (search = "", perPage = 20, role = "") =>
   chatRequest(`contacts?per_page=${perPage}&search=${encodeURIComponent(search)}${role ? `&role=${role}` : ""}`);
 
-// bhumi-chat-start ({ user_id?, role?, property_id? }) -> creates chats/{id} in Firestore
+// bhumi-chat-start ({ user_id?, role?, property_id? }) -> chat id + fields; first message creates chats/{id}
 export const startChatConversation = (payload) => chatRequest("conversations", { method: "POST", body: payload });
+
+// Deletes the chat from my list only
+export const deleteChatConversation = (chatId) => chatRequest(`conversations/${encodeURIComponent(chatId)}`, { method: "DELETE" });

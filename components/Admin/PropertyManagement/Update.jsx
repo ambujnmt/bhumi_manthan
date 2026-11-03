@@ -10,10 +10,18 @@ import { showToast } from "../../../store/toast";
 import { MAX_IMAGE_KB, pickImageFile } from "../../../utils/imageLimit";
 import { geocodeAddress, getPropertyDetail, updateProperty } from "../../../utils/adminFetchApi";
 import LocationFields from "./LocationFields";
+import CategoryFields from "./CategoryFields";
+import PropertyVideoField, { appendVideo, emptyVideo, videoFromProperty } from "./PropertyVideoField";
+import PropertySeoFields from "./PropertySeoFields";
 
 const initialForm = {
     title: "",
-    property_type: "",
+    slug: "",
+    meta_title: "",
+    meta_description: "",
+    meta_keywords: "",
+    category_id: "",
+    sub_category_id: "",
     listing_type: "",
     configuration: "",
     status: "",
@@ -75,13 +83,6 @@ const fieldSections = [
         title: "Basic Property Information",
         fields: [
             { name: "title", label: "Property Title", required: true, placeholder: "3 BHK Luxury Apartment" },
-            {
-                name: "property_type",
-                label: "Property Type",
-                type: "select",
-                required: true,
-                options: ["Apartment", "Villa", "House", "Plot", "Commercial"],
-            },
             {
                 name: "listing_type",
                 label: "Listing Type",
@@ -250,6 +251,7 @@ export default function Update() {
 
     // New "Add More" image slots
     const [extraImages, setExtraImages] = useState([]);
+    const [video, setVideo] = useState(emptyVideo);
 
     // Saved single images marked for removal (sent as remove_images[])
     const [removedImages, setRemovedImages] = useState([]);
@@ -295,6 +297,7 @@ export default function Update() {
         setExistingGallery(Array.isArray(data.gallery_images) ? data.gallery_images : []);
         setExtraImages([]);
         setRemovedImages([]);
+        setVideo(videoFromProperty(data));
         setGeoStatus("");
 
         savedAddressRef.current = [
@@ -510,6 +513,8 @@ export default function Update() {
                 }
             });
 
+            appendVideo(formData, video);
+
             const response = await updateProperty(router.query.id, formData);
 
             showToast(response?.message || "Property updated successfully.");
@@ -624,6 +629,18 @@ export default function Update() {
                                 </h3>
 
                                 <div className="grid grid-cols-1 gap-x-5 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+                                    {/* Category -> Sub Category (saved as property_type) */}
+                                    {section.title === "Basic Property Information" && (
+                                        <CategoryFields
+                                            values={form}
+                                            onChange={(patch) =>
+                                                setForm((previous) => ({ ...previous, ...patch }))
+                                            }
+                                            inputClass={inputClass}
+                                            labelClass={labelClass}
+                                        />
+                                    )}
+
                                     {section.title === "Location Details" && (
                                         <LocationFields
                                             values={form}
@@ -980,6 +997,18 @@ export default function Update() {
                                 />
                             </div>
                         </section>
+
+                        <PropertyVideoField value={video} onChange={setVideo} labelClass={labelClass} inputClass={inputClass} fileInputClass={fileInputClass} />
+
+                        <PropertySeoFields
+                            values={form}
+                            onChange={(patch) =>
+                                setForm((previous) => ({ ...previous, ...patch }))
+                            }
+                            savedSlug={property?.slug || ""}
+                            inputClass={inputClass}
+                            labelClass={labelClass}
+                        />
 
                         <div className="flex flex-col-reverse justify-end gap-3 border-t border-gray-200 pt-6 sm:flex-row">
                             <button

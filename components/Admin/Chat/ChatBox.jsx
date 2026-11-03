@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Spinner } from "@heroui/react";
-import { IoSend, IoArrowBack, IoSearch } from "react-icons/io5";
+import { Button, Spinner } from "@heroui/react";
+import { IoTrashOutline, IoSend, IoArrowBack, IoSearch } from "react-icons/io5";
 import { FaPlus } from "react-icons/fa";
 import { BsChatDotsFill, BsCheck2, BsCheck2All, BsHouseDoor } from "react-icons/bs";
 import PageTitle from "../../Breadcrumb/PageTitle";
 import Tmodal from "../../Tmodal/Tmodal";
 import { showToast } from "../../../store/toast";
-import { getChatContacts, startChatConversation } from "../../../utils/chatApi";
+import { deleteChatConversation, getChatContacts, startChatConversation } from "../../../utils/chatApi";
 import {
     connectFirebaseChat,
     getOlderMessages,
@@ -139,15 +139,18 @@ const MESSAGES_BG = {
 /**
  * Admin panel: <ChatBox />  (admin / staff / broker / seller -> customers) - fills its parent's height
  * Website profile: <ChatBox embedded isCustomer />  (customer -> admin / broker / seller)
+ * startPropertyId: opens the chat with that property's owner, then calls onPropertyChatDone
  *
  * Inbox + messages are read / written directly on Firestore (utils/firebaseChat.js)
  */
-export default function ChatBox({ embedded = false, isCustomer = false }) {
+export default function ChatBox({ embedded = false, fill = false, isCustomer = false, startPropertyId, onPropertyChatDone }) {
     const [conversations, setConversations] = useState([]);
     const [listLoading, setListLoading] = useState(true);
     const [search, setSearch] = useState("");
 
     const [activeId, setActiveId] = useState(null);
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleting, setDeleting] = useState(false);
     const [messages, setMessages] = useState([]);
     const [hasMore, setHasMore] = useState(false);
     const [messagesLoading, setMessagesLoading] = useState(false);
@@ -166,6 +169,8 @@ export default function ChatBox({ embedded = false, isCustomer = false }) {
     const [contacts, setContacts] = useState([]);
     const [contactsLoading, setContactsLoading] = useState(false);
     const [startingId, setStartingId] = useState(null);
+    const [openingPropertyChat, setOpeningPropertyChat] = useState(Boolean(startPropertyId));
+    const propertyChatRequested = useRef(false);
 
     const bottomRef = useRef(null);
     const inputRef = useRef(null);
@@ -216,7 +221,13 @@ export default function ChatBox({ embedded = false, isCustomer = false }) {
         return subscribeChats(
             live,
             (list) => {
-                setConversations((previous) => (JSON.stringify(previous) === JSON.stringify(list) ? previous : list));
+                setConversations((previous) => {
+                    // A chat just started has no Firestore document until its first message
+                    const notSavedYet = previous.filter((item) => item.is_new && !list.some((chat) => chat.id === item.id));
+                    const next = [...notSavedYet, ...list];
+
+                    return JSON.stringify(previous) === JSON.stringify(next) ? previous : next;
+                });
                 setListLoading(false);
             },
             (error) => {
@@ -243,8 +254,19 @@ export default function ChatBox({ embedded = false, isCustomer = false }) {
         lastMessageIdRef.current = null;
     };
 
+    // Wait for the chat itself: it says which old messages I deleted
+    const activeReady = Boolean(active);
+    const activeClearedAt = active?.cleared_at || null;
+    const activeIsNew = Boolean(active?.is_new);
+
     useEffect(() => {
-        if (!live || !activeId) return;
+        if (!live || !activeId || !activeReady) return;
+
+        // Nothing to read until the first message creates the chat
+        if (activeIsNew) {
+            setMessagesLoading(false);
+            return;
+        }
 
         let first = true;
 
@@ -269,9 +291,10 @@ export default function ChatBox({ embedded = false, isCustomer = false }) {
                 console.error("Chat messages failed:", error);
                 setMessagesLoading(false);
                 showToast("Failed to load messages.", "error");
-            }
+            },
+            activeClearedAt
         );
-    }, [live, activeId]);
+    }, [live, activeId, activeReady, activeClearedAt, activeIsNew]);
 
     // Scroll only when a new message is added at the bottom (not on older pages / server ack)
     const lastMessageId = messages[messages.length - 1]?.id || null;
@@ -303,6 +326,38 @@ export default function ChatBox({ embedded = false, isCustomer = false }) {
         input.style.height = `${Math.min(input.scrollHeight, 128)}px`;
     }, [text, activeId]);
 
+    const confirmDelete = async () => {
+        const id = deleteTarget?.id;
+
+        if (!id) return;
+
+        setDeleting(true);
+
+        try {
+            if (deleteTarget.is_new) {
+                // No message sent yet: nothing saved in Firestore
+                setConversations((previous) => previous.filter((item) => item.id !== id));
+            } else {
+                // So old unread messages are not counted when the chat comes back
+                if (live) await markFirebaseChatRead(live, id).catch(() => {});
+
+                await deleteChatConversation(id);
+            }
+
+            if (activeIdRef.current === id) {
+                setActiveId(null);
+                setMessages([]);
+            }
+
+            setDeleteTarget(null);
+            showToast("Chat deleted.", "success");
+        } catch (error) {
+            showToast(error?.message || "Failed to delete chat.", "error");
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     const loadOlder = async () => {
         if (!live || !activeId || !oldestRef.current) return;
 
@@ -313,7 +368,7 @@ export default function ChatBox({ embedded = false, isCustomer = false }) {
         setOlderLoading(true);
 
         try {
-            const res = await getOlderMessages(live, id, oldestRef.current);
+            const res = await getOlderMessages(live, id, oldestRef.current, activeClearedAt);
 
             if (activeIdRef.current !== id) return;
 
@@ -383,23 +438,46 @@ export default function ChatBox({ embedded = false, isCustomer = false }) {
         return () => clearTimeout(timer);
     }, [newChatOpen, contactSearch, contactRole]);
 
+    const showStartedConversation = (conversation) => {
+        setConversations((previous) =>
+            previous.some((item) => item.id === conversation.id)
+                ? previous
+                : [conversation, ...previous]
+        );
+        openConversation(conversation.id);
+    };
+
+    // Contact Seller on a property page
+    useEffect(() => {
+        if (!live || !startPropertyId || propertyChatRequested.current) return;
+
+        propertyChatRequested.current = true;
+        setOpeningPropertyChat(true);
+
+        startChatConversation({ property_id: startPropertyId })
+            .then((res) => {
+                if (res?.data?.id) showStartedConversation(res.data);
+            })
+            .catch((error) => showToast(error?.message || "Chat could not be started.", "error"))
+            .finally(() => {
+                setOpeningPropertyChat(false);
+                onPropertyChatDone?.();
+            });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [live, startPropertyId]);
+
     const startChat = async (contact) => {
         setStartingId(contact.id);
 
         try {
-            // Laravel creates chats/{id} in Firestore (who can chat with whom)
+            // Laravel decides who can chat with whom. The first message creates chats/{id}.
             const res = await startChatConversation({ user_id: contact.id });
             const conversation = res?.data;
 
             if (conversation?.id) {
-                setConversations((previous) =>
-                    previous.some((item) => item.id === conversation.id)
-                        ? previous
-                        : [{ ...conversation, other_uid: conversation.other_user?.uid }, ...previous]
-                );
+                showStartedConversation(conversation);
                 setNewChatOpen(false);
                 setContactSearch("");
-                openConversation(conversation.id);
             }
         } catch (error) {
             showToast(error?.message || "Chat could not be started.", "error");
@@ -430,7 +508,7 @@ export default function ChatBox({ embedded = false, isCustomer = false }) {
     );
 
     return (
-        <div className={embedded ? "" : "flex h-full min-h-0 flex-col"}>
+        <div className={fill ? "h-full" : embedded ? "" : "flex h-full min-h-0 flex-col"}>
             {/* {!embedded && (
                 <PageTitle
                     breadCrumbItems={[
@@ -443,7 +521,11 @@ export default function ChatBox({ embedded = false, isCustomer = false }) {
 
             <div
                 className={`${
-                    embedded ? "h-[70vh] min-h-[480px] border border-gray-100" : "mt-2 min-h-0 flex-1"
+                    fill
+                        ? "h-full border border-gray-100"
+                        : embedded
+                        ? "h-[70vh] min-h-[480px] border border-gray-100"
+                        : "mt-2 min-h-0 flex-1"
                 } flex overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5`}
             >
                 {/* Conversations */}
@@ -490,11 +572,11 @@ export default function ChatBox({ embedded = false, isCustomer = false }) {
                                 const unread = unreadOf(item);
 
                                 return (
+                                    <div key={item.id} className="relative mb-0.5">
                                     <button
-                                        key={item.id}
                                         type="button"
                                         onClick={() => openConversation(item.id)}
-                                        className={`mb-0.5 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
+                                        className={`flex w-full items-center gap-3 rounded-xl py-2.5 pl-3 pr-9 text-left transition ${
                                             isActive ? "bg-orange-50 ring-1 ring-orange-100" : "hover:bg-gray-50"
                                         }`}
                                     >
@@ -505,14 +587,14 @@ export default function ChatBox({ embedded = false, isCustomer = false }) {
                                                     {item.other_user?.name || "Deleted user"}
                                                 </span>
                                                 <span className={`shrink-0 text-[11px] ${unread ? "font-semibold text-[#E87722]" : "text-gray-400"}`}>
-                                                    {formatTime(item.last_message_at || item.created_at)}
+                                                    {formatTime(item.last_message_at)}
                                                 </span>
                                             </div>
                                             {item.property && (
-                                                <p className="flex items-center gap-1 truncate text-[11px] font-medium text-[#E87722]">
+                                                <span className="flex items-center gap-1 truncate text-[11px] font-medium text-[#E87722]">
                                                     <BsHouseDoor size={11} className="shrink-0" />
                                                     <span className="truncate">{item.property.title}</span>
-                                                </p>
+                                                </span>
                                             )}
                                             <div className="mt-0.5 flex items-center justify-between gap-2">
                                                 <p className={`truncate text-xs ${unread ? "font-semibold text-[#1A1F36]" : "text-gray-500"}`}>
@@ -533,6 +615,16 @@ export default function ChatBox({ embedded = false, isCustomer = false }) {
                                             </div>
                                         </div>
                                     </button>
+                                    <button
+                                        type="button"
+                                        aria-label={`Delete chat with ${item.other_user?.name || "deleted user"}`}
+                                        title="Delete chat"
+                                        onClick={() => setDeleteTarget(item)}
+                                        className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                                    >
+                                        <IoTrashOutline size={16} aria-hidden="true" />
+                                    </button>
+                                    </div>
                                 );
                             })
                         ) : (
@@ -555,8 +647,12 @@ export default function ChatBox({ embedded = false, isCustomer = false }) {
                 </aside>
 
                 {/* Messages */}
-                <section className={`${activeId ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-1 flex-col`}>
-                    {!active ? (
+                <section className={`${activeId || (openingPropertyChat && !connectError) ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-1 flex-col`}>
+                    {!active && openingPropertyChat && !connectError ? (
+                        <div className="flex flex-1 items-center justify-center" style={MESSAGES_BG} aria-label="Opening chat">
+                            <Spinner size="md" />
+                        </div>
+                    ) : !active ? (
                         <div className="flex flex-1 flex-col items-center justify-center px-6 text-center" style={MESSAGES_BG}>
                             <span className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white text-[#E87722] shadow-sm ring-8 ring-orange-50">
                                 <BsChatDotsFill size={34} />
@@ -772,6 +868,29 @@ export default function ChatBox({ embedded = false, isCustomer = false }) {
                         <p className="py-8 text-center text-sm text-gray-500">{isCustomer ? "No one found." : "No customers found."}</p>
                     )}
                 </div>
+            </Tmodal>
+
+            <Tmodal
+                isOpen={Boolean(deleteTarget)}
+                onClose={() => !deleting && setDeleteTarget(null)}
+                size="sm"
+                noScroll
+                title="Delete this chat?"
+                footer={
+                    <>
+                        <Button variant="light" isDisabled={deleting} onPress={() => setDeleteTarget(null)} className="font-medium text-[#62748E] hover:bg-gray-100">
+                            Cancel
+                        </Button>
+                        <Button isLoading={deleting} onPress={confirmDelete} className="bg-red-600 font-semibold text-white hover:bg-red-700">
+                            Delete
+                        </Button>
+                    </>
+                }
+            >
+                <span className="text-sm text-[#62748E]">
+                    The chat with {deleteTarget?.other_user?.name || "this user"} and its messages will be removed from your list.
+                    They will still have their copy. If they message you again, the chat comes back with only the new messages.
+                </span>
             </Tmodal>
         </div>
     );

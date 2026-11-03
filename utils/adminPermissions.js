@@ -25,10 +25,18 @@ export const hasPermission = (user, permission) => {
   return permission.split("|").some((item) => permissions.includes(item));
 };
 
+// Staff whose role has only SEO permissions: no chat or appointments in the panel
+export const isSeoOnly = (user) => {
+  if (user?.role !== "staff" || !Array.isArray(user.permissions) || user.permissions.length === 0) return false;
+
+  return user.permissions.every((permission) => permission.startsWith("seo."));
+};
+
 // First admin page the user can open (login redirect)
 const ADMIN_PAGES = [
   ["dashboard.view", "/admin/dashboard"],
   ["properties.view", "/admin/propertyManagement/propertyList"],
+  ["property_categories.view", "/admin/propertyCategory/listing"],
   ["enquiries.view", "/admin/enquiry/enquiryList"],
   ["contact_messages.view", "/admin/contact/contactList"],
   ["subscribers.view", "/admin/subscriber/subscriberList"],
@@ -37,9 +45,11 @@ const ADMIN_PAGES = [
   ["blogs.view", "/admin/blog/blogList"],
   ["locations.view", "/admin/location/locationList"],
   ["banners.view", "/admin/banner/bannerList"],
+  ["youtuber_videos.view", "/admin/youtuberVideo/videoList"],
   ["events.view", "/admin/event/listing"],
   ["plans.view", "/admin/plan/listing"],
   ["settings.view", "/admin/settings/siteSettings"],
+  ["seo.view|seo.edit", "/admin/seo/properties"],
 ];
 
 // URL prefix of admin panel pages by logged in role:

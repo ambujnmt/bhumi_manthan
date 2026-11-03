@@ -1,7 +1,7 @@
 import { useUser } from "../../context/UserContext";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { adminHomePath, hasAdminAccess, hasPermission, PANEL_ROLES } from "../../utils/adminPermissions";
+import { adminHomePath, hasAdminAccess, hasPermission, isSeoOnly, PANEL_ROLES } from "../../utils/adminPermissions";
 import AdminRolePending from "../Common/AdminRolePending";
 
 // true after the first client render: on client side navigation (sidebar click)
@@ -12,7 +12,7 @@ let hydrated = false;
  * Access result for the logged in user:
  * { status: "loading" | "authorized" | "pending" | "redirect", to }
  */
-const getAccess = (user, allowedRoles, permission, superAdminOnly) => {
+const getAccess = (user, allowedRoles, permission, superAdminOnly, blockSeoOnly) => {
   // ------------------------------------------------
   // USER NOT LOGGED IN
   // ------------------------------------------------
@@ -36,7 +36,7 @@ const getAccess = (user, allowedRoles, permission, superAdminOnly) => {
   if (user.role !== "super_admin" && hasAdminAccess(user)) {
     const isAdminPage = allowedRoles.includes("super_admin");
 
-    if (!isAdminPage || superAdminOnly || !hasPermission(user, permission)) {
+    if (!isAdminPage || superAdminOnly || !hasPermission(user, permission) || (blockSeoOnly && isSeoOnly(user))) {
       return { status: "redirect", to: adminHomePath(user) };
     }
 
@@ -79,7 +79,7 @@ const getAccess = (user, allowedRoles, permission, superAdminOnly) => {
  * - superAdminOnly is not set (roles & staff pages)
  * Seller / broker with an admin role use the admin panel instead of their own dashboard.
  */
-const PrivateRoute = ({ children, allowedRoles = [], permission = "", superAdminOnly = false }) => {
+const PrivateRoute = ({ children, allowedRoles = [], permission = "", superAdminOnly = false, blockSeoOnly = false }) => {
   const { user, authLoading } = useUser();
   const router = useRouter();
 
@@ -93,7 +93,7 @@ const PrivateRoute = ({ children, allowedRoles = [], permission = "", superAdmin
 
   const access = !mounted || authLoading
     ? { status: "loading" }
-    : getAccess(user, allowedRoles, permission, superAdminOnly);
+    : getAccess(user, allowedRoles, permission, superAdminOnly, blockSeoOnly);
 
   useEffect(() => {
     if (access.status === "redirect") {

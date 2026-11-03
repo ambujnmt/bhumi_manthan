@@ -18,6 +18,7 @@ import {
 } from "react-icons/ai";
 import { loginUser } from "@/utils/fetchApi";
 import { useUser } from "../../context/UserContext";
+import { clearPostLoginRedirect, postLoginRedirect } from "../../utils/postLoginRedirect";
 
 export default function Login() {
   const router = useRouter();
@@ -124,6 +125,11 @@ login(user, token);
 |--------------------------------------------------------------------------
 */
 
+// A saved destination (Contact Seller) is only for customers
+if (user.role !== "customer") {
+  clearPostLoginRedirect();
+}
+
 // Super admin / seller / broker / staff with admin role -> admin panel
 if (hasAdminAccess(user)) {
   router.push(adminHomePath(user));
@@ -147,7 +153,7 @@ if (user.role === "broker") {
 |--------------------------------------------------------------------------
 */
 
-router.push("/");
+router.push(postLoginRedirect() || "/");
     } catch (error) {
       setError(
         error?.message ||

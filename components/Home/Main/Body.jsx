@@ -7,6 +7,7 @@ import ExploreProperties from './HomeSections/ExploreProperties';
 import PremiumLuxury from './HomeSections/PremiumLuxury';
 import MiddleColumn from './HomeSections/MiddleColumn';
 import HomeTestimonial from './HomeSections/HomeTestimonial';
+import YoutuberVideos from './HomeSections/YoutuberVideos';
 import UpcomingEvents from './HomeSections/UpcomingEvents';
 import Blogs from './HomeSections/Blogs';
 import MobileApp from './HomeSections/MobileApp';
@@ -15,7 +16,7 @@ import useHomeListings from '../../../utils/useHomeListings';
 
 
 // banners: loaded on server (pages/index.jsx), null = load in browser
-export default function Body({ banners = null, listings = null }) {
+export default function Body({ banners = null, listings = null, youtuberVideos = null }) {
   // Same nearby API as mobile app (/nearby/home), normal lists as fallback
   const { loading, featured, luxury, projects } = useHomeListings(listings);
 
@@ -30,6 +31,7 @@ export default function Body({ banners = null, listings = null }) {
       <PremiumLuxury loading={loading} properties={luxury.items} nearby={luxury.nearby} />
       <MiddleColumn />
       <HomeTestimonial />
+      <YoutuberVideos initialVideos={youtuberVideos} />
       <UpcomingEvents />
       <Blogs />
       <MobileApp />

@@ -7,6 +7,7 @@ import useSearchFilters, {
     budgetLabel,
     countActiveFilters,
     filtersToApi,
+    resolveTab,
     useSearchOptions,
 } from "../../../utils/useSearchFilters";
 
@@ -73,17 +74,21 @@ export default function SearchPropertiesLeftCol() {
                 : [...previous[key], value],
         }));
 
-    const budgets = options?.budgets?.[filters.type] || [];
+    // tab = category group, its sub categories = property types
+    const tab = resolveTab(options, filters.type);
+    const tabKey = tab?.key || filters.type;
+    const propertyTypes = tab?.property_types || [];
+    const budgets = options?.budgets?.[tabKey] || [];
     const changed = JSON.stringify(draft) !== urlKey;
 
     // Applied filters as removable tags
     const tags = [
         ...filters.localities.map((name) => ({ label: name, remove: { localities: filters.localities.filter((l) => l !== name) } })),
         ...(filters.q ? [{ label: filters.q, remove: { q: "" } }] : []),
-        ...(filters.budget_min ? [{ label: `Min ${budgetLabel(options, filters.type, filters.budget_min)}`, remove: { budget_min: "" } }] : []),
-        ...(filters.budget_max ? [{ label: `Max ${budgetLabel(options, filters.type, filters.budget_max)}`, remove: { budget_max: "" } }] : []),
+        ...(filters.budget_min ? [{ label: `Min ${budgetLabel(options, tabKey, filters.budget_min)}`, remove: { budget_min: "" } }] : []),
+        ...(filters.budget_max ? [{ label: `Max ${budgetLabel(options, tabKey, filters.budget_max)}`, remove: { budget_max: "" } }] : []),
         ...filters.property_types.map((key) => ({
-            label: options?.property_types?.find((t) => t.key === key)?.label || key,
+            label: propertyTypes.find((t) => t.key === key)?.label || key,
             remove: { property_types: filters.property_types.filter((t) => t !== key) },
         })),
         ...filters.bedrooms.map((key) => ({ label: `${key} BHK`, remove: { bedrooms: filters.bedrooms.filter((b) => b !== key) } })),
@@ -175,13 +180,12 @@ export default function SearchPropertiesLeftCol() {
                     </div>
                 </div>
 
-                {/* Property Type (Commercial tab is already commercial only) */}
-                {filters.type !== "commercial" && (
+                {/* Property Type = sub categories of selected tab */}
+                {propertyTypes.length > 0 && (
                     <div className="mb-6 border-t border-gray-100 pt-3">
                         <h3 className="mb-3 text-sm font-semibold text-gray-900">Property Type</h3>
                         <div className="flex flex-wrap gap-2">
-                            {(options?.property_types || [])
-                                .filter((t) => t.key !== "commercial")
+                            {propertyTypes
                                 .map((t) => (
                                     <button
                                         key={t.key}
