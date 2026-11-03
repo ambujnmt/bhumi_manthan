@@ -11,6 +11,7 @@ import useSearchFilters, {
     SEARCH_PATH,
     filtersToQuery,
     readSessionCache,
+    resolveTab,
     useSearchOptions,
     writeSessionCache,
 } from "../../../utils/useSearchFilters";
@@ -20,7 +21,7 @@ const SUGGEST_DEBOUNCE = 250;
 
 /**
  * Website search bar (same flow as app search screen)
- * Buy / Rent / Commercial -> City -> Locality chips (+ Similar Localities) -> Search
+ * Category tab (Residential / Commercial / Rental ...) -> City -> Locality chips (+ Similar Localities) -> Search
  * Locality / project / builder suggestions: GET /api/search/suggest
  *
  * mode="page" (search page): tab applies at once, Search updates the URL filters
@@ -34,7 +35,7 @@ export default function SearchBar({ mode = "page", footer = null }) {
     const { location: userLocation } = useUserLocation();
 
     // Draft until "Search" (on search page tab applies at once)
-    const [type, setType] = useState(isHome ? "buy" : filters.type);
+    const [type, setType] = useState(isHome ? "" : filters.type);
     const [city, setCity] = useState(isHome ? "" : filters.city);
     const [localities, setLocalities] = useState(isHome ? [] : filters.localities);
     const [q, setQ] = useState(isHome ? "" : filters.q);
@@ -108,14 +109,17 @@ export default function SearchBar({ mode = "page", footer = null }) {
         }
     };
 
+    // "" / old key (buy, rent) -> real tab key
+    const activeTab = resolveTab(options, type)?.key || "";
+
     const changeTab = (key) => {
-        if (key === type) return;
+        if (key === activeTab) return;
 
         if (isHome) {
             setType(key);
         } else {
-            // budget ranges differ per tab -> reset budget
-            setFilters({ type: key, city, localities, q, budget_min: "", budget_max: "" });
+            // budget ranges + property types (sub categories) differ per tab -> reset them
+            setFilters({ type: key, city, localities, q, budget_min: "", budget_max: "", property_types: [] });
         }
     };
 
@@ -131,19 +135,20 @@ export default function SearchBar({ mode = "page", footer = null }) {
 
     return (
         <div className="relative z-10 w-full rounded-2xl bg-[#0B1B3A] px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
-            {/* Tabs */}
+            {/* Tabs = category groups (skeleton until options load) */}
             <div className="no-scrollbar mb-4 flex items-center gap-2 overflow-x-auto sm:gap-3">
-                {(options?.tabs || [
-                    { key: "buy", label: "Buy" },
-                    { key: "rent", label: "Rent" },
-                    { key: "commercial", label: "Commercial" },
-                ]).map((tab) => (
+                {!options &&
+                    [0, 1, 2].map((i) => (
+                        <span key={i} className="h-9 w-24 shrink-0 animate-pulse rounded-lg bg-white/10" />
+                    ))}
+
+                {(options?.tabs || []).map((tab) => (
                     <button
                         key={tab.key}
                         type="button"
                         onClick={() => changeTab(tab.key)}
                         className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                            type === tab.key ? "bg-white text-[#0B1B3A]" : "text-white/80 hover:text-white"
+                            activeTab === tab.key ? "bg-white text-[#0B1B3A]" : "text-white/80 hover:text-white"
                         }`}
                     >
                         {tab.label}

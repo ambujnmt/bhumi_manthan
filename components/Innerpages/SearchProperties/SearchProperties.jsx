@@ -4,14 +4,8 @@ import React from 'react'
 import SearchBar from './SearchBar';
 import SearchPropertiesLeftCol from './SearchPropertiesLeftCol';
 import SearchPropertiesRightCol from './SearchPropertiesRightCol';
-import useSearchFilters from '../../../utils/useSearchFilters';
+import useSearchFilters, { resolveTab, useSearchOptions } from '../../../utils/useSearchFilters';
 import HeroCarousel from '../../Home/Main/HomeSections/HeroCarousel'
-const TAB_HEADINGS = {
-    buy: { crumb: "Buy Properties", title: "Properties for Sale" },
-    rent: { crumb: "Rent Properties", title: "Properties for Rent" },
-    commercial: { crumb: "Commercial Properties", title: "Commercial Properties" },
-};
-
 /**
  * Property search page
  * Search bar: tab -> city -> localities (+ similar)
@@ -20,7 +14,9 @@ const TAB_HEADINGS = {
  */
 export default function SearchProperties() {
     const { filters } = useSearchFilters();
-    const heading = TAB_HEADINGS[filters.type] || TAB_HEADINGS.buy;
+    // Heading from selected category group (Residential Properties ...)
+    const tab = resolveTab(useSearchOptions(), filters.type);
+    const heading = tab ? `${tab.label} Properties` : "Properties";
 
     return (
         <>
@@ -34,10 +30,10 @@ export default function SearchProperties() {
                         <div className="col-span-12">
                             <div className="flex mb-4">
                                 <Link href="/" className="text-[14px] text-[var(--text-color2)]">Home </Link>
-                                <p className="text-[14px] text-[var(--text-color2)] mb-0">&nbsp; / &nbsp;{heading.crumb}</p>
+                                <p className="text-[14px] text-[var(--text-color2)] mb-0">&nbsp; / &nbsp;{heading}</p>
                             </div>
                             <h2 className="text-[28px] font-bold text-[var(--text-color1)]">
-                                {heading.title} in {filters.city || "India"}
+                                {heading} in {filters.city || "India"}
                             </h2>
                             <p className="text-[16px] text-[var(--text-color2)] mb-4">
                                 Discover verified homes from trusted owners, builders and agents.

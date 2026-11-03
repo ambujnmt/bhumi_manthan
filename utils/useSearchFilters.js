@@ -5,8 +5,8 @@ import { getSearchOptions } from "./fetchApi";
 /*
 |--------------------------------------------------------------------------
 | Property search filters live in the URL (share / refresh keeps them)
-| /web/property/searchProperties?type=buy&city=Gurgaon&localities=Sector 50
-|   &budget_min=..&budget_max=..&property_types=flat&bedrooms=2,3
+| /web/property/searchProperties?type=residential&city=Gurgaon&localities=Sector 50
+|   &budget_min=..&budget_max=..&property_types=apartment&bedrooms=2,3
 |   &furnishing=furnished&sort=price_low
 |--------------------------------------------------------------------------
 */
@@ -17,7 +17,7 @@ const LIST_KEYS = ["localities", "property_types", "bedrooms", "furnishing"];
 const TEXT_KEYS = ["type", "city", "q", "budget_min", "budget_max", "sort"];
 
 export const EMPTY_FILTERS = {
-  type: "buy",
+  type: "", // category group slug ("" = first tab)
   city: "",
   q: "",
   localities: [],
@@ -73,8 +73,16 @@ export const filtersToQuery = (filters) => {
   return query;
 };
 
-// Filters for count / properties API (type always sent)
-export const filtersToApi = (filters) => ({ ...filtersToQuery(filters), type: filters.type || "buy" });
+// Filters for count / properties API (no type -> backend uses first tab)
+export const filtersToApi = (filters) => filtersToQuery(filters);
+
+// Search tab = category group (Residential / Commercial / Rental) from search options.
+// type = tab key or old key (buy / rent)
+export const findTab = (options, type) =>
+  (options?.tabs || []).find((tab) => tab.key === type || tab.aliases?.includes(type)) || null;
+
+// Same, but unknown / "" type = first tab (like backend)
+export const resolveTab = (options, type) => findTab(options, type) || options?.tabs?.[0] || null;
 
 export const countActiveFilters = (filters) =>
   (filters.budget_min ? 1 : 0) +

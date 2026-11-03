@@ -968,3 +968,38 @@ export const saveAdminStaff = (payload, staffId = null) =>
 
 // bhumi-admin-staff-delete
 export const deleteAdminStaff = (staffId) => adminJsonRequest(`staff/delete/${staffId}`, "DELETE");
+
+// bhumi-admin-seo (type = "properties" / "blogs")
+export const getSeoItems = (type) => adminJsonRequest(`seo/${type}`);
+
+export const saveSeoItem = (type, id, payload) =>
+  adminJsonRequest(`seo/${type}/update/${id}`, "POST", payload);
+
+// bhumi-admin-youtuber-videos
+export const getAdminYoutuberVideos = () => adminJsonRequest("youtuber-videos/all");
+
+export const deleteYoutuberVideo = (id) => adminJsonRequest(`youtuber-videos/delete/${id}`, "DELETE");
+
+// formData: youtuber_name, title, video or video_url, thumbnail, sort_order, is_active
+export const saveYoutuberVideo = async (formData, id = null) => {
+  const token = Cookies.get("accessToken") || Cookies.get("token");
+
+  const response = await fetch(`${BASE_URL}admin/youtuber-videos/${id ? `update/${id}` : "add"}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data.status !== true) {
+    const validationErrors = data.errors ? Object.values(data.errors).flat().join(" ") : "";
+
+    throw new Error(validationErrors || data.message || "Something went wrong.");
+  }
+
+  return data;
+};

@@ -3,7 +3,6 @@ import NextLink from "next/link";
 
 import React, { useEffect, useRef, useState } from "react";
 import {
-  FiHeart,
   FiMapPin,
   FiGrid,
   FiList,
@@ -17,20 +16,21 @@ import { useRouter } from "next/router";
 
 import { getHomeSectionProperties, searchProperties } from "../../../utils/fetchApi";
 import useUserLocation from "../../../utils/useUserLocation";
-import useSearchFilters, { SEARCH_PATH, filtersToApi } from "../../../utils/useSearchFilters";
+import useSearchFilters, {
+  SEARCH_PATH,
+  filtersToApi,
+  resolveTab,
+  useSearchOptions,
+} from "../../../utils/useSearchFilters";
 import { formatDistance } from "../../../utils/formatPrice";
+import WishlistButton from "../../Common/WishlistButton";
 
 const PER_PAGE = 12;
-
-const TAB_TITLES = {
-  buy: "Properties for Sale",
-  rent: "Properties for Rent",
-  commercial: "Commercial Properties",
-};
 
 export default function SearchPropertiesRightCol() {
   const router = useRouter();
   const { filters, setFilters, isReady, isSearch } = useSearchFilters();
+  const tabLabel = resolveTab(useSearchOptions(), filters.type)?.label; // category group
 
   // ?featured=1 / ?luxury=1 (homepage "View All" buttons) -> only that section
   const featuredOnly = router.query.featured === "1";
@@ -51,7 +51,6 @@ export default function SearchPropertiesRightCol() {
   const [error, setError] = useState("");
 
   const [isSortOpen, setIsSortOpen] = useState(false);
-  const [likedProperties, setLikedProperties] = useState([]);
   const sortRef = useRef(null);
 
   const sortOptions = [
@@ -287,16 +286,6 @@ export default function SearchPropertiesRightCol() {
       : "Location not available";
   };
 
-  const toggleLike = (propertyId) => {
-    setLikedProperties((previous) => {
-      if (previous.includes(propertyId)) {
-        return previous.filter((id) => id !== propertyId);
-      }
-
-      return [...previous, propertyId];
-    });
-  };
-
   /*
   |--------------------------------------------------------------------------
   | List + sorting
@@ -335,7 +324,7 @@ export default function SearchPropertiesRightCol() {
               {loading
                 ? "Loading Properties..."
                 : isSearch
-                  ? `${total} ${TAB_TITLES[filters.type] || "Properties"}${where ? ` in ${where}` : ""}`
+                  ? `${total} ${tabLabel ? `${tabLabel} Properties` : "Properties"}${where ? ` in ${where}` : ""}`
                   : `${total} ${sectionLabel}Properties Found${nearby ? " Near You" : ""}`}
             </h1>
 
@@ -492,10 +481,6 @@ export default function SearchPropertiesRightCol() {
 
               {list.map((property) => {
 
-                const isLiked = likedProperties.includes(
-                  property.id
-                );
-
                 return (
                   <article
                     key={property.id || property.property_id}
@@ -528,23 +513,7 @@ export default function SearchPropertiesRightCol() {
 
                       {/* Heart */}
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toggleLike(property.id)
-                        }
-                        className={`absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 ${
-                          isLiked
-                            ? "text-red-500"
-                            : "text-gray-600 hover:text-red-500"
-                        }`}
-                      >
-                        <FiHeart
-                          className={`h-4 w-4 ${
-                            isLiked ? "fill-current" : ""
-                          }`}
-                        />
-                      </button>
+                      <WishlistButton propertyId={property.id} className="absolute right-3 top-3" />
 
                     </div>
 
@@ -659,10 +628,6 @@ export default function SearchPropertiesRightCol() {
 
               {list.map((property) => {
 
-                const isLiked = likedProperties.includes(
-                  property.id
-                );
-
                 return (
                   <article
                     key={property.id || property.property_id}
@@ -711,25 +676,7 @@ export default function SearchPropertiesRightCol() {
                               <MdVerified className="h-4 w-4 text-[#009449]" />
                             )}
 
-                            <button
-                              type="button"
-                              onClick={() =>
-                                toggleLike(property.id)
-                              }
-                              className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                                isLiked
-                                  ? "text-red-500"
-                                  : "text-gray-400 hover:text-red-500"
-                              }`}
-                            >
-                              <FiHeart
-                                className={`h-4 w-4 ${
-                                  isLiked
-                                    ? "fill-current"
-                                    : ""
-                                }`}
-                              />
-                            </button>
+                            <WishlistButton propertyId={property.id} />
 
                           </div>
 

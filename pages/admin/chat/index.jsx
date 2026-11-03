@@ -9,7 +9,7 @@ export default function AdminChat() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   return (
-       <PrivateRoute allowedRoles={["super_admin"]}>
+       <PrivateRoute allowedRoles={["super_admin"]} blockSeoOnly>
       <div className="flex h-screen overflow-hidden">
 
         {/* Overlay for mobile */}

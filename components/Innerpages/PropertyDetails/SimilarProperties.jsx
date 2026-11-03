@@ -2,6 +2,7 @@ import React from 'react'
 import { Link } from "@heroui/react";
 import { LuBuilding2 } from "react-icons/lu";
 import { formatPropertyPrice, imageFallback } from "../../../utils/formatPrice";
+import WishlistButton from "../../Common/WishlistButton";
 
 export default function SimilarProperties({ properties = [] }) {
     if (!properties.length) return null;
@@ -30,12 +31,15 @@ export default function SimilarProperties({ properties = [] }) {
                                     href={`/web/propertyDetail/${property.slug || property.id}`}
                                     className="block"
                                 >
-                                    <img
-                                        src={property.main_image || "/assets/img/similar-property1.png"}
-                                        onError={imageFallback("/assets/img/similar-property1.png")}
-                                        alt={property.title}
-                                        className="h-40 w-full rounded-lg object-cover"
-                                    />
+                                    <div className="relative">
+                                        <img
+                                            src={property.main_image || "/assets/img/similar-property1.png"}
+                                            onError={imageFallback("/assets/img/similar-property1.png")}
+                                            alt={property.title}
+                                            className="h-40 w-full rounded-lg object-cover"
+                                        />
+                                        <WishlistButton propertyId={property.id} className="absolute top-[8px] right-[8px]" />
+                                    </div>
                                     <div className="p-[10px]">
                                         <h5 className="text-[14px] text-[#202D47] font-medium">{formatPropertyPrice(property.price)}</h5>
                                         <h5 className="text-[14px] text-[#202D47] font-medium line-clamp-1">{property.title}</h5>

@@ -1,6 +1,6 @@
 import Head from "next/head";
 
-const MetaTags = ({ title, keywords, description, image, robots, maxSnippet }) => {
+const MetaTags = ({ title, keywords, description, image, robots, maxSnippet, canonical, type, siteName }) => {
   const robotsContent = [robots, maxSnippet ? `max-snippet:${maxSnippet}` : null]
     .filter(Boolean)
     .join(", ");
@@ -11,9 +11,16 @@ const MetaTags = ({ title, keywords, description, image, robots, maxSnippet }) =
       <meta httpEquiv="X-UA-Compatible" content="IE=edge,chrome=1" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       {robotsContent && <meta name="robots" content={robotsContent} />}
+      {siteName && <meta property="og:site_name" content={siteName} />}
+      {type && <meta property="og:type" content={type} />}
+      {canonical && (
+        <>
+          <link rel="canonical" href={canonical} />
+          <meta property="og:url" content={canonical} />
+        </>
+      )}
       {title && (
         <>
-          <meta property="og:site_name" content={title} />
           <title>{title}</title>
           <meta property="og:title" content={title} />
           <meta name="twitter:title" content={title} />
@@ -30,6 +37,7 @@ const MetaTags = ({ title, keywords, description, image, robots, maxSnippet }) =
         <>
           <meta property="og:image" content={image} />
           <meta name="twitter:image" content={image} />
+          <meta name="twitter:card" content="summary_large_image" />
         </>
       )}
       {keywords && <meta name="keywords" content={keywords} />}

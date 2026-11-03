@@ -5,9 +5,99 @@ import { Spinner } from "@heroui/react";
 import { useRouter } from "next/router";
 import { getProfile } from "../../../utils/fetchApi";
 import { subscribeChatUnread } from "../../../utils/firebaseChat";
+import { clearPostLoginRedirect } from "../../../utils/postLoginRedirect";
+import { FiAward, FiCalendar, FiCheckCircle, FiFileText, FiMail, FiPhone, FiShield, FiUser } from "react-icons/fi";
 import ChatBox from "../../Admin/Chat/ChatBox";
 
-export default function Profile() {
+const PILL_TONES = {
+  good: "bg-emerald-50 text-emerald-700",
+  warn: "bg-amber-50 text-amber-700",
+  bad: "bg-red-50 text-red-600",
+  muted: "bg-gray-100 text-gray-600",
+  brand: "bg-[#FFECD3] text-[var(--primary-color)]",
+};
+
+const Pill = ({ tone, children }) => (
+  <span className={`inline-flex items-center rounded-full px-[10px] py-[3px] text-xs font-semibold capitalize ${PILL_TONES[tone]}`}>
+    {children}
+  </span>
+);
+
+function InfoRow({ icon: Icon, label, children }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl p-[10px] transition-colors hover:bg-gray-50">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFECD3] text-[var(--primary-color)]" aria-hidden="true">
+        <Icon size={18} />
+      </span>
+      <div className="min-w-0">
+        <div className="text-xs text-[#62748E]">{label}</div>
+        <div className="break-words text-sm font-semibold text-[var(--secondary-color)]">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileDetails({ profile }) {
+  const role = profile.role === "super_admin" ? "Admin" : (profile.role || "-").replace(/_/g, " ");
+  const isActive = profile.status === "active";
+  const memberSince = profile.created_at
+    ? new Date(profile.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : "-";
+
+  return (
+    <div className="space-y-[20px]">
+      {/* Identity */}
+      <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <div className="h-[96px] bg-gradient-to-r from-[var(--secondary-color)] to-[var(--primary-color)]" />
+        <div className="flex flex-col gap-[12px] px-[20px] pb-[20px] sm:flex-row sm:items-end sm:gap-[20px] sm:px-[24px]">
+          <span className="-mt-[44px] flex h-[88px] w-[88px] shrink-0 items-center justify-center rounded-full border-4 border-white bg-[var(--primary-color)] text-[36px] font-bold text-white shadow-md" aria-hidden="true">
+            {profile.name?.trim().charAt(0).toUpperCase() || "U"}
+          </span>
+          <div className="min-w-0 flex-1 sm:pt-[12px]">
+            <h2 className="mb-[2px] break-words text-xl font-bold text-[var(--secondary-color)]">{profile.name || "-"}</h2>
+            <div className="break-words text-sm text-[#62748E]">{profile.email || "-"}</div>
+          </div>
+          <div className="flex flex-wrap gap-2 sm:pb-[4px]">
+            <Pill tone="brand">{role}</Pill>
+            <Pill tone={isActive ? "good" : "bad"}>{profile.status || "-"}</Pill>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 gap-[20px] xl:grid-cols-2">
+        {/* Personal details */}
+        <section className="rounded-2xl border border-gray-100 bg-white p-[16px] shadow-sm sm:p-[20px]">
+          <h3 className="mb-[12px] px-[10px] text-base font-bold text-[var(--secondary-color)]">Personal Information</h3>
+          <div className="space-y-[4px]">
+            <InfoRow icon={FiUser} label="Full Name">{profile.name || "-"}</InfoRow>
+            <InfoRow icon={FiMail} label="Email Address">{profile.email || "-"}</InfoRow>
+            <InfoRow icon={FiPhone} label="Phone Number">{profile.phone || "-"}</InfoRow>
+            <InfoRow icon={FiCalendar} label="Member Since">{memberSince}</InfoRow>
+          </div>
+        </section>
+
+        {/* Account state */}
+        <section className="rounded-2xl border border-gray-100 bg-white p-[16px] shadow-sm sm:p-[20px]">
+          <h3 className="mb-[12px] px-[10px] text-base font-bold text-[var(--secondary-color)]">Account Details</h3>
+          <div className="space-y-[4px]">
+            <InfoRow icon={FiAward} label="Role"><Pill tone="brand">{role}</Pill></InfoRow>
+            <InfoRow icon={FiShield} label="Account Status">
+              <Pill tone={isActive ? "good" : "bad"}>{profile.status || "-"}</Pill>
+            </InfoRow>
+            <InfoRow icon={FiCheckCircle} label="Email Verification">
+              <Pill tone={profile.is_verified ? "good" : "warn"}>{profile.is_verified ? "Verified" : "Not Verified"}</Pill>
+            </InfoRow>
+            <InfoRow icon={FiFileText} label="Terms & Conditions">
+              <Pill tone={profile.terms_accepted ? "good" : "muted"}>{profile.terms_accepted ? "Accepted" : "Not Accepted"}</Pill>
+            </InfoRow>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+export default function Profile({ dashboard = false }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -16,6 +106,16 @@ export default function Profile() {
   const router = useRouter();
   const tab = router.query.tab === "chat" ? "chat" : "profile";
   const [chatUnread, setChatUnread] = useState(0);
+
+  // ?tab=chat&property=slug (Contact Seller) opens the chat with that property's owner
+  const startPropertyId = tab === "chat" ? router.query.property : undefined;
+
+  const handlePropertyChatDone = () => {
+    const { property: _property, ...query } = router.query;
+
+    clearPostLoginRedirect();
+    router.replace({ pathname: router.pathname, query }, undefined, { shallow: true });
+  };
 
   const changeTab = (key) => {
     const { tab: _tab, ...query } = router.query;
@@ -100,23 +200,26 @@ export default function Profile() {
   /* ================= PROFILE ================= */
 
   return (
-    <div className="container mx-auto px-4 py-10">
+    <div className={dashboard ? (tab === "chat" ? "h-full" : "") : "container mx-auto px-4 py-10"}>
 
       {/* Page Heading */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-[#001737]">
-          My Profile
-        </h1>
+      {/* Dashboard: the sidebar already says which page this is */}
+      {!dashboard && (
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-[#001737]">
+            My Profile
+          </h1>
 
-        <p className="mt-2 text-[#62748E]">
-          {tab === "chat"
-            ? "Chat with admin, brokers and sellers."
-            : "View your personal account information."}
-        </p>
-      </div>
+          <p className="mt-2 text-[#62748E]">
+            {tab === "chat"
+              ? "Chat with admin, brokers and sellers."
+              : "View your personal account information."}
+          </p>
+        </div>
+      )}
 
       {/* Tabs: Profile / Messages */}
-      <div className="mb-6 flex gap-2">
+      {!dashboard && <div className="mb-6 flex gap-2">
         {[
           ["profile", "Profile"],
           ["chat", "Messages"],
@@ -139,167 +242,18 @@ export default function Profile() {
             )}
           </button>
         ))}
-      </div>
+      </div>}
 
       {tab === "chat" ? (
-        <ChatBox embedded isCustomer={profile?.role === "customer"} />
+        <ChatBox
+          embedded
+          fill={dashboard}
+          isCustomer={profile?.role === "customer"}
+          startPropertyId={startPropertyId}
+          onPropertyChatDone={handlePropertyChatDone}
+        />
       ) : (
-      <>
-      {/* Profile Card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-
-        {/* Profile Header */}
-        <div className="bg-[#001737] px-6 py-8">
-          <div className="flex items-center gap-5">
-
-            {/* Avatar */}
-            <div className="w-20 h-20 rounded-full bg-[#E87722] flex items-center justify-center shrink-0">
-              <span className="text-white text-3xl font-bold">
-                {profile?.name?.charAt(0)?.toUpperCase()}
-              </span>
-            </div>
-
-            {/* Name & Email */}
-            <div>
-              <h2 className="text-2xl font-bold text-white">
-                {profile?.name || "-"}
-              </h2>
-
-              <p className="text-gray-300 mt-1">
-                {profile?.email || "-"}
-              </p>
-            </div>
-
-          </div>
-        </div>
-
-        {/* Profile Information */}
-        <div className="p-6">
-
-          <h3 className="text-xl font-semibold text-[#001737] mb-6">
-            Personal Information
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-            {/* Full Name */}
-            <div>
-              <p className="text-sm text-[#62748E] mb-1">
-                Full Name
-              </p>
-
-              <p className="text-base font-semibold text-[#1A1F36]">
-                {profile?.name || "-"}
-              </p>
-            </div>
-
-            {/* Email */}
-            <div>
-              <p className="text-sm text-[#62748E] mb-1">
-                Email Address
-              </p>
-
-              <p className="text-base font-semibold text-[#1A1F36]">
-                {profile?.email || "-"}
-              </p>
-            </div>
-
-            {/* Phone */}
-            <div>
-              <p className="text-sm text-[#62748E] mb-1">
-                Phone Number
-              </p>
-
-              <p className="text-base font-semibold text-[#1A1F36]">
-                {profile?.phone || "-"}
-              </p>
-            </div>
-
-            {/* Role */}
-            <div>
-              <p className="text-sm text-[#62748E] mb-1">
-                Role
-              </p>
-
-              <span className="inline-flex items-center px-3 py-1 rounded-full bg-orange-100 text-[#E87722] text-sm font-semibold capitalize">
-                {profile?.role || "-"}
-              </span>
-            </div>
-
-            {/* Account Status */}
-            <div>
-              <p className="text-sm text-[#62748E] mb-1">
-                Account Status
-              </p>
-
-              <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold capitalize ${
-                  profile?.status === "active"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-red-100 text-red-600"
-                }`}
-              >
-                {profile?.status || "-"}
-              </span>
-            </div>
-
-            {/* Email Verification */}
-            <div>
-              <p className="text-sm text-[#62748E] mb-1">
-                Email Verification
-              </p>
-
-              <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
-                  profile?.is_verified
-                    ? "bg-green-100 text-green-700"
-                    : "bg-yellow-100 text-yellow-700"
-                }`}
-              >
-                {profile?.is_verified
-                  ? "Verified"
-                  : "Not Verified"}
-              </span>
-            </div>
-
-            {/* Terms Accepted */}
-            <div>
-              <p className="text-sm text-[#62748E] mb-1">
-                Terms & Conditions
-              </p>
-
-              <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
-                  profile?.terms_accepted
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-100 text-gray-600"
-                }`}
-              >
-                {profile?.terms_accepted
-                  ? "Accepted"
-                  : "Not Accepted"}
-              </span>
-            </div>
-
-            {/* Member Since */}
-            <div>
-              <p className="text-sm text-[#62748E] mb-1">
-                Member Since
-              </p>
-
-              <p className="text-base font-semibold text-[#1A1F36]">
-                {profile?.created_at
-                  ? new Date(
-                      profile.created_at
-                    ).toLocaleDateString()
-                  : "-"}
-              </p>
-            </div>
-
-          </div>
-        </div>
-      </div>
-      </>
+      <ProfileDetails profile={profile} />
       )}
     </div>
   );

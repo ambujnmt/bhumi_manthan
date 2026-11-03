@@ -3,6 +3,7 @@ import { FaArrowRight, FaShieldAlt, FaParking, FaDumbbell, FaBed, FaVectorSquare
 import { FiNavigation } from "react-icons/fi";
 import { formatDistance, formatPropertyPrice, imageFallback } from "../../../../utils/formatPrice";
 import SectionSkeleton from "./SectionSkeleton";
+import WishlistButton from "../../../Common/WishlistButton";
 import { Link } from "@heroui/react";
 
 // Amenity name -> icon (anything else gets a check mark)
@@ -76,6 +77,7 @@ export default function PremiumLuxury({ loading = false, properties = [], nearby
                                             alt={property.title}
                                             className="w-full h-48 object-cover"
                                         />
+                                        <WishlistButton propertyId={property.id} className="absolute top-[10px] right-[10px]" />
                                         {distance && (
                                             <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white">
                                                 <FiNavigation size={10} /> {distance}

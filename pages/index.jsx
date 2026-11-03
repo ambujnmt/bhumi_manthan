@@ -2,9 +2,9 @@ import React from "react";
 import Main from "../components/Home/Main/Main";
 import { loadDefaultListings } from "../utils/useHomeListings";
 
-export default function HomePage({ banners, listings }) {
+export default function HomePage({ banners, listings, youtuberVideos }) {
   return (
-      <Main banners={banners} listings={listings} />
+      <Main banners={banners} listings={listings} youtuberVideos={youtuberVideos} />
   );
 }
 
@@ -15,6 +15,24 @@ export default function HomePage({ banners, listings }) {
 export async function getStaticProps() {
   let banners = null;
   let listings = null;
+  let youtuberVideos = null;
+
+  const loadYoutuberVideos = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}youtuber-videos`, {
+        headers: { Accept: "application/json" },
+      });
+
+      const data = await response.json();
+
+      if (response.ok && Array.isArray(data?.data?.videos)) {
+        youtuberVideos = data.data.videos;
+      }
+    } catch (error) {
+      // API down at build time -> the section loads them in browser
+      console.error("Home YouTuber videos fetch error:", error?.message);
+    }
+  };
 
   const loadBanners = async () => {
     try {
@@ -49,10 +67,10 @@ export async function getStaticProps() {
     }
   };
 
-  await Promise.all([loadBanners(), loadListings()]);
+  await Promise.all([loadBanners(), loadListings(), loadYoutuberVideos()]);
 
   return {
-    props: { banners, listings },
+    props: { banners, listings, youtuberVideos },
     revalidate: 60,
   };
 }

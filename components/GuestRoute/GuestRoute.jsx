@@ -2,6 +2,7 @@ import { useUser } from "../../context/UserContext";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { adminHomePath, hasAdminAccess } from "../../utils/adminPermissions";
+import { postLoginRedirect } from "../../utils/postLoginRedirect";
 
 const GuestRoute = ({ children }) => {
   const { user, authLoading } = useUser();
@@ -41,7 +42,8 @@ const GuestRoute = ({ children }) => {
 
       // Customer
       if (user.role === "customer") {
-        router.replace("/");
+        // Runs right after login too, so it must go to the same place as the login form
+        router.replace(postLoginRedirect() || "/");
         return;
       }
 

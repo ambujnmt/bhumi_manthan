@@ -8,10 +8,18 @@ import RichTextEditor from "../../RichTextEditor/RichTextEditor";
 import { showToast } from "../../../store/toast";
 import { MAX_IMAGE_KB, pickImageFile } from "../../../utils/imageLimit";
 import LocationFields from "./LocationFields";
+import CategoryFields from "./CategoryFields";
+import PropertyVideoField, { appendVideo, emptyVideo } from "./PropertyVideoField";
+import PropertySeoFields from "./PropertySeoFields";
 
 const initialForm = {
     title: "",
-    property_type: "Apartment",
+    slug: "",
+    meta_title: "",
+    meta_description: "",
+    meta_keywords: "",
+    category_id: "",
+    sub_category_id: "",
     listing_type: "Sale",
     configuration: "",
     status: "Ready to Move",
@@ -60,13 +68,6 @@ const fieldSections = [
         title: "Basic Property Information",
         fields: [
             { name: "title", label: "Property Title", required: true, placeholder: "3 BHK Luxury Apartment" },
-            {
-                name: "property_type",
-                label: "Property Type",
-                type: "select",
-                required: true,
-                options: ["Apartment", "Villa", "House", "Plot", "Commercial"],
-            },
             {
                 name: "listing_type",
                 label: "Listing Type",
@@ -194,6 +195,7 @@ export default function Create() {
     const [form, setForm] = useState(initialForm);
     const [images, setImages] = useState(initialImages);
     const [extraImages, setExtraImages] = useState(defaultImageSlots);
+    const [video, setVideo] = useState(emptyVideo);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
     const [messageType, setMessageType] = useState("");
@@ -310,6 +312,8 @@ Object.entries(form).forEach(([key, value]) => {
             }
         });
 
+        appendVideo(formData, video);
+
         // Call the create property API
         const response = await createProperty(formData);
 
@@ -320,6 +324,7 @@ Object.entries(form).forEach(([key, value]) => {
         setForm({ ...initialForm });
         setImages({ ...initialImages });
         setExtraImages(defaultImageSlots());
+        setVideo(emptyVideo());
 
         // Safely reset native form inputs and file inputs
         if (formRef.current) {
@@ -391,6 +396,18 @@ Object.entries(form).forEach(([key, value]) => {
                                 </h3>
 
                                 <div className="grid grid-cols-1 gap-x-5 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+                                    {/* Category -> Sub Category (saved as property_type) */}
+                                    {section.title === "Basic Property Information" && (
+                                        <CategoryFields
+                                            values={form}
+                                            onChange={(patch) =>
+                                                setForm((previous) => ({ ...previous, ...patch }))
+                                            }
+                                            inputClass={inputClass}
+                                            labelClass={labelClass}
+                                        />
+                                    )}
+
                                     {section.title === "Location Details" && (
                                         <LocationFields
                                             values={form}
@@ -737,6 +754,17 @@ Object.entries(form).forEach(([key, value]) => {
                                 ))}
                             </div>
                         </section>
+
+                        <PropertyVideoField value={video} onChange={setVideo} labelClass={labelClass} inputClass={inputClass} fileInputClass={fileInputClass} />
+
+                        <PropertySeoFields
+                            values={form}
+                            onChange={(patch) =>
+                                setForm((previous) => ({ ...previous, ...patch }))
+                            }
+                            inputClass={inputClass}
+                            labelClass={labelClass}
+                        />
 
                         <div className="flex flex-col-reverse justify-end gap-3 border-t border-gray-200 pt-6 sm:flex-row">
                             <button

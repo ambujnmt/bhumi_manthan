@@ -5,6 +5,8 @@ import dynamic from "next/dynamic";
 import { useEffect } from "react";
 import { LanguageProvider } from "../context/LanguageContext";
 import { UserProvider, useUser } from "../context/UserContext";
+import { WishlistProvider } from "../context/WishlistContext";
+import { CompareProvider } from "../context/CompareContext";
 import { GoogleOAuthProvider } from '@react-oauth/google'; // ✅ Import GoogleOAuthProvider
 import { RegisteredUserProvider } from "../context/RegisteredUserContext"; // ✅ Import RegisteredUserProvider
 import { toRolePath } from "../utils/adminPermissions";
@@ -50,6 +52,8 @@ function App({ Component, pageProps, websiteData }) {
       <LanguageProvider>
         <UserProvider>
           <RegisteredUserProvider>
+            <WishlistProvider>
+            <CompareProvider>
             <RoleAwareProviders>
               <DefaultLayout websiteData={websiteData}>
                  <Toast />
@@ -57,6 +61,8 @@ function App({ Component, pageProps, websiteData }) {
               </DefaultLayout>
               <Snackbar />
             </RoleAwareProviders>
+            </CompareProvider>
+            </WishlistProvider>
           </RegisteredUserProvider>
         </UserProvider>
       </LanguageProvider>

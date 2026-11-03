@@ -6,18 +6,34 @@ import FloorLocation from './FloorLocation';
 import PropertyImageSlider from './PropertyImageSlider';
 import SimilarProperties from './SimilarProperties';
 import PropertySideForm from './PropertySideForm';
+import AgentCard from './AgentCard';
+import { resolveVideo } from './PropertyVideo';
+import WishlistButton from '../../Common/WishlistButton';
+import CompareButton from '../../Common/CompareButton';
 import { FaCog, FaRulerCombined, FaCity, FaBuilding, } from "react-icons/fa";
 import { FaVectorSquare, FaCompass, FaFileSignature, FaCouch } from "react-icons/fa";
 import { FaHome, FaChevronRight, FaArrowLeft } from "react-icons/fa";
 import { MdRealEstateAgent, MdApartment } from "react-icons/md";
+import { BsChatDotsFill } from "react-icons/bs";
 import PropertyDescription from './PropertyDescription';
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { getPropertyDetails } from "@/utils/fetchApi";
+import {
+    clearPostLoginRedirect,
+    isBookingAfterLogin,
+    rememberBookingAfterLogin,
+    rememberPostLoginRedirect,
+} from "@/utils/postLoginRedirect";
+import { showToast } from "@/store/toast";
+import { useUser } from "@/context/UserContext";
+import { BookAppointmentButton } from "@/modules/appointments";
 
 export default function PropertyDetails() {
     const params = useParams();
     const id = params?.id;
+    const router = useRouter();
+    const { user } = useUser();
 
     const [property, setProperty] = useState(null);
     const [similarProperties, setSimilarProperties] = useState([]);
@@ -59,6 +75,42 @@ export default function PropertyDetails() {
             cancelled = true;
         };
     }, [id]);
+
+    // /web/profile ignores the id and always shows the logged in user, which isn't known yet before login
+    const contactSeller = () => {
+        const chatPath = `/web/profile/me?tab=chat&property=${encodeURIComponent(property.slug || property.id)}`;
+
+        if (!user) {
+            rememberPostLoginRedirect(chatPath);
+            router.push("/login");
+            return;
+        }
+
+        // The chat API lets sellers, brokers and admins message customers only
+        if (user.role !== "customer") {
+            showToast("Contact Seller is available for customer accounts only.", "error");
+            return;
+        }
+
+        router.push(chatPath);
+    };
+
+    // Guest clicked Book Appointment: back here after login, with the booking window open
+    const [openBooking, setOpenBooking] = useState(false);
+    const listingKey = property?.slug || property?.id;
+
+    const askLoginToBook = () => {
+        rememberBookingAfterLogin(listingKey);
+        rememberPostLoginRedirect(`/web/propertyDetail/${encodeURIComponent(listingKey)}`);
+        router.push("/login");
+    };
+
+    useEffect(() => {
+        if (!user || !listingKey || !isBookingAfterLogin(listingKey)) return;
+
+        clearPostLoginRedirect();
+        setOpenBooking(true);
+    }, [user, listingKey]);
 
     const propertyImages = property
         ? [
@@ -194,7 +246,7 @@ export default function PropertyDetails() {
 
                         {/* Slider section */}
                         <div className="xl:col-span-8 lg:col-span-8 md:col-span-8 col-span-12">
-                            <PropertyImageSlider images={propertyImages} />
+                            <PropertyImageSlider images={propertyImages} video={resolveVideo(property)} title={property.title} />
 
                             {/* highlights */}
                             <section className="w-full mt-[30px]">
@@ -264,6 +316,17 @@ export default function PropertyDetails() {
 
                         {/* Form section */}
                         <div className="xl:col-span-4 lg:col-span-4 md:col-span-4 col-span-12">
+                            <div className="mx-auto mb-4 w-full max-w-sm">
+                                <BookAppointmentButton
+                                    bookableType="property"
+                                    bookableKey={property.slug || property.id}
+                                    title={property.title}
+                                    user={user}
+                                    onLoginRequired={askLoginToBook}
+                                    autoOpen={openBooking}
+                                    className="w-full"
+                                />
+                            </div>
                             <PropertySideForm propertyId={id} />
                         </div>
                         {/* // Form section */}
@@ -307,9 +370,12 @@ export default function PropertyDetails() {
                                 </div>
 
                                 {/* Title + location */}
-                                <h1 className="text-[28px] font-bold text-[var(--text-color1)]">
-                                    {property.title}
-                                </h1>
+                                <div className="flex items-start justify-between gap-3">
+                                    <h1 className="text-[28px] font-bold text-[var(--text-color1)]">
+                                        {property.title}
+                                    </h1>
+                                    <WishlistButton propertyId={property.id} className="h-10 w-10 border border-gray-200" />
+                                </div>
 
                                 {/* Price */}
                                 <div className="mt-2">
@@ -326,6 +392,8 @@ export default function PropertyDetails() {
                                             .join(", ")}
                                     </p>
                                 </div>
+
+                                <CompareButton propertyId={property.id} />
 
                                 {/* Specs row */}
                                 <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 mb-4">
@@ -410,14 +478,7 @@ export default function PropertyDetails() {
                                     </div>
                                 </div>
 
-                                <div className="gap-4">
-                                    <Link href="#" className="bg-[var(--primary-color)] hover:bg-[var(--secondary-color)] transition-colors text-white text-sm font-semibold rounded-lg px-8 py-3 w-full lg:w-auto shrink-0 mr-5">
-                                        Contact Seller
-                                    </Link>
-                                    <Link href="#" className="border-1 border-orange-600 hover:bg-[var(--secondary-color)] hover:text-white transition-colors text-[var(--primary-color)] text-sm font-semibold rounded-lg px-8 py-3 w-full lg:w-auto shrink-0">
-                                        Get Phone No.
-                                    </Link>
-                                </div>
+                                <AgentCard property={property} onChat={contactSeller} />
 
 
                                 {/* <AboutPropertyDetail /> */}
@@ -467,6 +528,17 @@ export default function PropertyDetails() {
                     </div>
                 </div>
             </section>
+
+            {/* Floating chat button (same flow as Contact Seller) */}
+            <button
+                type="button"
+                onClick={contactSeller}
+                aria-label="Chat with seller"
+                title="Chat with seller"
+                className="fixed bottom-20 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--primary-color)] text-white shadow-lg transition-colors hover:bg-[var(--secondary-color)]"
+            >
+                <BsChatDotsFill size={24} aria-hidden="true" />
+            </button>
         </>
     )
 }

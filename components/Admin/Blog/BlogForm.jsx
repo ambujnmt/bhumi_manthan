@@ -7,6 +7,8 @@ import PageTitle from "../../Breadcrumb/PageTitle";
 import { Spinner } from "@heroui/react";
 import { getAdminBlogDetail, saveBlog } from "../../../utils/adminFetchApi";
 import { showToast } from "../../../store/toast";
+import { buildBlogSeo } from "../../../utils/seo";
+import SeoFields from "../SeoFields";
 import "react-quill/dist/quill.snow.css";
 
 // Quill uses window -> load only in browser
@@ -31,6 +33,10 @@ const initialForm = {
     excerpt: "",
     content: "",
     is_active: true,
+    slug: "",
+    meta_title: "",
+    meta_description: "",
+    meta_keywords: "",
 };
 
 const categoryOptions = [
@@ -64,6 +70,7 @@ export default function BlogForm({ blogId = null }) {
 
     const [form, setForm] = useState(initialForm);
     const [currentReadTime, setCurrentReadTime] = useState(null);
+    const [savedSlug, setSavedSlug] = useState("");
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState("");
 
@@ -95,7 +102,12 @@ export default function BlogForm({ blogId = null }) {
                     excerpt: blog.excerpt ?? "",
                     content: blog.content ?? "",
                     is_active: !!blog.is_active,
+                    slug: blog.slug ?? "",
+                    meta_title: blog.meta_title ?? "",
+                    meta_description: blog.meta_description ?? "",
+                    meta_keywords: blog.meta_keywords ?? "",
                 });
+                setSavedSlug(blog.slug ?? "");
                 setCurrentReadTime(blog.read_time);
                 setImagePreview(blog.image ?? "");
             } catch (error) {
@@ -169,7 +181,10 @@ export default function BlogForm({ blogId = null }) {
 
             if (isEdit) {
                 setCurrentReadTime(res?.data?.blog?.read_time ?? currentReadTime);
-                setForm((previous) => ({ ...previous, read_time: "" }));
+                // Backend may change the slug (made from title, or -1 if already taken)
+                const slug = res?.data?.blog?.slug ?? form.slug;
+                setSavedSlug(slug);
+                setForm((previous) => ({ ...previous, read_time: "", slug }));
                 setImageFile(null);
             } else {
                 router.push("/admin/blog/blogList");
@@ -351,6 +366,20 @@ export default function BlogForm({ blogId = null }) {
                                 />
                             </div>
                         </div>
+
+                        <SeoFields
+                            values={form}
+                            onChange={(patch) =>
+                                setForm((previous) => ({ ...previous, ...patch }))
+                            }
+                            seo={buildBlogSeo(form)}
+                            urlPath="/web/blog/"
+                            savedSlug={savedSlug}
+                            titlePlaceholder="First-Time Home Buyer Tips for 2026"
+                            keywordsPlaceholder="home buying tips, first home india"
+                            inputClass={inputClass}
+                            labelClass={labelClass}
+                        />
 
                         <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-[#1A1F36]">
                             <input
