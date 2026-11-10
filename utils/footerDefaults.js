@@ -2,6 +2,9 @@
 // Used by website Footer until admin saves Footer Settings,
 // and as the starting values of the admin Footer Settings form.
 
+// Bhumi Manthan Video Tour page (videos from Admin -> YouTuber Videos)
+export const VIDEO_TOUR_LINK = { title: "Video Tour", href: "/web/videoTour" };
+
 const footerDefaults = {
   logo: "/assets/img/footer-logo.png",
 
@@ -24,6 +27,7 @@ const footerDefaults = {
         { title: "Contact Us", href: "/user/cms/contactUs" },
         { title: "Careers", href: "#" },
         { title: "Blog & Articles", href: "/web/blog" },
+        VIDEO_TOUR_LINK,
       ],
     },
     {
@@ -69,6 +73,19 @@ const footerDefaults = {
   ],
 };
 
+// Footer saved before the Video Tour page existed: add the link to the first column
+const withVideoTour = (columns) => {
+  const hasLink = columns.some((column) =>
+    (column?.links || []).some((link) => link?.href === VIDEO_TOUR_LINK.href)
+  );
+
+  if (hasLink || columns.length === 0) return columns;
+
+  return columns.map((column, index) =>
+    index === 0 ? { ...column, links: [...(column.links || []), VIDEO_TOUR_LINK] } : column
+  );
+};
+
 // Saved settings on top of defaults (missing keys -> default)
 export const mergeFooter = (saved) => {
   if (!saved) return footerDefaults;
@@ -79,7 +96,7 @@ export const mergeFooter = (saved) => {
     logo: saved.logo || footerDefaults.logo,
     social: { ...footerDefaults.social, ...(saved.social || {}) },
     contact: { ...footerDefaults.contact, ...(saved.contact || {}) },
-    columns: Array.isArray(saved.columns) ? saved.columns : footerDefaults.columns,
+    columns: Array.isArray(saved.columns) ? withVideoTour(saved.columns) : footerDefaults.columns,
     bottom_links: Array.isArray(saved.bottom_links) ? saved.bottom_links : footerDefaults.bottom_links,
   };
 };

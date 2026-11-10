@@ -10,10 +10,33 @@ import useSearchFilters, {
     resolveTab,
     useSearchOptions,
 } from "../../../utils/useSearchFilters";
+import { propertyKind } from "../../Admin/PropertyManagement/propertyFieldRules";
 
 const COUNT_DEBOUNCE = 300;
 
-const FILTER_KEYS = ["budget_min", "budget_max", "property_types", "bedrooms", "furnishing"];
+// Type based list filters (API: tabs[].property_types[].filters says which type has which)
+const TYPE_FILTERS = ["bedrooms", "furnishing", "preferred_tenants", "pg_sharing", "pg_gender", "pg_meals"];
+
+const FILTER_KEYS = ["budget_min", "budget_max", "property_types", "listing_type", ...TYPE_FILTERS];
+
+// Old API without tabs[].property_types[].filters -> same table as the backend
+const FALLBACK_FILTERS = {
+    flat: ["bedrooms", "furnishing", "preferred_tenants"],
+    independent: ["bedrooms", "furnishing", "preferred_tenants"],
+    office: ["furnishing"],
+    shop: ["furnishing"],
+    pg: ["furnishing", "preferred_tenants", "pg_sharing", "pg_gender", "pg_meals"],
+    plot: [],
+    warehouse: [],
+};
+
+// Chip groups shown below BHK / Furnishing (options come from /api/search/options)
+const EXTRA_GROUPS = [
+    { key: "preferred_tenants", title: "Preferred Tenants" },
+    { key: "pg_sharing", title: "Sharing Type" },
+    { key: "pg_gender", title: "PG For" },
+    { key: "pg_meals", title: "Meals" },
+];
 
 const pickFilters = (filters) =>
     FILTER_KEYS.reduce((values, key) => ({ ...values, [key]: filters[key] }), {});
@@ -47,8 +70,36 @@ export default function SearchPropertiesLeftCol() {
         setDraft(pickFilters(filters));
     }, [urlKey]);
 
+    // tab = category group, its sub categories = property types
+    const tab = resolveTab(options, filters.type);
+    const tabKey = tab?.key || filters.type;
+    const propertyTypes = tab?.property_types || [];
+
+    // Filters only for property types that have them (no BHK for plot / office / PG, PG filters only for PG ...).
+    // Nothing selected -> every type of the tab.
+    const selectedTypes = draft.property_types.length
+        ? propertyTypes.filter((t) => draft.property_types.includes(t.key))
+        : propertyTypes;
+    const available = new Set(
+        selectedTypes.flatMap((t) => t.filters || FALLBACK_FILTERS[propertyKind(tabKey, t.key)] || [])
+    );
+    const canShow = (key) => propertyTypes.length === 0 || available.has(key);
+
+    // Rental tab is always rent; tenants only matter when renting
+    const showListing = tabKey !== "rental" && (options?.listing_types || []).length > 0;
+    const renting = tabKey === "rental" || draft.listing_type.some((key) => key !== "sale");
+    const visible = (key) => canShow(key) && (key !== "preferred_tenants" || renting);
+
+    // Hidden filters are not applied (a plot search never asks for 3 BHK)
+    const applied = TYPE_FILTERS.reduce(
+        (values, key) => ({ ...values, [key]: visible(key) ? draft[key] : [] }),
+        { ...draft, listing_type: showListing ? draft.listing_type : [] }
+    );
+    const showBedrooms = visible("bedrooms");
+    const showFurnishing = visible("furnishing");
+
     // Live count for city / localities / tab from URL + draft filters
-    const countKey = JSON.stringify(filtersToApi({ ...filters, ...draft }));
+    const countKey = JSON.stringify(filtersToApi({ ...filters, ...applied }));
     useEffect(() => {
         const controller = new AbortController();
         setCounting(true);
@@ -74,12 +125,8 @@ export default function SearchPropertiesLeftCol() {
                 : [...previous[key], value],
         }));
 
-    // tab = category group, its sub categories = property types
-    const tab = resolveTab(options, filters.type);
-    const tabKey = tab?.key || filters.type;
-    const propertyTypes = tab?.property_types || [];
     const budgets = options?.budgets?.[tabKey] || [];
-    const changed = JSON.stringify(draft) !== urlKey;
+    const changed = JSON.stringify(applied) !== urlKey;
 
     // Applied filters as removable tags
     const tags = [
@@ -96,6 +143,13 @@ export default function SearchPropertiesLeftCol() {
             label: options?.furnishing?.find((f) => f.key === key)?.label || key,
             remove: { furnishing: filters.furnishing.filter((f) => f !== key) },
         })),
+        // For Sale / Rent / Lease, tenants, PG sharing ...
+        ...["listing_type", ...EXTRA_GROUPS.map((group) => group.key)].flatMap((group) =>
+            filters[group].map((key) => ({
+                label: (options?.[group === "listing_type" ? "listing_types" : group] || []).find((o) => o.key === key)?.label || key,
+                remove: { [group]: filters[group].filter((item) => item !== key) },
+            }))
+        ),
     ];
 
     const activeCount = countActiveFilters(filters);
@@ -201,7 +255,28 @@ export default function SearchPropertiesLeftCol() {
                     </div>
                 )}
 
-                {/* Bedrooms */}
+                {/* For Sale / Rent / Lease (not on the Rental tab) */}
+                {showListing && (
+                    <div className="mb-6 border-t border-gray-100 pt-3">
+                        <h3 className="mb-3 text-sm font-semibold text-gray-900">Available For</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {options.listing_types.map((item) => (
+                                <button
+                                    key={item.key}
+                                    type="button"
+                                    aria-pressed={draft.listing_type.includes(item.key)}
+                                    onClick={() => toggle("listing_type", item.key)}
+                                    className={chipClass(draft.listing_type.includes(item.key))}
+                                >
+                                    {item.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Bedrooms (homes only) */}
+                {showBedrooms && (
                 <div className="mb-6 border-t border-gray-100 pt-3">
                     <h3 className="mb-3 text-sm font-semibold text-gray-900">No. of Bedrooms</h3>
                     <div className="grid grid-cols-5 gap-1.5">
@@ -219,8 +294,10 @@ export default function SearchPropertiesLeftCol() {
                         ))}
                     </div>
                 </div>
+                )}
 
-                {/* Furnishing */}
+                {/* Furnishing (not for plot / land / warehouse) */}
+                {showFurnishing && (
                 <div className="mb-6 border-t border-gray-100 pt-3">
                     <h3 className="mb-3 text-sm font-semibold text-gray-900">Furnishing Status</h3>
                     <div className="flex flex-wrap gap-2">
@@ -237,11 +314,32 @@ export default function SearchPropertiesLeftCol() {
                         ))}
                     </div>
                 </div>
+                )}
+
+                {/* Preferred tenants (renting homes / PG), PG sharing / for / meals */}
+                {EXTRA_GROUPS.filter((group) => visible(group.key) && (options?.[group.key] || []).length > 0).map((group) => (
+                    <div key={group.key} className="mb-6 border-t border-gray-100 pt-3">
+                        <h3 className="mb-3 text-sm font-semibold text-gray-900">{group.title}</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {options[group.key].map((item) => (
+                                <button
+                                    key={item.key}
+                                    type="button"
+                                    aria-pressed={draft[group.key].includes(item.key)}
+                                    onClick={() => toggle(group.key, item.key)}
+                                    className={chipClass(draft[group.key].includes(item.key))}
+                                >
+                                    {item.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                ))}
 
                 {/* Show N Properties */}
                 <button
                     type="button"
-                    onClick={() => setFilters(draft)}
+                    onClick={() => setFilters(applied)}
                     disabled={!changed && !counting}
                     className="flex w-full items-center justify-center gap-2 rounded-lg border bg-[var(--primary-color)] px-3 py-3.5 text-[15px] font-medium leading-[100%] text-white transition-all duration-300 hover:bg-[var(--secondary-color)] disabled:cursor-default disabled:opacity-70"
                 >

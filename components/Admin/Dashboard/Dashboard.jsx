@@ -12,6 +12,8 @@ import {
   FiMessageSquare,
   FiMessageCircle,
   FiChevronRight,
+  FiGift,
+  FiCalendar,
 } from "react-icons/fi";
 import {
   HiOutlineBuildingOffice2,
@@ -38,6 +40,7 @@ const STAT_CARDS = [
     icon: FiHome,
     iconBg: "bg-blue-50",
     iconColor: "text-blue-600",
+    href: "/admin/propertyManagement/propertyList",
   },
   {
     key: "active_listings",
@@ -45,6 +48,7 @@ const STAT_CARDS = [
     icon: HiOutlineBuildingOffice2,
     iconBg: "bg-emerald-50",
     iconColor: "text-emerald-600",
+    href: "/admin/propertyManagement/propertyList",
   },
   {
     key: "total_enquiries",
@@ -52,6 +56,7 @@ const STAT_CARDS = [
     icon: FiMessageSquare,
     iconBg: "bg-violet-50",
     iconColor: "text-violet-600",
+    href: "/admin/enquiry/enquiryList",
   },
   {
     key: "registered_users",
@@ -59,6 +64,16 @@ const STAT_CARDS = [
     icon: FiUsers,
     iconBg: "bg-orange-50",
     iconColor: "text-orange-600",
+    href: "/admin/user/userManagement",
+  },
+  // Seller / broker (instead of Registered Users): their own events
+  {
+    key: "total_events",
+    title: "My Events",
+    icon: FiCalendar,
+    iconBg: "bg-orange-50",
+    iconColor: "text-orange-600",
+    href: "/admin/event/listing",
   },
 ];
 
@@ -146,8 +161,35 @@ export default function Dashboard() {
   const yearProperties = monthly.reduce((sum, item) => sum + item.properties, 0);
   const yearEnquiries = monthly.reduce((sum, item) => sum + item.enquiries, 0);
 
+  // Festival offer running (seller / broker): from the logged in user's listing quota
+  const offer = user?.listing_quota?.offer;
+
   return (
     <div className="min-h-screen [&_p]:mb-0">
+
+      {offer?.ends_at && (
+        <div
+          role="status"
+          className="mb-5 flex flex-col gap-3 rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50 to-orange-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-2.5 text-sm text-purple-900">
+            <FiGift className="mt-0.5 shrink-0 text-purple-600" size={18} aria-hidden="true" />
+            <p>
+              <b>{offer.title || "Festival offer"}:</b> post unlimited properties till{" "}
+              <b>
+                {new Date(offer.ends_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+              </b>
+              .
+            </p>
+          </div>
+          <NextLink
+            href="/admin/propertyManagement/createProperty"
+            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#7C3AED] px-4 py-2 text-sm font-semibold text-white no-underline shadow-sm transition hover:bg-[#6D28D9]"
+          >
+            Post Property
+          </NextLink>
+        </div>
+      )}
 
       {/* ================================================================
           HEADER
@@ -156,8 +198,7 @@ export default function Dashboard() {
 
         <div>
           <p className="mt-1 text-sm text-[#62748E]">
-            Welcome back. Here's what's happening with your real estate
-            platform today.
+            &ldquo;Welcome! Here&apos;s what&apos;s happening with your real estate platform today.&rdquo;
           </p>
         </div>
 
@@ -192,10 +233,14 @@ export default function Dashboard() {
           const stat = data.stats?.[card.key] || { total: 0, this_month: 0, change: 0 };
           const isDown = stat.change < 0;
 
+          // Every card opens its list page
+          const CardTag = card.href ? NextLink : "div";
+
           return (
-            <div
+            <CardTag
               key={card.key}
-              className="rounded-xl border border-gray-100 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.03)] transition hover:-translate-y-0.5 hover:shadow-md"
+              {...(card.href ? { href: card.href } : {})}
+              className="block rounded-xl border border-gray-100 bg-white p-4 no-underline shadow-[0_2px_8px_rgba(0,0,0,0.03)] transition hover:-translate-y-0.5 hover:shadow-md"
             >
               <div className="flex items-start justify-between">
 
@@ -237,12 +282,15 @@ export default function Dashboard() {
                 </span>
 
                 <span className="text-xs text-gray-400">
-                  {stat.this_month} new this month
+                  {stat.upcoming !== undefined
+                    ? `${stat.upcoming} upcoming · ${stat.this_month} new this month`
+                    : `${stat.this_month} new this month`}
                 </span>
               </div>
-            </div>
+            </CardTag>
           );
         })}
+
       </div>
 
       {/* ================================================================

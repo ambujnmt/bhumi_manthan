@@ -19,7 +19,16 @@ import { useAdminPermission } from "../../../utils/adminPermissions";
 
 const MAX_THUMBNAIL_MB = 2;
 
+// Video categories (same values as backend YoutuberVideo::CATEGORIES)
+const CATEGORIES = [
+    { value: "tour", label: "Tour Videos" },
+    { value: "property", label: "Properties Videos" },
+];
+
+const categoryLabel = (value) => CATEGORIES.find((item) => item.value === value)?.label || "Tour Videos";
+
 const initialForm = {
+    category: "tour",
     youtuber_name: "",
     title: "",
     sort_order: "0",
@@ -42,6 +51,19 @@ export default function Listing() {
     const can = useAdminPermission();
     const [videos, setVideos] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    // Category tab: "all" | "tour" | "property"
+    const [activeCategory, setActiveCategory] = useState("all");
+    const categoryOf = (item) => item.category || "tour";
+    const visibleVideos =
+        activeCategory === "all" ? videos : videos.filter((item) => categoryOf(item) === activeCategory);
+    const tabs = [
+        { value: "all", label: "All Videos", count: videos.length },
+        ...CATEGORIES.map((item) => ({
+            ...item,
+            count: videos.filter((video) => categoryOf(video) === item.value).length,
+        })),
+    ];
 
     // Add / Edit Modal
     const [formOpen, setFormOpen] = useState(false);
@@ -78,12 +100,13 @@ export default function Listing() {
         setForm(
             item
                 ? {
+                      category: item.category || "tour",
                       youtuber_name: item.youtuber_name || "",
                       title: item.title || "",
                       sort_order: String(item.sort_order ?? 0),
                       is_active: !!item.is_active,
                   }
-                : initialForm
+                : { ...initialForm, category: activeCategory === "all" ? "tour" : activeCategory }
         );
         setVideo(item ? videoFromProperty(item) : emptyVideo());
         setThumbnailFile(null);
@@ -143,6 +166,7 @@ export default function Listing() {
         try {
             const formData = new FormData();
 
+            formData.append("category", form.category);
             formData.append("youtuber_name", form.youtuber_name.trim());
             formData.append("title", form.title.trim());
             formData.append("sort_order", form.sort_order || "0");
@@ -216,7 +240,38 @@ export default function Listing() {
                 title="YouTuber Videos"
             />
 
-            <div className="mb-4 mt-6 flex items-center justify-end">
+            <div className="mb-4 mt-6 flex flex-wrap items-center justify-between gap-3">
+                {/* Category tabs */}
+                <div role="tablist" aria-label="Video category" className="flex flex-wrap gap-2">
+                    {tabs.map((tab) => {
+                        const active = activeCategory === tab.value;
+
+                        return (
+                            <button
+                                key={tab.value}
+                                type="button"
+                                role="tab"
+                                aria-selected={active}
+                                onClick={() => setActiveCategory(tab.value)}
+                                className={`flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition ${
+                                    active
+                                        ? "bg-[#001737] text-white shadow-sm"
+                                        : "border border-gray-300 bg-white text-[#283A86] hover:border-[#E87722] hover:text-[#E87722]"
+                                }`}
+                            >
+                                <span>{tab.label}</span>
+                                <span
+                                    className={`rounded-full px-2 py-0.5 text-xs ${
+                                        active ? "bg-white/20 text-white" : "bg-gray-100 text-[#62748E]"
+                                    }`}
+                                >
+                                    {tab.count}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+
                 {can("youtuber_videos.create") && (
                     <button
                         type="button"
@@ -234,6 +289,7 @@ export default function Listing() {
                     <thead className="bg-gray-100">
                         <tr>
                             <th className="whitespace-nowrap px-4 py-3 text-left">YouTuber</th>
+                            <th className="whitespace-nowrap px-4 py-3 text-left">Category</th>
                             <th className="whitespace-nowrap px-4 py-3 text-left">Title</th>
                             <th className="whitespace-nowrap px-4 py-3 text-left">Video</th>
                             <th className="whitespace-nowrap px-4 py-3 text-left">Order</th>
@@ -245,16 +301,27 @@ export default function Listing() {
                     <tbody>
                         {loading ? (
                             <tr>
-                                <td colSpan="6">
+                                <td colSpan="7">
                                     <div className="flex items-center justify-center py-16">
                                         <Spinner size="md" />
                                     </div>
                                 </td>
                             </tr>
-                        ) : videos.length > 0 ? (
-                            videos.map((item) => (
+                        ) : visibleVideos.length > 0 ? (
+                            visibleVideos.map((item) => (
                                 <tr key={item.id} className="border-t">
                                     <td className="whitespace-nowrap px-4 py-3 font-semibold text-[#1A1F36]">{item.youtuber_name}</td>
+                                    <td className="whitespace-nowrap px-4 py-3">
+                                        <span
+                                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                                categoryOf(item) === "property"
+                                                    ? "bg-blue-100 text-blue-700"
+                                                    : "bg-orange-100 text-[#c25e12]"
+                                            }`}
+                                        >
+                                            {categoryLabel(categoryOf(item))}
+                                        </span>
+                                    </td>
                                     <td className="max-w-[280px] truncate px-4 py-3">{item.title || "-"}</td>
                                     <td className="whitespace-nowrap px-4 py-3">
                                         <a
@@ -314,8 +381,10 @@ export default function Listing() {
                             ))
                         ) : (
                             <tr>
-                                <td colSpan="6" className="py-6 text-center text-gray-500">
-                                    No videos yet. The home page section stays hidden until one is added.
+                                <td colSpan="7" className="py-6 text-center text-gray-500">
+                                    {activeCategory === "all"
+                                        ? "No videos yet. The home page section stays hidden until one is added."
+                                        : `No ${categoryLabel(activeCategory).toLowerCase()} yet.`}
                                 </td>
                             </tr>
                         )}
@@ -364,6 +433,25 @@ export default function Listing() {
                             {formError}
                         </p>
                     )}
+
+                    <div>
+                        <label htmlFor="video_category" className={labelClass}>
+                            Category <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                            id="video_category"
+                            name="category"
+                            value={form.category}
+                            onChange={handleChange}
+                            className={inputClass}
+                        >
+                            {CATEGORIES.map((item) => (
+                                <option key={item.value} value={item.value}>
+                                    {item.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
                     <div>
                         <label htmlFor="youtuber_name" className={labelClass}>

@@ -6,8 +6,8 @@ const list = (value) => (Array.isArray(value) ? value : []);
 
 const CACHE_KEY = "bm_home_listings";
 
-// Home shows only this many featured cards ("View All" shows the full list)
-const FEATURED_ON_HOME = 4;
+// Featured cards loaded for home (8 per page with pagination there, "View All" shows the full list)
+export const FEATURED_ON_HOME = 40;
 
 // Last shown listings -> shown instantly after page refresh
 const readCache = () => {

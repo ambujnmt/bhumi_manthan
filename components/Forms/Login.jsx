@@ -201,7 +201,7 @@ router.push(postLoginRedirect() || "/");
               className="mb-2 text-xs font-semibold uppercase tracking-[2px]"
               style={{ color: "#E87722" }}
             >
-              Welcome Back
+              Bhoomi Manthan
             </p>
 
             <h1
@@ -211,7 +211,7 @@ router.push(postLoginRedirect() || "/");
                 fontFamily: "Montserrat, sans-serif",
               }}
             >
-              Welcome back.
+              Your next property starts here.
             </h1>
 
             <p

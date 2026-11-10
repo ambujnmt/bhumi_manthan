@@ -2,9 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import { Spinner } from "@heroui/react";
-import { FiCheck, FiMail, FiPhone, FiShield, FiUser } from "react-icons/fi";
+import { FiCheck, FiEdit2, FiMail, FiPhone, FiShield, FiUser } from "react-icons/fi";
 import PageTitle from "../../Breadcrumb/PageTitle";
-import { getProfile } from "../../../utils/fetchApi";
+import { getMyPlanOrders, getProfile, updateProfile } from "../../../utils/fetchApi";
+import { useUser } from "../../../context/UserContext";
+import { showToast } from "../../../store/toast";
+import MyPlanCard from "./MyPlanCard";
 
 // Same module keys as backend AdminRole::MODULES
 const MODULE_LABELS = {
@@ -57,18 +60,213 @@ const groupPermissions = (permissions = []) => {
     }));
 };
 
-function CardHeader({ icon: Icon, title, subtitle }) {
+// Grey blocks in the page's shape while profile + plan load (one loader, no jump)
+function ProfileSkeleton({ showPlan }) {
+  const line = "rounded bg-gray-200";
+
+  return (
+    <div className="w-full animate-pulse space-y-5" aria-busy="true" aria-label="Loading profile">
+      {/* Header */}
+      <div className={`${cardClass} overflow-hidden`}>
+        <div className="h-1.5 bg-gray-200" />
+        <div className="flex flex-col justify-between gap-5 p-5 sm:flex-row sm:items-center sm:p-7">
+          <div className="flex items-center gap-4">
+            <div className="h-16 w-16 rounded-full bg-gray-200 sm:h-20 sm:w-20" />
+            <div className="space-y-2.5">
+              <div className={`${line} h-3 w-20`} />
+              <div className={`${line} h-5 w-44`} />
+              <div className={`${line} h-5 w-24`} />
+            </div>
+          </div>
+          <div className="h-8 w-24 rounded-full bg-gray-200" />
+        </div>
+      </div>
+
+      {/* Personal + account */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        {[0, 1].map((card) => (
+          <div key={card} className={cardClass}>
+            <div className="flex items-center gap-3 border-b border-gray-100 px-5 py-4 sm:px-7">
+              <div className="h-9 w-9 rounded-lg bg-gray-200" />
+              <div className="space-y-2">
+                <div className={`${line} h-3.5 w-36`} />
+                <div className={`${line} h-2.5 w-48`} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2 sm:p-7">
+              {[0, 1, 2, 3].map((item) => (
+                <div key={item} className="space-y-2">
+                  <div className={`${line} h-2.5 w-16`} />
+                  <div className={`${line} h-4 w-32`} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* My plan */}
+      {showPlan && (
+        <div className={cardClass}>
+          <div className="flex items-center gap-3 border-b border-gray-100 px-5 py-4 sm:px-7">
+            <div className="h-9 w-9 rounded-lg bg-gray-200" />
+            <div className="space-y-2">
+              <div className={`${line} h-3.5 w-24`} />
+              <div className={`${line} h-2.5 w-56`} />
+            </div>
+          </div>
+          <div className="space-y-5 p-5 sm:p-7">
+            <div className="h-20 rounded-xl bg-gray-100" />
+            <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
+              {[0, 1, 2, 3].map((item) => (
+                <div key={item} className="space-y-2">
+                  <div className={`${line} h-2.5 w-16`} />
+                  <div className={`${line} h-4 w-24`} />
+                </div>
+              ))}
+            </div>
+            <div className={`${line} h-2 w-full`} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CardHeader({ icon: Icon, title, subtitle, action = null }) {
   return (
     <div className="flex items-center gap-3 border-b border-gray-100 px-5 py-4 sm:px-7">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50">
+      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-orange-50">
         <Icon className="h-[18px] w-[18px] text-[#E87722]" />
       </div>
 
-      <div>
+      <div className="min-w-0 flex-1">
         <h3 className="mb-0 text-sm font-bold text-[#001737] sm:text-base">{title}</h3>
         <p className="mb-0 text-xs text-gray-400">{subtitle}</p>
       </div>
+
+      {action}
     </div>
+  );
+}
+
+const inputClass =
+  "mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-[#1A1F36] outline-none transition focus:border-[#E87722] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500";
+
+const labelClass = "mb-0 block text-xs font-medium uppercase tracking-wide text-gray-400";
+
+const PHONE_PATTERN = /^\+?[0-9\s-]{7,20}$/;
+
+// Edit name + phone (email is verified with OTP, so it stays read only)
+function EditProfileForm({ profile, onCancel, onSaved }) {
+  const [form, setForm] = useState({ name: profile.name || "", phone: profile.phone || "" });
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setForm((previous) => ({ ...previous, [name]: value }));
+    setErrors((previous) => ({ ...previous, [name]: undefined }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    const name = form.name.trim();
+    const phone = form.phone.trim();
+    const nextErrors = {};
+
+    if (!name) nextErrors.name = "Please enter your name.";
+    if (!phone) nextErrors.phone = "Please enter your phone number.";
+    else if (!PHONE_PATTERN.test(phone)) nextErrors.phone = "Please enter a valid phone number.";
+
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const res = await updateProfile({ name, phone });
+      showToast(res?.message || "Profile updated successfully.");
+      onSaved(res?.data?.user);
+    } catch (error) {
+      const fieldErrors = Object.fromEntries(
+        Object.entries(error?.errors || {}).map(([key, messages]) => [key, [].concat(messages)[0]])
+      );
+
+      setErrors(fieldErrors);
+      showToast(error?.message || "Unable to update profile.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} noValidate className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2 sm:p-7">
+      <div>
+        <label htmlFor="admin_profile_name" className={labelClass}>
+          Full Name <span className="text-red-500">*</span>
+        </label>
+        <input
+          id="admin_profile_name"
+          name="name"
+          value={form.name}
+          onChange={handleChange}
+          maxLength={255}
+          autoComplete="name"
+          className={inputClass}
+          aria-invalid={Boolean(errors.name)}
+        />
+        {errors.name && <p className="mb-0 mt-1 text-xs text-red-600">{errors.name}</p>}
+      </div>
+
+      <div>
+        <label htmlFor="admin_profile_phone" className={labelClass}>
+          Phone Number <span className="text-red-500">*</span>
+        </label>
+        <input
+          id="admin_profile_phone"
+          name="phone"
+          type="tel"
+          value={form.phone}
+          onChange={handleChange}
+          maxLength={20}
+          autoComplete="tel"
+          className={inputClass}
+          aria-invalid={Boolean(errors.phone)}
+        />
+        {errors.phone && <p className="mb-0 mt-1 text-xs text-red-600">{errors.phone}</p>}
+      </div>
+
+      <div className="sm:col-span-2">
+        <label htmlFor="admin_profile_email" className={labelClass}>
+          Email Address
+        </label>
+        <input id="admin_profile_email" value={profile.email || ""} disabled className={inputClass} />
+        <p className="mb-0 mt-1 text-xs text-gray-400">Email is verified with OTP and can&apos;t be changed here.</p>
+      </div>
+
+      <div className="flex flex-wrap justify-end gap-2 sm:col-span-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-[#001737] transition hover:bg-gray-50 disabled:opacity-60"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-[#E87722] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#d96818] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {saving && <Spinner size="sm" color="white" />}
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -88,29 +286,54 @@ export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const { user: loggedInUser, updateUser } = useUser();
+
+  // Saved profile: page + logged in user (header name) update at once
+  const handleSaved = (user) => {
+    if (user) {
+      setProfile(user);
+      updateUser({ ...(loggedInUser || {}), ...user });
+    }
+
+    setEditing(false);
+  };
+
+  // My Plan card data (seller / broker / staff), loaded together with the profile
+  const [planData, setPlanData] = useState(null);
+  const [planError, setPlanError] = useState("");
 
   useEffect(() => {
     const fetchProfile = async () => {
-      try {
-        setLoading(true);
-        setError("");
+      setLoading(true);
+      setError("");
 
-        const response = await getProfile();
+      // Profile + plan in parallel: one loader for the whole page
+      const wantsPlan = ["seller", "broker", "staff"].includes(loggedInUser?.role);
 
-        if (response?.status) {
-          setProfile(response?.data?.user);
-        } else {
-          setError(response?.message);
-        }
-      } catch (error) {
-        console.error("Profile fetch error:", error);
-        setError(error?.message);
-      } finally {
-        setLoading(false);
+      const [profileResult, planResult] = await Promise.allSettled([
+        getProfile(),
+        wantsPlan ? getMyPlanOrders() : Promise.resolve(null),
+      ]);
+
+      if (profileResult.status === "fulfilled" && profileResult.value?.status) {
+        setProfile(profileResult.value.data?.user);
+      } else {
+        // No console.error: it opens the Next dev error overlay
+        setError(profileResult.reason?.message || profileResult.value?.message || "Profile could not be loaded.");
       }
+
+      if (planResult.status === "fulfilled") {
+        setPlanData(planResult.value?.data ?? null);
+      } else {
+        setPlanError(planResult.reason?.message || "Plan details could not be loaded.");
+      }
+
+      setLoading(false);
     };
 
     fetchProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const isSuperAdmin = profile?.role === "super_admin";
@@ -128,9 +351,7 @@ export default function Profile() {
 
       <div className="mt-4">
         {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <Spinner size="lg" />
-          </div>
+          <ProfileSkeleton showPlan={["seller", "broker", "staff"].includes(loggedInUser?.role)} />
         ) : error || !profile ? (
           <div className={`${cardClass} p-10 text-center`}>
             <h3 className="mb-0 text-lg font-semibold text-[#001737]">Profile not available</h3>
@@ -206,8 +427,27 @@ export default function Profile() {
 
               {/* Personal Information */}
               <div className={cardClass}>
-                <CardHeader icon={FiUser} title="Personal Information" subtitle="Basic account details" />
+                <CardHeader
+                  icon={FiUser}
+                  title={editing ? "Edit Personal Information" : "Personal Information"}
+                  subtitle={editing ? "Update your name and phone number" : "Basic account details"}
+                  action={
+                    !editing && (
+                      <button
+                        type="button"
+                        onClick={() => setEditing(true)}
+                        className="flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-[#E87722] px-3 py-1.5 text-xs font-semibold text-[#E87722] transition hover:bg-[#E87722] hover:text-white"
+                      >
+                        <FiEdit2 size={13} />
+                        Edit
+                      </button>
+                    )
+                  }
+                />
 
+                {editing ? (
+                  <EditProfileForm profile={profile} onCancel={() => setEditing(false)} onSaved={handleSaved} />
+                ) : (
                 <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2 sm:p-7">
                   {[
                     { label: "Full Name", value: profile.name },
@@ -228,6 +468,7 @@ export default function Profile() {
                     </div>
                   ))}
                 </div>
+                )}
               </div>
 
               {/* Account Information */}
@@ -267,6 +508,14 @@ export default function Profile() {
                 </div>
               </div>
             </div>
+
+            {/* ========================================================= */}
+            {/* MY PLAN (seller / broker / staff) */}
+            {/* ========================================================= */}
+
+            {["seller", "broker", "staff"].includes(profile.role) && (
+              <MyPlanCard cardClass={cardClass} CardHeader={CardHeader} data={planData} error={planError} />
+            )}
 
             {/* ========================================================= */}
             {/* ACCESS & PERMISSIONS */}

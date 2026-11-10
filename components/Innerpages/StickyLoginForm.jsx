@@ -13,12 +13,37 @@ import {
   FiEye,
   FiEyeOff,
   FiUserPlus,
+  FiPlusCircle,
 } from "react-icons/fi";
 import { Spinner } from "@heroui/react";
 import { useRouter } from "next/navigation";
 import { loginUser } from "@/utils/fetchApi";
 import { useUser } from "../../context/UserContext";
 import { adminHomePath, hasAdminAccess } from "../../utils/adminPermissions";
+
+// Post Property button kahan le jaye (guest ko seller login par bhej rahe hain)
+const POST_PROPERTY_HREF = "/login";
+
+// Popup band karne ke baad 24 ghante tak auto-open nahi hoga
+const DISMISS_KEY = "loginPopupDismissedAt";
+const DISMISS_DURATION = 24 * 60 * 60 * 1000;
+
+const wasDismissedRecently = () => {
+  try {
+    const dismissedAt = Number(localStorage.getItem(DISMISS_KEY));
+    return dismissedAt > 0 && Date.now() - dismissedAt < DISMISS_DURATION;
+  } catch {
+    return false;
+  }
+};
+
+const markDismissed = () => {
+  try {
+    localStorage.setItem(DISMISS_KEY, String(Date.now()));
+  } catch {
+    // storage unavailable — ignore
+  }
+};
 
 export default function StickyLoginForm() {
   const router = useRouter();
@@ -41,6 +66,9 @@ export default function StickyLoginForm() {
       return;
     }
 
+    // Agar user ne pichhle 24 ghante me popup band kiya tha to auto-open mat karo
+    if (wasDismissedRecently()) return;
+
     const timer = setTimeout(() => {
       setOpen(true);
     }, 600);
@@ -48,12 +76,20 @@ export default function StickyLoginForm() {
     return () => clearTimeout(timer);
   }, [user, accessToken]);
 
+  // User ne popup khud band kiya — time save karo
+  const dismissPopup = () => {
+    if (loading) return;
+    markDismissed();
+    setOpen(false);
+  };
+
   // Close popup using Escape key.
   useEffect(() => {
     if (!open) return;
 
     const handleKeyDown = (event) => {
       if (event.key === "Escape" && !loading) {
+        markDismissed();
         setOpen(false);
       }
     };
@@ -164,11 +200,8 @@ export default function StickyLoginForm() {
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
-            if (
-              event.target === event.currentTarget &&
-              !loading
-            ) {
-              setOpen(false);
+            if (event.target === event.currentTarget) {
+              dismissPopup();
             }
           }}
         >
@@ -181,7 +214,7 @@ export default function StickyLoginForm() {
             {/* Close Button */}
             <button
               type="button"
-              onClick={() => !loading && setOpen(false)}
+              onClick={dismissPopup}
               disabled={loading}
               aria-label="Close login popup"
               className="absolute right-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-600 shadow-sm transition hover:rotate-90 hover:bg-white hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
@@ -202,16 +235,16 @@ export default function StickyLoginForm() {
                   </div>
 
                   <p className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-orange-300">
-                    Welcome Back
+                    Bhoomi Manthan
                   </p>
 
                   <h2 className="max-w-sm text-4xl font-bold leading-tight tracking-tight">
-                    Your next chapter starts here.
+                    Your next property starts here.
                   </h2>
 
                   <p className="mt-5 max-w-sm text-sm leading-7 text-slate-300">
-                    Sign in to access your account, manage your activity,
-                    and continue where you left off.
+                    Login to save favourites, compare listings and
+                    contact owners.
                   </p>
                 </div>
 
@@ -250,11 +283,11 @@ export default function StickyLoginForm() {
                     id="login-title"
                     className="text-3xl font-bold tracking-tight text-slate-900"
                   >
-                    Welcome back!
+                    Sign in to your account
                   </h2>
 
                   <p className="mt-2 text-sm leading-6 text-slate-500">
-                    Please enter your details to sign in to your account.
+                    Enter your details to continue to Bhoomi Manthan.
                   </p>
                 </div>
 
@@ -402,17 +435,28 @@ export default function StickyLoginForm() {
         </div>
       )}
 
-      {/* Floating Login Button */}
+      {/* Floating buttons: Post Property + Login */}
       {!open && (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Open login popup"
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-[var(--primary-color)] px-5 py-3 text-sm font-semibold text-white shadow-xl transition hover:-translate-y-1 hover:bg-[var(--secondary-color)]"
-        >
-          <FiLogIn className="text-lg" />
-          Login
-        </button>
+        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="Open login popup"
+            className="flex items-center gap-2 rounded-full bg-[var(--primary-color)] px-5 py-3 text-sm font-semibold text-white shadow-xl transition hover:-translate-y-1 hover:bg-[var(--secondary-color)]"
+          >
+            <FiLogIn className="text-lg" />
+            Login
+          </button>
+
+          <NextLink
+            href={POST_PROPERTY_HREF}
+            aria-label="Post your property for free"
+            className="flex items-center gap-2 no-underline hover:no-underline rounded-full bg-[var(--primary-color)] px-5 py-3 text-sm font-semibold text-white shadow-xl transition hover:-translate-y-1 hover:bg-[var(--secondary-color)]"
+          >
+            <FiPlusCircle className="text-lg" />
+            Post Property Free
+          </NextLink>
+        </div>
       )}
 
       {/* Popup Animation */}

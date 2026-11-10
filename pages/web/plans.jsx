@@ -2,12 +2,13 @@ import PlanList from "@/components/Innerpages/Plans/PlanList";
 import Header from "../../components/Home/Menu/Header";
 import Footer from "../../components/Home/Menu/Footer";
 import { getPlans } from "../../utils/fetchApi";
+import { fetchPageBanner } from "../../components/Common/PageBannerImage";
 
-export default function Plans({ plans }) {
+export default function Plans({ plans, banner }) {
     return (
         <>
             <Header />
-            <PlanList initialPlans={plans} />
+            <PlanList initialPlans={plans} initialBanner={banner} />
             <Footer />
         </>
     );
@@ -25,8 +26,12 @@ export async function getStaticProps() {
         console.error("Plans fetch error:", error?.message);
     }
 
+    // Hero image: Admin -> Banner (type: Plans Page)
+    const banner = await fetchPageBanner("plans");
+
     return {
-        props: { plans },
+        // undefined is not allowed in props: API failed -> PlanList loads the banner in browser
+        props: { plans, ...(banner !== undefined && { banner }) },
         revalidate: 60,
     };
 }

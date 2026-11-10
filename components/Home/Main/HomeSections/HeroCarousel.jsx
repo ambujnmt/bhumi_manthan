@@ -54,9 +54,11 @@ const HeroCarousel = ({ initialBanners = null }) => {
 
     return (
         <>
+            {/* Phone / tablet: banner's own ratio (whole image, nothing cut).
+                Desktop (lg+): full screen height below the header, as before. */}
             <section
-                className="w-full bg-[#e9edf3]"
-                style={{ height: "calc(100vh - 82.64px)" }}
+                className="w-full bg-[#e9edf3] lg:!aspect-auto lg:h-[calc(100vh-82.64px)]"
+                style={{ aspectRatio: BANNER_RATIO }}
             >
                 {/* Loading: same size placeholder */}
                 {!banners && <div className="h-full w-full animate-pulse bg-[#e9edf3]" />}

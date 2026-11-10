@@ -9,7 +9,8 @@ export default function propertyDetails({ seo }) {
         <>
             {seo && <MetaTags {...seo} />}
             <Header />
-            <PropertyDetails />
+            {/* No server meta on in-app navigation: the page sets the title from its own fetch */}
+            <PropertyDetails clientSeo={!seo} />
             <Footer />
         </>
     );
@@ -18,6 +19,14 @@ export default function propertyDetails({ seo }) {
 // Meta tags must be in the first HTML: crawlers and link previews don't wait for the client fetch.
 // The page still loads its own data in the browser (is_compared needs the user's token).
 export async function getServerSideProps({ params, req, res }) {
+    // In-app navigation (Link / router.push) asks for /_next/data/...json, not HTML.
+    // Crawlers never do this, and waiting on the API here held the old property on screen
+    // until it answered, then the page fetched the same data again. Skip it so the URL
+    // change shows the new property's loader at once.
+    if (req.url?.startsWith("/_next/data/")) {
+        return { props: { seo: null } };
+    }
+
     try {
         const response = await fetch(
             `${process.env.NEXT_PUBLIC_API_BASE_URL}properties/detail/${encodeURIComponent(params.id)}`,

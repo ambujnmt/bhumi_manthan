@@ -34,7 +34,18 @@ const SectionTitle = ({ children }) => (
 );
 
 // Property details in enquiry "View" modal
-const PropertyDetails = ({ property, fallbackTitle }) => {
+const PropertyDetails = ({ property, fallbackTitle, eventTitle }) => {
+    if (!property && eventTitle) {
+        return (
+            <div className="mb-5">
+                <SectionTitle>Event Registration</SectionTitle>
+                <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-[#283A86]">
+                    Registered for <span className="font-semibold text-[#1A1F36]">{eventTitle}</span> from the Events page.
+                </div>
+            </div>
+        );
+    }
+
     if (!property) {
         return (
             <div className="mb-5">
@@ -131,6 +142,13 @@ const CONFIG = {
         singular: "Enquiry",
         name: (item) => item.name,
         details: (item) => [
+            // Events page registration form
+            ...(item.event_title
+                ? [
+                    ["Event", item.event_title],
+                    ["Attendees", item.attendees],
+                ]
+                : []),
             ["Name", item.name],
             ["Phone", item.phone],
             ["Email", item.email],
@@ -348,7 +366,16 @@ export default function Listing({ type = "contact" }) {
 
                                         {isEnquiry ? (
                                             <td className="px-4 py-3 whitespace-nowrap text-xs text-[#1A1F36]">
-                                                {requirement.length ? requirement.map((text) => <p key={text}>{text}</p>) : "-"}
+                                                {item.event_title && (
+                                                    <p>
+                                                        <span className="mr-1.5 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Event</span>
+                                                        {item.event_title}
+                                                        {item.attendees ? ` · ${item.attendees} ${item.attendees === 1 ? "person" : "people"}` : ""}
+                                                    </p>
+                                                )}
+                                                {requirement.length
+                                                    ? requirement.map((text) => <p key={text}>{text}</p>)
+                                                    : !item.event_title && "-"}
                                             </td>
                                         ) : (
                                             <td className="px-4 py-3">
@@ -444,7 +471,7 @@ export default function Listing({ type = "contact" }) {
                     // Enquiry: property + enquiry side by side on desktop
                     <div className={isEnquiry ? "grid grid-cols-1 gap-x-6 md:grid-cols-2" : ""}>
                         {isEnquiry && (
-                            <PropertyDetails property={viewItem.property} fallbackTitle={viewItem.property_title} />
+                            <PropertyDetails property={viewItem.property} fallbackTitle={viewItem.property_title} eventTitle={viewItem.event_title} />
                         )}
 
                         <div>

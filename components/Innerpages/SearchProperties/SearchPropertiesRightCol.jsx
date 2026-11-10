@@ -6,10 +6,8 @@ import {
   FiMapPin,
   FiGrid,
   FiList,
-  FiMaximize2,
   FiChevronDown,
 } from "react-icons/fi";
-import { FaBed, FaBath } from "react-icons/fa";
 import { MdVerified } from "react-icons/md";
 import { Link } from "@heroui/react";
 import { useRouter } from "next/router";
@@ -24,8 +22,11 @@ import useSearchFilters, {
 } from "../../../utils/useSearchFilters";
 import { formatDistance } from "../../../utils/formatPrice";
 import WishlistButton from "../../Common/WishlistButton";
+import Pagination from "../../Common/Pagination";
+import { cardSpecs, priceInfo } from "../PropertyDetails/PropertySpecs";
 
-const PER_PAGE = 12;
+// 15 properties per page (search, featured and luxury lists)
+const PER_PAGE = 15;
 
 export default function SearchPropertiesRightCol() {
   const router = useRouter();
@@ -47,8 +48,8 @@ export default function SearchPropertiesRightCol() {
   const [properties, setProperties] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const listTopRef = useRef(null);
 
   const [isSortOpen, setIsSortOpen] = useState(false);
   const sortRef = useRef(null);
@@ -70,6 +71,22 @@ export default function SearchPropertiesRightCol() {
     per_page: PER_PAGE,
   };
   const searchKey = JSON.stringify(searchParams);
+
+  // Current page belongs to one list: filters / section / sort / location change -> back to page 1
+  // (kept together with its list key, so a filter change never fetches the old page first)
+  const listKey = `${searchKey}|${sectionFilter}|${userLocation?.latitude ?? ""},${userLocation?.longitude ?? ""}`;
+  const [pageState, setPageState] = useState({ key: listKey, page: 1 });
+  const page = pageState.key === listKey ? pageState.page : 1;
+
+  const goToPage = (value) => {
+    setPageState({ key: listKey, page: value });
+
+    // Back to the top of the list (below the fixed header)
+    const top = listTopRef.current?.getBoundingClientRect().top;
+    if (top !== undefined) {
+      window.scrollTo({ top: window.scrollY + top - 130, behavior: "smooth" });
+    }
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -93,8 +110,8 @@ export default function SearchPropertiesRightCol() {
         setError("");
 
         if (isSearch) {
-          // GET /api/search/properties (filters, sort, page 1)
-          const data = await searchProperties({ ...JSON.parse(searchKey), page: 1 }, controller.signal);
+          // GET /api/search/properties (filters, sort, page)
+          const data = await searchProperties({ ...JSON.parse(searchKey), page }, controller.signal);
 
           setProperties(data.properties || []);
           setPagination(data.pagination || null);
@@ -139,25 +156,8 @@ export default function SearchPropertiesRightCol() {
     fetchProperties();
 
     return () => controller.abort();
-  }, [isReady, isSearch, sectionFilter, locationReady, userLocation, searchKey]);
-
-  // "Load More" -> next page appended
-  const loadMore = async () => {
-    if (!pagination || pagination.current_page >= pagination.last_page) return;
-
-    try {
-      setLoadingMore(true);
-
-      const data = await searchProperties({ ...searchParams, page: pagination.current_page + 1 });
-
-      setProperties((previous) => [...previous, ...(data.properties || [])]);
-      setPagination(data.pagination || null);
-    } catch (error) {
-      setError(error?.message || "Unable to load more properties.");
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+    // Search: each page comes from the API. Featured / Luxury: full list once, paged below.
+  }, [isReady, isSearch, sectionFilter, locationReady, userLocation, searchKey, isSearch ? page : 0]);
 
   /*
   |--------------------------------------------------------------------------
@@ -304,7 +304,15 @@ export default function SearchPropertiesRightCol() {
   }
 
   const total = isSearch ? pagination?.total ?? list.length : list.length;
-  const hasMore = isSearch && pagination && pagination.current_page < pagination.last_page;
+
+  // Pages: search -> from API, featured / luxury -> 15 at a time from the full list
+  const totalPages = isSearch
+    ? pagination?.last_page || 1
+    : Math.max(Math.ceil(list.length / PER_PAGE), 1);
+  const currentPage = Math.min(page, totalPages);
+  const shown = isSearch ? list : list.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+  const firstShown = total === 0 ? 0 : (currentPage - 1) * PER_PAGE + 1;
+  const lastShown = Math.min((currentPage - 1) * PER_PAGE + shown.length, total);
 
   const where = [
     filters.localities.length ? filters.localities.join(", ") : "",
@@ -317,12 +325,12 @@ export default function SearchPropertiesRightCol() {
 
         {/* Header row */}
 
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div ref={listTopRef} className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
           <div>
             <h1 className="text-xl font-semibold text-gray-900">
               {loading
-                ? "Loading Properties..."
+                ? <span className="inline-block h-7 w-64 max-w-full animate-pulse rounded bg-gray-200 align-middle" aria-label="Loading properties" />
                 : isSearch
                   ? `${total} ${tabLabel ? `${tabLabel} Properties` : "Properties"}${where ? ` in ${where}` : ""}`
                   : `${total} ${sectionLabel}Properties Found${nearby ? " Near You" : ""}`}
@@ -438,11 +446,54 @@ export default function SearchPropertiesRightCol() {
 
         {/* Loading */}
 
+        {/* Loading: grey cards in the same shape as the results (grid / list), so nothing jumps */}
         {loading && (
-          <div className="flex min-h-[300px] items-center justify-center">
-            <p className="text-sm text-gray-500">
-              Loading properties...
-            </p>
+          <div
+            aria-busy="true"
+            aria-label="Loading properties"
+            className={viewMode === "grid" ? "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" : "flex flex-col gap-3"}
+          >
+            {Array.from({ length: viewMode === "grid" ? 6 : 4 }).map((_, index) =>
+              viewMode === "grid" ? (
+                <div key={index} className="animate-pulse overflow-hidden rounded-xl border border-gray-200 bg-white">
+                  <div className="h-44 w-full bg-gray-200" />
+                  <div className="space-y-2.5 px-2 py-3">
+                    <div className="h-3 w-1/3 rounded bg-gray-200" />
+                    <div className="h-4 w-3/4 rounded bg-gray-200" />
+                    <div className="h-3 w-1/2 rounded bg-gray-100" />
+                    <div className="flex gap-3 pt-1">
+                      <div className="h-3 w-12 rounded bg-gray-100" />
+                      <div className="h-3 w-12 rounded bg-gray-100" />
+                      <div className="h-3 w-16 rounded bg-gray-100" />
+                    </div>
+                    <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                      <div className="h-5 w-24 rounded bg-gray-200" />
+                      <div className="h-8 w-24 rounded-lg bg-gray-100" />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div key={index} className="flex animate-pulse flex-col overflow-hidden rounded-xl border border-gray-200 bg-white sm:flex-row">
+                  <div className="h-48 w-full shrink-0 bg-gray-200 sm:h-auto sm:min-h-[176px] sm:w-64" />
+                  <div className="flex flex-1 flex-col justify-between gap-3 p-4">
+                    <div className="space-y-2.5">
+                      <div className="h-3 w-1/4 rounded bg-gray-200" />
+                      <div className="h-5 w-2/3 rounded bg-gray-200" />
+                      <div className="h-3 w-1/3 rounded bg-gray-100" />
+                      <div className="flex gap-4 pt-1">
+                        <div className="h-3 w-14 rounded bg-gray-100" />
+                        <div className="h-3 w-14 rounded bg-gray-100" />
+                        <div className="h-3 w-20 rounded bg-gray-100" />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                      <div className="h-6 w-28 rounded bg-gray-200" />
+                      <div className="h-9 w-28 rounded-lg bg-gray-100" />
+                    </div>
+                  </div>
+                </div>
+              )
+            )}
           </div>
         )}
 
@@ -477,9 +528,9 @@ export default function SearchPropertiesRightCol() {
           list.length > 0 &&
           viewMode === "grid" && (
 
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
 
-              {list.map((property) => {
+              {shown.map((property) => {
 
                 return (
                   <article
@@ -549,36 +600,13 @@ export default function SearchPropertiesRightCol() {
                       </p>
 
                       <div className="mb-3 flex items-center gap-4 text-xs text-gray-500">
-
-                        {property.bedrooms !== null &&
-                          property.bedrooms !== undefined && (
-                            <span className="flex items-center gap-1">
-                              <FaBed className="h-3.5 w-3.5" />
-
-                              {property.bedrooms} Beds
-                            </span>
-                          )}
-
-                        {property.bathrooms !== null &&
-                          property.bathrooms !== undefined && (
-                            <span className="flex items-center gap-1">
-                              <FaBath className="h-3.5 w-3.5" />
-
-                              {property.bathrooms} Baths
-                            </span>
-                          )}
-
-                        {property.super_area && (
-                          <span className="flex items-center gap-1">
-                            <FiMaximize2 className="h-3.5 w-3.5" />
-
-                            {Number(
-                              property.super_area
-                            ).toLocaleString("en-IN")}{" "}
-                            sq.ft
+                        {/* Facts by property type: beds / baths / area, plot area, washrooms, PG sharing ... */}
+                        {cardSpecs(property).map(({ icon: Icon, text }) => (
+                          <span key={text} className="flex items-center gap-1">
+                            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                            {text}
                           </span>
-                        )}
-
+                        ))}
                       </div>
 
                       <div className="flex items-center justify-between border-t border-gray-100 pt-3">
@@ -587,6 +615,7 @@ export default function SearchPropertiesRightCol() {
 
                           <p className="text-base font-bold text-[var(--primary-color)]">
                             {formatPrice(property.price)}
+                            {property.price && priceInfo(property).perMonth && <span className="text-xs font-medium text-gray-500"> / month</span>}
                           </p>
 
                           <p className="text-[11px] text-gray-400">
@@ -624,9 +653,9 @@ export default function SearchPropertiesRightCol() {
           list.length > 0 &&
           viewMode === "list" && (
 
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
 
-              {list.map((property) => {
+              {shown.map((property) => {
 
                 return (
                   <article
@@ -698,36 +727,13 @@ export default function SearchPropertiesRightCol() {
                         </p>
 
                         <div className="mb-3 flex items-center gap-4 text-xs text-gray-500">
-
-                          {property.bedrooms !== null &&
-                            property.bedrooms !== undefined && (
-                              <span className="flex items-center gap-1">
-                                <FaBed className="h-3.5 w-3.5" />
-
-                                {property.bedrooms} Beds
-                              </span>
-                            )}
-
-                          {property.bathrooms !== null &&
-                            property.bathrooms !== undefined && (
-                              <span className="flex items-center gap-1">
-                                <FaBath className="h-3.5 w-3.5" />
-
-                                {property.bathrooms} Baths
-                              </span>
-                            )}
-
-                          {property.super_area && (
-                            <span className="flex items-center gap-1">
-                              <FiMaximize2 className="h-3.5 w-3.5" />
-
-                              {Number(
-                                property.super_area
-                              ).toLocaleString("en-IN")}{" "}
-                              sq.ft
+                          {/* Facts by property type: beds / baths / area, plot area, washrooms, PG sharing ... */}
+                          {cardSpecs(property).map(({ icon: Icon, text }) => (
+                            <span key={text} className="flex items-center gap-1">
+                              <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                              {text}
                             </span>
-                          )}
-
+                          ))}
                         </div>
 
                       </div>
@@ -738,6 +744,7 @@ export default function SearchPropertiesRightCol() {
 
                           <p className="text-base font-bold text-[var(--primary-color)]">
                             {formatPrice(property.price)}
+                            {property.price && priceInfo(property).perMonth && <span className="text-xs font-medium text-gray-500"> / month</span>}
                           </p>
 
                           <p className="text-[11px] text-gray-400">
@@ -766,23 +773,16 @@ export default function SearchPropertiesRightCol() {
             </div>
           )}
 
-        {/* Load More (search pages) */}
+        {/* Pagination: 15 per page (search, featured, luxury) */}
 
-        {!loading && !error && hasMore && (
-          <div className="mt-8 text-center">
-            <button
-              type="button"
-              onClick={loadMore}
-              disabled={loadingMore}
-              className="inline-flex items-center gap-2 rounded-lg border border-[var(--secondary-color)] px-6 py-3 text-sm font-medium text-[var(--secondary-color)] transition hover:bg-[var(--secondary-color)] hover:text-white disabled:opacity-60"
-            >
-              {loadingMore && (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              )}
-              {loadingMore
-                ? "Loading..."
-                : `Load More (${pagination.total - list.length} more)`}
-            </button>
+        {!loading && !error && list.length > 0 && (
+          <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-gray-100 pt-6 sm:flex-row">
+            <p className="mb-0 text-sm text-gray-500">
+              Showing <span className="font-semibold text-gray-800">{firstShown}–{lastShown}</span> of{" "}
+              <span className="font-semibold text-gray-800">{total}</span> properties
+            </p>
+
+            <Pagination page={currentPage} totalPages={totalPages} onChange={goToPage} label="Property pages" />
           </div>
         )}
 

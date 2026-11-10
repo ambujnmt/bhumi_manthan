@@ -12,6 +12,7 @@ import {
     FaUsers,
 } from "react-icons/fa";
 import EventCard from "./EventCard";
+import EventRegistrationForm from "./EventRegistrationForm";
 import {
     eventCityState,
     formatEventDateRange,
@@ -147,8 +148,8 @@ export default function EventDetail({ event, moreEvents = [] }) {
                 </div>
 
                 {/* Sidebar */}
-                <aside className="col-span-12 lg:col-span-4">
-                    <div className="lg:sticky lg:top-28 rounded-2xl border border-gray-100 bg-white p-5 shadow-md">
+                <aside className="col-span-12 space-y-6 lg:col-span-4">
+                    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-md">
                         <h2 className="text-[16px] font-bold text-[var(--text-color1)]">Event Details</h2>
 
                         <ul className="mt-4 space-y-4">
@@ -201,6 +202,13 @@ export default function EventDetail({ event, moreEvents = [] }) {
                             )}
                         </div>
                     </div>
+
+                    {/* Registration form (only while the event is upcoming) */}
+                    {upcoming && (
+                        <div className="lg:sticky lg:top-28">
+                            <EventRegistrationForm fixedEvent={event} idPrefix="event_reg" />
+                        </div>
+                    )}
                 </aside>
             </div>
 

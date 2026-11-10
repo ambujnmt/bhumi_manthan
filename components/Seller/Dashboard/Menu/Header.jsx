@@ -14,7 +14,6 @@ import { useRouter } from "next/router";
 export default function Header({ menuOpen, toggleMenu }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
 
-  const [profileOpen, setProfileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -130,94 +129,9 @@ export default function Header({ menuOpen, toggleMenu }) {
         {/* ================= LEFT SECTION ================= */}
 
         <div className="flex min-w-0 flex-1 items-center">
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => {
-                setProfileOpen(!profileOpen);
-                setDropdownOpen(false);
-              }}
-              className="
-                flex
-                items-center
-                gap-3
-                rounded-lg
-                px-2
-                py-1.5
-                transition-all
-                duration-200
-                hover:bg-gray-50
-              "
-            >
-              <div className="hidden text-left sm:block">
-                <p className="mb-0 text-[11px] font-medium text-[#62748E]">
-                  Welcome back
-                </p>
-
-                <p className="mb-0 text-sm font-semibold text-[#1A1F36]">
-                  {userName}
-                </p>
-              </div>
-            </button>
-
-            {/* Profile dropdown */}
-
-            {profileOpen && (
-              <div
-                className="
-                  absolute
-                  left-0
-                  top-full
-                  mt-2
-                  w-52
-                  overflow-hidden
-                  rounded-xl
-                  border
-                  border-gray-100
-                  bg-white
-                  shadow-[0_10px_35px_rgba(0,23,55,0.12)]
-                "
-              >
-                <div className="border-b border-gray-100 px-4 py-3">
-                  <p className="mb-0 text-xs text-[#62748E]">
-                    Signed in as
-                  </p>
-
-                  <p className="mt-0.5 mb-0 text-sm font-semibold text-[#1A1F36]">
-                    {userName}
-                  </p>
-
-                  {userEmail && (
-                    <p className="mt-1 truncate text-[11px] text-[#62748E]">
-                      {userEmail}
-                    </p>
-                  )}
-                </div>
-
-                <Link
-                  href={`/seller/profile/${userId}`}
-                  onClick={() => setProfileOpen(false)}
-                  className="
-                    flex
-                    items-center
-                    gap-3
-                    px-4
-                    py-3
-                    text-sm
-                    font-medium
-                    text-[#1A1F36]
-                    transition-colors
-                    hover:bg-orange-50
-                    hover:text-[#E87722]
-                  "
-                >
-                  <FaRegUser className="h-4 w-4 text-[#62748E]" />
-
-                  My Account
-                </Link>
-              </div>
-            )}
-          </div>
+          <p className="mb-0 hidden truncate px-2 text-sm font-semibold text-[#1A1F36] sm:block">
+            {userName}
+          </p>
         </div>
 
         {/* ================= RIGHT SECTION ================= */}
@@ -259,7 +173,6 @@ export default function Header({ menuOpen, toggleMenu }) {
               type="button"
               onClick={() => {
                 setDropdownOpen(!dropdownOpen);
-                setProfileOpen(false);
               }}
               aria-label="Open profile menu"
               className="

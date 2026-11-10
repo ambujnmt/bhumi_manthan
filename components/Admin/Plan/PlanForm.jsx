@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, Spinner } from "@heroui/react";
 import { useRouter } from "next/router";
-import { FiSave } from "react-icons/fi";
+import { FiImage, FiSave, FiUpload } from "react-icons/fi";
 import { FaPlus } from "react-icons/fa";
 import { FaRegTrashCan } from "react-icons/fa6";
 
@@ -11,7 +11,9 @@ import PageTitle from "../../Breadcrumb/PageTitle";
 import {
     addAdminPlan,
     getAdminPlanById,
+    removeAdminPlanImage,
     updateAdminPlan,
+    uploadAdminPlanImage,
 } from "../../../utils/fetchApi";
 import { showToast } from "../../../store/toast";
 import {
@@ -41,16 +43,21 @@ const initialForm = {
     is_active: true,
 };
 
+// free: price 0, never expires | month / year: plan expires after 1 month / 1 year
 const BILLING_PERIODS = [
-    { value: "year", label: "Per Year" },
-    { value: "month", label: "Per Month" },
-    { value: "one_time", label: "One Time" },
+    { value: "free", label: "Free (no expiry)" },
+    { value: "month", label: "Monthly (valid 1 month)" },
+    { value: "year", label: "Yearly (valid 1 year)" },
+    { value: "one_time", label: "One Time (no expiry)" },
 ];
 
 const inputClass =
     "mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-[#1A1F36] outline-none transition focus:border-[#E87722] focus:ring-2 focus:ring-orange-100";
 
 const labelClass = "block text-sm font-medium text-[#283A86]";
+
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
+const IMAGE_MAX_SIZE = 2 * 1024 * 1024;
 
 const toNumber = (value) => {
     const number = Number(value);
@@ -147,6 +154,50 @@ export default function PlanForm({ planId }) {
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState("");
 
+    // Plan image: savedImage = current URL, imageFile = new pick, removeImage = remove on save
+    const [savedImage, setSavedImage] = useState("");
+    const [imageFile, setImageFile] = useState(null);
+    const [imagePreview, setImagePreview] = useState("");
+    const [removeImage, setRemoveImage] = useState(false);
+
+    useEffect(() => {
+        if (!imageFile) return undefined;
+
+        const url = URL.createObjectURL(imageFile);
+        setImagePreview(url);
+
+        return () => URL.revokeObjectURL(url);
+    }, [imageFile]);
+
+    const shownImage = imageFile ? imagePreview : removeImage ? "" : savedImage;
+
+    const handleImageChange = (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+
+        if (!file) return;
+
+        if (!IMAGE_TYPES.includes(file.type)) {
+            setFormError("Plan image must be JPG, PNG, WEBP or SVG.");
+            return;
+        }
+
+        if (file.size > IMAGE_MAX_SIZE) {
+            setFormError("Plan image must be 2 MB or smaller.");
+            return;
+        }
+
+        setFormError("");
+        setImageFile(file);
+        setRemoveImage(false);
+    };
+
+    const handleImageRemove = () => {
+        setImageFile(null);
+        setImagePreview("");
+        setRemoveImage(Boolean(savedImage));
+    };
+
     useEffect(() => {
         if (!isEdit) return;
 
@@ -181,6 +232,7 @@ export default function PlanForm({ planId }) {
                     sort_order: String(plan.sort_order ?? 0),
                     is_active: Boolean(plan.is_active),
                 });
+                setSavedImage(plan.image_url || "");
             } catch (error) {
                 if (!ignore) setFormError(error?.message || "Unable to load plan.");
             } finally {
@@ -201,6 +253,8 @@ export default function PlanForm({ planId }) {
         setForm((previous) => ({
             ...previous,
             [name]: value,
+            // Free plan is always price 0
+            ...(name === "billing_period" && value === "free" ? { price: "0" } : {}),
         }));
     };
 
@@ -247,6 +301,21 @@ export default function PlanForm({ planId }) {
             const result = isEdit
                 ? await updateAdminPlan(planId, payload)
                 : await addAdminPlan(payload);
+
+            const savedId = result?.data?.plan?.id || planId;
+
+            // Image after plan data (plan is saved even if the image fails)
+            try {
+                if (imageFile && savedId) {
+                    await uploadAdminPlanImage(savedId, imageFile);
+                } else if (removeImage && savedId) {
+                    await removeAdminPlanImage(savedId);
+                }
+            } catch (imageError) {
+                showToast(`Plan saved, but image not saved: ${imageError?.message}`, "error");
+                if (!isEdit && savedId) router.replace(`/admin/plan/update/${savedId}`);
+                return;
+            }
 
             showToast(result?.message);
             router.push("/admin/plan/listing");
@@ -341,8 +410,12 @@ export default function PlanForm({ planId }) {
                                 onChange={handleChange}
                                 placeholder="4999"
                                 className={inputClass}
+                                disabled={form.billing_period === "free"}
                                 required
                             />
+                            {form.billing_period === "free" && (
+                                <p className="mb-0 mt-1 text-xs text-[#62748E]">Free plan is always ₹0.</p>
+                            )}
                         </div>
 
                         {/* Billing period */}
@@ -407,6 +480,66 @@ export default function PlanForm({ planId }) {
                                     readOnly
                                     className={`${inputClass} bg-gray-50 text-gray-500`}
                                 />
+                            </div>
+                        </div>
+
+                        {/* Plan image */}
+                        <div className="md:col-span-2">
+                            <label htmlFor="plan_image" className={labelClass}>
+                                Plan Image
+                            </label>
+
+                            <div className="mt-1.5 flex flex-col gap-4 rounded-lg border border-dashed border-gray-300 p-4 sm:flex-row sm:items-center">
+                                <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#E87722]/40 bg-gray-50">
+                                    {shownImage ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                            src={shownImage}
+                                            alt="Plan image preview"
+                                            className="h-full w-full object-cover"
+                                        />
+                                    ) : (
+                                        <FiImage size={28} className="text-gray-300" />
+                                    )}
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <label
+                                            htmlFor="plan_image"
+                                            className="mb-0 flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-[#001737] px-4 text-sm font-medium text-white transition hover:bg-[#E87722]"
+                                        >
+                                            <FiUpload size={15} />
+                                            {shownImage ? "Change Image" : "Upload Image"}
+                                        </label>
+                                        <input
+                                            id="plan_image"
+                                            type="file"
+                                            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                                            onChange={handleImageChange}
+                                            className="sr-only"
+                                        />
+
+                                        {shownImage && (
+                                            <button
+                                                type="button"
+                                                onClick={handleImageRemove}
+                                                className="flex h-10 items-center gap-2 rounded-lg border border-gray-300 px-4 text-sm font-medium text-red-600 transition hover:border-red-300 hover:bg-red-50"
+                                            >
+                                                <FaRegTrashCan size={13} />
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <p className="mb-0 mt-2 text-xs text-[#62748E]">
+                                        {imageFile
+                                            ? `New image: ${imageFile.name} (saved with the plan)`
+                                            : removeImage
+                                                ? "Image will be removed when you save."
+                                                : "Shown on the website plan card, next to the listings badge (in place of the illustration). JPG, PNG, WEBP or SVG, max 2 MB. Use an illustration on a white or transparent background (house / building), like 320 × 260 px."}
+                                    </p>
+                                </div>
                             </div>
                         </div>
 

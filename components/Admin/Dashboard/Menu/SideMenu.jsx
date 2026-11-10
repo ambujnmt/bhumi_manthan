@@ -6,11 +6,10 @@ import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/router';
 import { MdOutlineLogout, MdOutlineMonitor } from "react-icons/md";
 import { HiMenu } from "react-icons/hi";
-import { FaBuilding, FaCity, FaClipboardList, FaCog, FaEnvelope, FaImages, FaLayerGroup, FaMapMarkedAlt, FaNewspaper, FaRegCalendarCheck, FaSearch, FaUser, FaUserShield, FaYoutube } from 'react-icons/fa';
+import { FaBuilding, FaCity, FaClipboardList, FaCog, FaEnvelope, FaImages, FaLayerGroup, FaMapMarkedAlt, FaMoneyBillWave, FaNewspaper, FaRegCalendarCheck, FaSearch, FaUser, FaUserShield, FaUserTie, FaYoutube } from 'react-icons/fa';
 import { RxDotFilled } from "react-icons/rx";
 import { BsChatDotsFill } from "react-icons/bs";
 import { FiMail } from "react-icons/fi";
-import { getInboxCounts } from "../../../../utils/adminFetchApi";
 import { useUser } from "../../../../context/UserContext";
 import { hasAdminAccess, hasPermission, isSeoOnly, PANEL_URL_PREFIX } from "../../../../utils/adminPermissions";
 import { subscribeChatUnread } from "../../../../utils/firebaseChat";
@@ -55,7 +54,6 @@ export default function SideMenu({
   // Menu items by role permissions (super admin sees everything)
   const isSuperAdmin = user?.role === 'super_admin';
   const can = (permission) => hasPermission(user, permission);
-  const canSeeMessages = can('contact_messages.view|enquiries.view');
 
   const handleLogout = () => {
     logout();
@@ -66,38 +64,7 @@ export default function SideMenu({
   // Fresh role / permissions: UserContext refreshes the user from /profile
   // and PrivateRoute moves the user to the right dashboard.
 
-  // Unread contact messages + enquiries (Messages box)
-  const [inboxCounts, setInboxCounts] = useState({ contact: 0, enquiry: 0 });
-  const unreadTotal = inboxCounts.contact + inboxCounts.enquiry;
-
-  useEffect(() => {
-    if (!canSeeMessages) return;
-
-    const loadCounts = () =>
-      getInboxCounts()
-        .then((res) =>
-          setInboxCounts({
-            contact: res?.data?.contact_unread ?? 0,
-            enquiry: res?.data?.enquiry_unread ?? 0,
-          })
-        )
-        .catch(() => { });
-
-    loadCounts();
-
-    // Refresh every minute + when a message is read / deleted
-    const timer = setInterval(loadCounts, 60000);
-    window.addEventListener('inbox:updated', loadCounts);
-
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener('inbox:updated', loadCounts);
-    };
-  }, [pathname, canSeeMessages]);
-
-
-
-  // Unread chat messages (Chat menu badge)
+  // Unread chat messages (Messages box + Chat menu badge)
   const canChat = hasAdminAccess(user) && !isSeoOnly(user);
   const [chatUnread, setChatUnread] = useState(0);
 
@@ -107,6 +74,9 @@ export default function SideMenu({
     // Live from Firestore
     return subscribeChatUnread(setChatUnread);
   }, [canChat]);
+
+  // Messages box shows only unread chat messages
+  const unreadTotal = canChat ? chatUnread : 0;
 
   /*
   |--------------------------------------------------------------------------
@@ -183,7 +153,9 @@ export default function SideMenu({
   |--------------------------------------------------------------------------
   */
   const isDashboardActive = pathname === '/admin' || isActive('/admin/dashboard');
-  const isUserActive = isActive('/admin/user');
+  // User Management page has 2 tabs -> 2 menu items (?tab=team = seller / broker / staff)
+  const isTeamActive = isActive('/admin/user') && router.query?.tab === 'team';
+  const isUserActive = isActive('/admin/user') && !isTeamActive;
   const isPropertyActive = isActive('/admin/propertyManagement');
   const isPropertyCategoryActive = isActive('/admin/propertyCategory');
   const isProjectActive = isActive('/admin/project');
@@ -199,6 +171,7 @@ export default function SideMenu({
   const isRoleActive = isActive('/admin/role');
   const isEventActive = isActive('/admin/event');
   const isPlanActive = isActive('/admin/plan');
+  const isPlanOrderActive = isActive('/admin/planOrder');
   /*
   |--------------------------------------------------------------------------
   | Dropdown Links
@@ -331,7 +304,7 @@ export default function SideMenu({
       {/* ================================================================
           MESSAGES BOX (fixed, does not scroll with menu)
       ================================================================ */}
-      {canSeeMessages && (
+      {canChat && (
         <div className="flex-shrink-0 px-3 pt-3">
           {isCollapsed ? (
             <div
@@ -466,10 +439,27 @@ export default function SideMenu({
           {/* ============================================================
         USER MANAGEMENT
     ============================================================ */}
-          {can('users.view') && (
+          {can('users.view') && [
+            {
+              key: 'customers',
+              href: '/admin/user/userManagement',
+              label: 'Customers',
+              Icon: FaUser,
+              active: isUserActive,
+            },
+            {
+              key: 'team',
+              href: '/admin/user/userManagement?tab=team',
+              label: 'Seller / Broker / Staff',
+              Icon: FaUserTie,
+              active: isTeamActive,
+            },
+          ].map(({ key, href, label, Icon, active: isUserActive }) => (
             <Link
-              href="/admin/user/userManagement"
+              key={key}
+              href={href}
               onClick={toggleMenu}
+              title={isCollapsed ? label : undefined}
               className={`
         group
         relative
@@ -497,7 +487,7 @@ export default function SideMenu({
           ${isCollapsed ? 'justify-center' : 'gap-3'}
         `}
               >
-                <FaUser
+                <Icon
                   className={`
             h-[18px]
             w-[18px]
@@ -513,7 +503,7 @@ export default function SideMenu({
 
                 {!isCollapsed && (
                   <span className="text-[13px] font-semibold">
-                    User Management
+                    {label}
                   </span>
                 )}
               </div>
@@ -522,7 +512,7 @@ export default function SideMenu({
                 <span className="h-5 w-1 rounded-full bg-[#E87722]" />
               )}
             </Link>
-          )}
+          ))}
 
           {/* property */}
           {can('properties.view') && (
@@ -1241,6 +1231,42 @@ export default function SideMenu({
     </div>
 
     {!isCollapsed && isPlanActive && (
+      <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+    )}
+  </Link>
+)}
+
+{/* Plan orders (cash / offline payments) + cash flow */}
+{can('plans.view') && (
+  <Link
+    href="/admin/planOrder/orderList"
+    onClick={toggleMenu}
+    title={isCollapsed ? 'Plan Orders' : undefined}
+    className={`
+      group relative mb-2 flex w-full cursor-pointer items-center rounded-lg px-2.5 py-2.5 transition-all duration-200
+      ${isPlanOrderActive
+        ? 'bg-orange-50 text-[#E87722]'
+        : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+      }
+      ${isCollapsed ? 'justify-center' : 'justify-between'}
+    `}
+  >
+    <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+      <FaMoneyBillWave
+        className={`
+          h-[18px] w-[18px] flex-shrink-0 transition-colors duration-200
+          ${isPlanOrderActive ? 'text-[#E87722]' : 'text-[#62748E] group-hover:text-[#E87722]'}
+        `}
+      />
+
+      {!isCollapsed && (
+        <span className="text-[13px] font-semibold">
+          Plan Orders
+        </span>
+      )}
+    </div>
+
+    {!isCollapsed && isPlanOrderActive && (
       <span className="h-5 w-1 rounded-full bg-[#E87722]" />
     )}
   </Link>

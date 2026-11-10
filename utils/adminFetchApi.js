@@ -1003,3 +1003,71 @@ export const saveYoutuberVideo = async (formData, id = null) => {
 
   return data;
 };
+
+// bhumi-admin-buyer-export
+// Cities that have buyers (profile city + property activity), with counts
+export const getBuyerCities = () => adminJsonRequest("buyers/cities");
+
+// Downloads the buyers CSV. params: { user_id } | { city } | {} (all buyers)
+export const downloadBuyersCsv = async (params = {}) => {
+  const token = Cookies.get("accessToken") || Cookies.get("token");
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== "")
+  ).toString();
+
+  const response = await fetch(`${BASE_URL}admin/buyers/export${query ? `?${query}` : ""}`, {
+    method: "GET",
+    headers: {
+      Accept: "text/csv, application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Download failed. Please try again.");
+  }
+
+  // buyers[-id][-city]-YYYY-MM-DD.csv (Content-Disposition is not readable cross-origin)
+  const slug = (text) => String(text).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const fileName = [
+    "buyers",
+    params.user_id && String(params.user_id),
+    params.city && slug(params.city),
+    new Date().toISOString().slice(0, 10),
+  ].filter(Boolean).join("-") + ".csv";
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+
+  return fileName;
+};
+
+// bhumi-admin-plan-orders (cash / offline plan payments + cash flow)
+// filters: { status, method, from, to }
+export const getAdminPlanOrders = (filters = {}) => {
+  const query = new URLSearchParams(
+    Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== "")
+  ).toString();
+
+  return adminJsonRequest(`plan-orders/all${query ? `?${query}` : ""}`);
+};
+
+export const getPlanOrderOptions = () => adminJsonRequest("plan-orders/options");
+
+// { user_id, plan_id, amount?, payment_method, payment_reference?, paid_at?, admin_note? }
+export const recordPlanPayment = (payload) => adminJsonRequest("plan-orders/add", "POST", payload);
+
+// { payment_method, payment_reference?, paid_at?, admin_note? }
+export const markPlanOrderPaid = (id, payload) => adminJsonRequest(`plan-orders/mark-paid/${id}`, "POST", payload);
+
+export const cancelAdminPlanOrder = (id, payload = {}) => adminJsonRequest(`plan-orders/cancel/${id}`, "POST", payload);

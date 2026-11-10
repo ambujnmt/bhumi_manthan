@@ -178,6 +178,32 @@ export const resetPassword = async (payload) => {
 };
 
 // bhumi--user-admin-profile
+// Update own profile: { name, phone } (email can't be changed here)
+export const updateProfile = async (payload) => {
+  const token = Cookies.get("accessToken");
+
+  const response = await fetch(`${BASE_URL}profile/update`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || !data?.status) {
+    const fieldErrors = data?.errors ? Object.values(data.errors).flat().join(" ") : "";
+    const error = new Error(fieldErrors || data?.message || "Unable to update profile.");
+    error.errors = data?.errors || {};
+    throw error;
+  }
+
+  return data;
+};
+
 export const getProfile = async () => {
   try {
     const token = Cookies.get("accessToken");
@@ -225,8 +251,9 @@ export const getProperties = async () => {
 };
 
 // bhumi-banner-list (frontend - only active)
-export const getBanners = async () => {
-  const response = await fetch(`${BASE_URL}banners`, {
+// type = page of the banner: home (default), events, plans
+export const getBanners = async (type = "home") => {
+  const response = await fetch(`${BASE_URL}banners?type=${encodeURIComponent(type)}`, {
     method: "GET",
     headers: {
       Accept: "application/json",
@@ -549,10 +576,12 @@ export const getNearbyHome = async ({ latitude, longitude, radius = 50 }) => {
     latitude: String(latitude),
     longitude: String(longitude),
     radius: String(radius),
-    featured_limit: "4",
+    // Home featured: 8 per page with pagination
+    featured_limit: "40",
     luxury_limit: "3",
     projects_limit: "5",
-    properties_limit: "4",
+    // used as featured list when there is no featured property nearby
+    properties_limit: "40",
   });
 
   const response = await fetch(`${BASE_URL}nearby/home?${params.toString()}`, {
@@ -874,6 +903,19 @@ const planRequest = async (path, options = {}) => {
 // list plans
 export const getAdminPlans = () => planRequest("all");
 
+// Paid / free listing rules: { free_listings_without_plan: number | null (no limit) }
+export const getListingRules = () => planRequest("listing-rules");
+
+export const updateListingRules = (payload) =>
+  planRequest("listing-rules", { method: "POST", body: JSON.stringify(payload) });
+
+// Festival offer: unlimited listings for all sellers / brokers between two times
+// { enabled, title, starts_at, ends_at } (ISO date-times)
+export const getListingOffer = () => planRequest("listing-offer");
+
+export const updateListingOffer = (payload) =>
+  planRequest("listing-offer", { method: "POST", body: JSON.stringify(payload) });
+
 // add plan
 export const addAdminPlan = (payload) =>
   planRequest("add", { method: "POST", body: JSON.stringify(payload) });
@@ -884,6 +926,33 @@ export const getAdminPlanById = (id) => planRequest(`view/${id}`);
 // update plan
 export const updateAdminPlan = (id, payload) =>
   planRequest(`update/${id}`, { method: "POST", body: JSON.stringify(payload) });
+
+// plan image (multipart, sent after add / update)
+export const uploadAdminPlanImage = async (id, file) => {
+  const token = Cookies.get("accessToken");
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const response = await fetch(`${BASE_URL}admin/plans/image/${id}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok || !result?.status) {
+    throw planApiError(result);
+  }
+
+  return result;
+};
+
+export const removeAdminPlanImage = (id) =>
+  planRequest(`image/${id}`, { method: "DELETE" });
 
 // delete plan
 export const deleteAdminPlan = (id) =>
@@ -942,8 +1011,17 @@ export const getPropertyCategories = async () => {
 };
 
 // website events (active only)
-export const getEvents = async (limit = 10) => {
-  const response = await fetch(`${BASE_URL}events?limit=${limit}`, {
+// location { latitude, longitude, radius } -> only events near user, nearest first (+ distance_km)
+export const getEvents = async (limit = 10, location = null) => {
+  const params = new URLSearchParams({ limit: String(limit) });
+
+  if (location?.latitude != null && location?.longitude != null) {
+    params.set("latitude", String(location.latitude));
+    params.set("longitude", String(location.longitude));
+    params.set("radius", String(location.radius ?? 50));
+  }
+
+  const response = await fetch(`${BASE_URL}events?${params.toString()}`, {
     headers: { Accept: "application/json" },
   });
 
@@ -1077,3 +1155,145 @@ export const addToCompare = (propertyId) =>
 
 export const removeFromCompare = (propertyId) =>
   compareRequest(`/remove/${propertyId}`, { method: "DELETE" });
+
+/*
+|--------------------------------------------------------------------------
+| Sellers / brokers with ratings (home section + detail modal)
+|--------------------------------------------------------------------------
+*/
+const agentRequest = async (path, options = {}) => {
+  const token = Cookies.get("accessToken");
+
+  try {
+    const response = await fetch(`${BASE_URL}agents${path}`, {
+      cache: "no-store",
+      ...options,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    const result = await response.json();
+
+    return response.ok ? result : { status: false, message: result?.message || "Something went wrong. Please try again." };
+  } catch (error) {
+    return { status: false, message: "Something went wrong. Please try again." };
+  }
+};
+
+// location { latitude, longitude, radius } -> agents near user, else all (top rated first)
+export const getNearbyAgents = (location = null, limit = 8) => {
+  const params = new URLSearchParams({ limit: String(limit) });
+
+  if (location?.latitude != null && location?.longitude != null) {
+    params.set("latitude", String(location.latitude));
+    params.set("longitude", String(location.longitude));
+    params.set("radius", String(location.radius ?? 50));
+  }
+
+  return agentRequest(`/nearby?${params.toString()}`);
+};
+
+export const getAgentDetail = (key) => agentRequest(`/${encodeURIComponent(key)}`);
+
+// { rating: 1-5, review?: text } - customer only
+export const rateAgent = (key, payload) =>
+  agentRequest(`/${encodeURIComponent(key)}/review`, { method: "POST", body: JSON.stringify(payload) });
+
+/*
+|--------------------------------------------------------------------------
+| Recently viewed properties (customer dashboard "Recent View")
+|--------------------------------------------------------------------------
+*/
+const recentRequest = async (path, options = {}) => {
+  try {
+    const response = await fetch(`${BASE_URL}recently-viewed${path}`, {
+      cache: "no-store",
+      ...options,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Cookies.get("accessToken")}`,
+      },
+    });
+
+    const result = await response.json();
+
+    return response.ok ? result : { status: false, message: result?.message || "Something went wrong. Please try again." };
+  } catch (error) {
+    return { status: false, message: "Something went wrong. Please try again." };
+  }
+};
+
+export const getRecentlyViewed = (page = 1) => recentRequest(`?page=${page}`);
+
+// Property detail opened by a logged in customer
+export const addRecentlyViewed = (propertyId) =>
+  recentRequest("/add", { method: "POST", body: JSON.stringify({ property_id: propertyId }) });
+
+export const removeRecentlyViewed = (propertyId) => recentRequest(`/remove/${propertyId}`, { method: "DELETE" });
+
+export const clearRecentlyViewed = () => recentRequest("/clear", { method: "DELETE" });
+
+// bhumi-plan-orders (buy a plan with cash / offline payment, seller / broker)
+const planOrderRequest = async (path, method = "GET", body) => {
+  const token = Cookies.get("accessToken");
+
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+    cache: "no-store",
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (response.status === 429) {
+    throw new Error("Too many requests. Please try again in a minute.");
+  }
+
+  if (!response.ok || data.status !== true) {
+    const error = new Error(data.message || "Something went wrong. Please try again.");
+    error.errors = data.errors;
+    error.status = response.status;
+    throw error;
+  }
+
+  return data;
+};
+
+// My orders + current listing quota + payment methods
+export const getMyPlanOrders = () => planOrderRequest("plan-orders/my");
+
+// payload: { plan_id, payment_method?, payment_reference?, note? }
+export const createPlanOrder = (payload) => planOrderRequest("plan-orders", "POST", payload);
+
+export const cancelPlanOrder = (id) => planOrderRequest(`plan-orders/cancel/${id}`, "POST");
+
+// bhumi-my-enquiries (buyer dashboard): property enquiries I sent + how many properties
+export const getMyEnquiries = () => planOrderRequest("my-enquiries");
+
+// Sidebar badge: { properties_count, total_enquiries }
+export const getMyEnquiryCount = () => planOrderRequest("my-enquiries/count");
+
+// bhumi-property-lookup: home search "Property ID" tab (any city, active only)
+export const lookupPropertyById = async (q, signal) => {
+  const response = await fetch(`${BASE_URL}properties/lookup?q=${encodeURIComponent(q)}`, {
+    headers: { Accept: "application/json" },
+    signal,
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data.status !== true) {
+    throw new Error(data.message || "Something went wrong. Please try again.");
+  }
+
+  return data.data?.properties || [];
+};

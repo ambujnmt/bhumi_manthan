@@ -2,7 +2,7 @@
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button, Spinner } from "@heroui/react";
-import { IoTrashOutline, IoSend, IoArrowBack, IoSearch } from "react-icons/io5";
+import { IoTrashOutline, IoSend, IoArrowBack, IoSearch, IoInformationCircle } from "react-icons/io5";
 import { FaPlus } from "react-icons/fa";
 import { BsChatDotsFill, BsCheck2, BsCheck2All, BsHouseDoor } from "react-icons/bs";
 import PageTitle from "../../Breadcrumb/PageTitle";
@@ -121,14 +121,6 @@ const RoleBadge = ({ role }) =>
         </span>
     ) : null;
 
-// Customer roles to pick in "New Chat" (customer side only)
-const CONTACT_ROLES = [
-    ["", "All"],
-    ["admin", "Admin"],
-    ["broker", "Broker"],
-    ["seller", "Seller"],
-];
-
 // Light dotted background behind messages
 const MESSAGES_BG = {
     backgroundColor: "#f6f7fb",
@@ -165,7 +157,8 @@ export default function ChatBox({ embedded = false, fill = false, isCustomer = f
     // New chat modal
     const [newChatOpen, setNewChatOpen] = useState(false);
     const [contactSearch, setContactSearch] = useState("");
-    const [contactRole, setContactRole] = useState("");
+    // Customer: New Chat shows admins only (no role tabs). Broker / seller chat starts from a property.
+    const [contactRole] = useState(isCustomer ? "admin" : "");
     const [contacts, setContacts] = useState([]);
     const [contactsLoading, setContactsLoading] = useState(false);
     const [startingId, setStartingId] = useState(null);
@@ -638,7 +631,7 @@ export default function ChatBox({ embedded = false, fill = false, isCustomer = f
                                         : term
                                         ? "No chats found."
                                         : isCustomer
-                                            ? "No chats yet. Click New Chat to talk with admin, broker or seller."
+                                            ? "No chats yet. Click New Chat to talk with admin."
                                             : "No chats yet. Customers' messages will show here."}
                                 </p>
                             </div>
@@ -807,35 +800,30 @@ export default function ChatBox({ embedded = false, fill = false, isCustomer = f
 
             {/* New Chat Modal */}
             <Tmodal isOpen={newChatOpen} onClose={() => setNewChatOpen(false)} title="New Chat" size="md">
+                {/* Customer: talk to the seller / broker first; admin is for when that does not work out */}
+                {isCustomer && (
+                    <div role="note" className="mb-3 flex gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] leading-5 text-amber-900">
+                        <IoInformationCircle className="mt-0.5 shrink-0 text-amber-500" size={18} aria-hidden="true" />
+                        <div>
+                            <p className="mb-1 font-semibold">Chat with our admin team</p>
+                            <p className="mb-0">
+                                For a property, please first use the <b>Chat</b> button on that property&apos;s page to talk to its seller or broker.
+                                If they don&apos;t reply, your issue isn&apos;t solved, or something feels wrong, message our admin team here and we&apos;ll help you.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 <div className="relative mb-3">
                     <IoSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                     <input
                         autoFocus
                         value={contactSearch}
                         onChange={(e) => setContactSearch(e.target.value)}
-                        placeholder={isCustomer ? "Search by name..." : "Search customer by name, phone, email..."}
+                        placeholder={isCustomer ? "Search admin by name..." : "Search customer by name, phone, email..."}
                         className="h-10 w-full rounded-full border border-transparent bg-gray-100 pl-9 pr-4 text-sm outline-none transition focus:border-[#E87722] focus:bg-white"
                     />
                 </div>
-
-                {isCustomer && (
-                    <div className="mb-3 flex flex-wrap gap-2">
-                        {CONTACT_ROLES.map(([key, label]) => (
-                            <button
-                                key={key || "all"}
-                                type="button"
-                                onClick={() => setContactRole(key)}
-                                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                                    contactRole === key
-                                        ? "bg-[#E87722] text-white"
-                                        : "bg-gray-100 text-gray-600 hover:text-[#E87722]"
-                                }`}
-                            >
-                                {label}
-                            </button>
-                        ))}
-                    </div>
-                )}
 
                 <div className="max-h-[50vh] overflow-y-auto">
                     {contactsLoading ? (
@@ -865,7 +853,7 @@ export default function ChatBox({ embedded = false, fill = false, isCustomer = f
                             </button>
                         ))
                     ) : (
-                        <p className="py-8 text-center text-sm text-gray-500">{isCustomer ? "No one found." : "No customers found."}</p>
+                        <p className="py-8 text-center text-sm text-gray-500">{isCustomer ? "No admin found." : "No customers found."}</p>
                     )}
                 </div>
             </Tmodal>
