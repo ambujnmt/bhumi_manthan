@@ -48,7 +48,7 @@ export default function SiteSettings() {
                 title="Site Settings"
             />
 
-            <div className="mt-6 mb-5 flex gap-1 overflow-x-auto border-b border-gray-200">
+            <div className="scrollbar-hide mt-6 mb-5 flex gap-1 overflow-x-auto border-b border-gray-200">
                 {tabs.map((item) => (
                     <button
                         key={item.key}

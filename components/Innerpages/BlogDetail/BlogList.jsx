@@ -73,7 +73,7 @@ export default function BlogList() {
 
                                     <NextLink
                                         href={`/web/blog/${blog.slug}`}
-                                        className="flex items-center gap-1.5 text-[var(--primary-color)] text-[13px] font-semibold mt-3 hover:gap-2.5 transition-all"
+                                        className="flex items-center gap-1.5 text-[var(--primary-color)] text-[13px] font-semibold mt-3 no-underline hover:no-underline hover:gap-2.5 transition-all"
                                     >
                                         Read More <FaArrowRight size={12} />
                                     </NextLink>

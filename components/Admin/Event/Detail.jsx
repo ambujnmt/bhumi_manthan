@@ -36,6 +36,83 @@ const InfoItem = ({ icon: Icon, label, children }) => (
     </div>
 );
 
+const formatDateTime = (value) =>
+    value
+        ? new Date(value).toLocaleString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        })
+        : "-";
+
+// Registrations / enquiries sent from this event's page on the website
+const Registrations = ({ items }) => {
+    const totalAttendees = items.reduce((sum, item) => sum + (Number(item.attendees) || 1), 0);
+
+    return (
+        <div className="col-span-12 overflow-hidden rounded-lg border border-gray-200 bg-white">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3 sm:px-5">
+                <h3 className="text-sm font-semibold text-[#283A86]">
+                    Registrations / Enquiries
+                    <span className="ml-2 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-semibold text-[#E87722]">
+                        {items.length}
+                    </span>
+                </h3>
+                {items.length > 0 && (
+                    <p className="text-xs text-gray-500">
+                        Total attendees: <span className="font-semibold text-gray-800">{totalAttendees}</span>
+                    </p>
+                )}
+            </div>
+
+            {items.length === 0 ? (
+                <p className="px-4 py-8 text-center text-sm text-gray-500 sm:px-5">
+                    No registrations yet. They will show here when people fill the form on the event page.
+                </p>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-50 text-xs text-gray-500">
+                            <tr>
+                                <th className="whitespace-nowrap px-4 py-2.5 text-left font-semibold">Name</th>
+                                <th className="whitespace-nowrap px-4 py-2.5 text-left font-semibold">Phone</th>
+                                <th className="whitespace-nowrap px-4 py-2.5 text-left font-semibold">Email</th>
+                                <th className="whitespace-nowrap px-4 py-2.5 text-left font-semibold">Attendees</th>
+                                <th className="w-full px-4 py-2.5 text-left font-semibold">Message</th>
+                                <th className="whitespace-nowrap px-4 py-2.5 text-left font-semibold">Received</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {items.map((item) => (
+                                <tr key={item.id} className="border-t border-gray-100 align-top">
+                                    <td className="whitespace-nowrap px-4 py-2.5 font-medium text-[#1A1F36]">{item.name}</td>
+                                    <td className="whitespace-nowrap px-4 py-2.5">
+                                        <a href={`tel:${item.phone}`} className="text-[#283A86] no-underline hover:text-[#E87722]">
+                                            {item.phone}
+                                        </a>
+                                    </td>
+                                    <td className="whitespace-nowrap px-4 py-2.5">
+                                        <a href={`mailto:${item.email}`} className="text-[#283A86] no-underline hover:text-[#E87722]">
+                                            {item.email}
+                                        </a>
+                                    </td>
+                                    <td className="whitespace-nowrap px-4 py-2.5">{item.attendees || 1}</td>
+                                    <td className="min-w-[220px] whitespace-pre-line break-words px-4 py-2.5 text-gray-600">
+                                        {item.message || "-"}
+                                    </td>
+                                    <td className="whitespace-nowrap px-4 py-2.5 text-xs text-gray-500">{formatDateTime(item.created_at)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+};
+
 export default function Detail() {
     const router = useRouter();
     const { id } = router.query;
@@ -258,6 +335,8 @@ export default function Detail() {
                             </a>
                         )}
                     </aside>
+
+                    <Registrations items={event.registrations || []} />
                 </div>
             )}
         </div>

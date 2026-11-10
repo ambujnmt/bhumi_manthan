@@ -1,21 +1,23 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/router";
 import { actionButtonClass, dangerActionButtonClass } from "../actionButtonClass";
 import { useAdminPermission } from "../../../utils/adminPermissions";
 import PageTitle from "../../Breadcrumb/PageTitle";
 import { Link, Spinner } from "@heroui/react";
-import { getUsers, deleteUser, permanentDeleteUser, getAdminRoles, saveAdminStaff, updateUser } from "../../../utils/adminFetchApi";
+import { getUsers, deleteUser, permanentDeleteUser, getAdminRoles, saveAdminStaff, updateUser, getBuyerCities, downloadBuyersCsv } from "../../../utils/adminFetchApi";
 import { showToast } from "../../../store/toast";
 import { AiOutlineEye } from "react-icons/ai";
 import Pagination from "../../Pagination/Pagination";
 import { FaPen, FaUserShield } from "react-icons/fa";
-import { FiPlus } from "react-icons/fi";
+import { FiCheck, FiDownload, FiMapPin, FiPlus, FiSearch, FiX } from "react-icons/fi";
 import { useUser } from "../../../context/UserContext";
 import { Tooltip } from "@heroui/react";
 import { FaRegTrashCan } from "react-icons/fa6";
 import Tmodal from "../../Tmodal/Tmodal";
 import DetailModal from "./DetailModal";
+import UserUpdate from "./Update";
 
 // Roles that can get admin panel access through an admin role
 const PANEL_ROLES = ["staff", "seller", "broker"];
@@ -56,6 +58,7 @@ export default function Listing() {
 
     const [roleUser, setRoleUser] = useState(null);
     const [viewUser, setViewUser] = useState(null); // View -> detail modal
+    const [editUser, setEditUser] = useState(null); // Edit user in a modal (Customers + Seller / Broker / Staff tabs)
     const [roleForm, setRoleForm] = useState({ role: "customer", admin_role_id: "" });
     const [staffModalOpen, setStaffModalOpen] = useState(false);
     const [staffForm, setStaffForm] = useState(initialStaffForm);
@@ -80,9 +83,96 @@ const [deleteLoading, setDeleteLoading] = useState(false);
     const [showDeleted, setShowDeleted] = useState(false);
     // search
     const [search, setSearch] = useState("");
-    // customers / team tab
-    const [tab, setTab] = useState(USER_TABS[0].key);
+    // customers / team tab: from the URL (?tab=team), so the sidebar links open the right tab
+    const router = useRouter();
+    const urlTab = router.query.tab === "team" ? "team" : USER_TABS[0].key;
+    const [tab, setTab] = useState(urlTab);
     const activeTab = USER_TABS.find((item) => item.key === tab) || USER_TABS[0];
+
+    useEffect(() => {
+        setTab(urlTab);
+        setPageIndex(0);
+    }, [urlTab]);
+
+    // Download buyers (customers) as CSV: all, one city, or one buyer (row icon)
+    const [buyerModalOpen, setBuyerModalOpen] = useState(false);
+    const [buyerScope, setBuyerScope] = useState("all");
+    const [buyerCity, setBuyerCity] = useState("");
+    const [buyerCitySearch, setBuyerCitySearch] = useState("");
+    const [buyerId, setBuyerId] = useState("");
+    const [buyerSearch, setBuyerSearch] = useState("");
+    const [buyerCities, setBuyerCities] = useState([]);
+    const [buyerCitiesLoading, setBuyerCitiesLoading] = useState(false);
+    const [buyerDownloading, setBuyerDownloading] = useState(false);
+    const [downloadingBuyerId, setDownloadingBuyerId] = useState(null);
+
+    const openBuyerModal = async () => {
+        setBuyerScope("all");
+        setBuyerCity("");
+        setBuyerCitySearch("");
+        setBuyerId("");
+        setBuyerSearch("");
+        setBuyerModalOpen(true);
+        setBuyerCitiesLoading(true);
+
+        try {
+            const res = await getBuyerCities();
+            setBuyerCities(res?.data?.cities || []);
+        } catch (error) {
+            setBuyerCities([]);
+            showToast(error?.message || "Failed to load cities.", "error");
+        } finally {
+            setBuyerCitiesLoading(false);
+        }
+    };
+
+    const handleBuyerDownload = async () => {
+        if (buyerScope === "city" && !buyerCity) {
+            showToast("Please select a city.", "error");
+            return;
+        }
+
+        if (buyerScope === "one" && !buyerId) {
+            showToast("Please select a buyer.", "error");
+            return;
+        }
+
+        setBuyerDownloading(true);
+
+        try {
+            const fileName = await downloadBuyersCsv(
+                buyerScope === "city" ? { city: buyerCity } : buyerScope === "one" ? { user_id: buyerId } : {}
+            );
+            showToast(`Downloaded ${fileName}`);
+            setBuyerModalOpen(false);
+        } catch (error) {
+            showToast(error?.message || "Download failed. Please try again.", "error");
+        } finally {
+            setBuyerDownloading(false);
+        }
+    };
+
+    const downloadOneBuyer = async (user) => {
+        setDownloadingBuyerId(user.id);
+
+        try {
+            const fileName = await downloadBuyersCsv({ user_id: user.id });
+            showToast(`Downloaded ${fileName}`);
+        } catch (error) {
+            showToast(error?.message || "Download failed. Please try again.", "error");
+        } finally {
+            setDownloadingBuyerId(null);
+        }
+    };
+
+    const changeTab = (key) => {
+        setTab(key);
+        setPageIndex(0);
+
+        // Keep the URL in sync (sidebar shows the matching menu item as active)
+        const basePath = router.asPath.split(/[?#]/)[0];
+        router.replace(key === "team" ? `${basePath}?tab=team` : basePath, undefined, { shallow: true });
+    };
 
     // pagination state
     const [pageIndex, setPageIndex] = useState(0);
@@ -341,7 +431,7 @@ const handleDeleteConfirm = async () => {
             />
 
             {/* Tabs */}
-            <div className="mt-6 flex gap-1 overflow-x-auto border-b border-gray-200">
+            <div className="scrollbar-hide mt-6 flex gap-1 overflow-x-auto border-b border-gray-200">
                 {USER_TABS.map((item) => {
                     const count = (Array.isArray(users) ? users : []).filter(item.match).length;
                     const isActive = item.key === tab;
@@ -350,10 +440,7 @@ const handleDeleteConfirm = async () => {
                         <button
                             key={item.key}
                             type="button"
-                            onClick={() => {
-                                setTab(item.key);
-                                setPageIndex(0);
-                            }}
+                            onClick={() => changeTab(item.key)}
                             className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
                                 isActive
                                     ? "border-[#E87722] text-[#E87722]"
@@ -385,6 +472,17 @@ const handleDeleteConfirm = async () => {
                 />
 
                 <div className="flex flex-wrap gap-2">
+                {!showDeleted && tab === "customers" && (
+                    <button
+                        type="button"
+                        onClick={openBuyerModal}
+                        className="flex h-10 items-center gap-2 rounded-lg bg-[#001737] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#283A86]"
+                    >
+                        <FiDownload size={15} />
+                        Download Buyers
+                    </button>
+                )}
+
                 {isSuperAdmin && !showDeleted && tab === "team" && (
                     <button
                         type="button"
@@ -460,7 +558,10 @@ const handleDeleteConfirm = async () => {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-2.5 whitespace-nowrap text-[#62748E]">{user.phone || "-"}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-[#62748E]">
+                                                <p className="mb-0">{user.phone || "-"}</p>
+                                                {user.city && <p className="mb-0 mt-0.5 text-xs">{user.city}</p>}
+                                            </td>
                                             <td className="px-4 py-2.5 whitespace-nowrap">
                                                 <div className="flex items-center gap-1.5">
                                                     <span
@@ -509,6 +610,21 @@ const handleDeleteConfirm = async () => {
                                                     </button>
                                                 </Tooltip>
 
+                                                {/* Download this buyer's data (CSV) */}
+                                                {!showDeleted && user.role === "customer" && (
+                                                    <Tooltip content="Download Buyer Data (CSV)">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => downloadOneBuyer(user)}
+                                                            disabled={downloadingBuyerId === user.id}
+                                                            aria-label={`Download data of ${user.name || user.email}`}
+                                                            className={actionButtonClass}
+                                                        >
+                                                            {downloadingBuyerId === user.id ? <Spinner size="sm" /> : <FiDownload size={15} />}
+                                                        </button>
+                                                    </Tooltip>
+                                                )}
+
                                                 {showDeleted ? (
                                                     can('users.delete') && (
                                                     <Tooltip content="Permanently Delete User">
@@ -537,12 +653,14 @@ const handleDeleteConfirm = async () => {
 
                                                         {can('users.edit') && (
                                                         <Tooltip content="Update User">
-                                                            <Link
-                                                                href={`/admin/user/userUpdate/${user.id}`}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setEditUser(user)}
+                                                                aria-label={`Update ${user.name || user.email}`}
                                                                 className={actionButtonClass}
                                                             >
                                                                 <FaPen size={13} />
-                                                            </Link>
+                                                            </button>
                                                         </Tooltip>
                                                         )}
 
@@ -650,6 +768,316 @@ const handleDeleteConfirm = async () => {
                             User stays logged in. The new dashboard and menus open on their next page refresh.
                         </p>
                     )}
+                </div>
+            </Tmodal>
+
+            {/* Edit User Modal (both tabs) */}
+            <Tmodal
+                isOpen={Boolean(editUser)}
+                onClose={() => setEditUser(null)}
+                size="4xl"
+                title={editUser ? `Update ${editUser.name || editUser.email}` : "Update User"}
+            >
+                {editUser && (
+                    <UserUpdate
+                        key={editUser.id}
+                        userId={editUser.id}
+                        inModal
+                        onCancel={() => setEditUser(null)}
+                        onSaved={(saved) => {
+                            if (saved) setUsers((prev) => prev.map((u) => (u.id === saved.id ? { ...u, ...saved } : u)));
+                            setEditUser(null);
+                        }}
+                    />
+                )}
+            </Tmodal>
+
+            {/* Download Buyers Modal */}
+            <Tmodal
+                isOpen={buyerModalOpen}
+                onClose={() => !buyerDownloading && setBuyerModalOpen(false)}
+                size="lg"
+                title="Download Buyers Data"
+                footer={
+                    <div className="flex gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setBuyerModalOpen(false)}
+                            disabled={buyerDownloading}
+                            className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleBuyerDownload}
+                            disabled={buyerDownloading || (buyerScope === "city" && !buyerCity) || (buyerScope === "one" && !buyerId)}
+                            className="flex items-center gap-2 rounded-lg bg-[rgb(232,119,34)] px-4 py-2 text-white disabled:opacity-60"
+                        >
+                            {buyerDownloading ? <Spinner size="sm" color="white" /> : <FiDownload size={15} />}
+                            {buyerDownloading ? "Preparing..." : "Download CSV"}
+                        </button>
+                    </div>
+                }
+            >
+                <div className="space-y-3">
+                    {[
+                        { value: "all", title: "All buyers", text: "Every customer account (deleted users not included)." },
+                        { value: "city", title: "Buyers of one city", text: "Profile city, or property they wishlisted, viewed or enquired in that city." },
+                        { value: "one", title: "One buyer", text: "Search a buyer by name, email or phone." },
+                    ].map((option) => (
+                        <label
+                            key={option.value}
+                            className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
+                                buyerScope === option.value ? "border-[#E87722] bg-orange-50/60" : "border-gray-200 hover:border-gray-300"
+                            }`}
+                        >
+                            <input
+                                type="radio"
+                                name="buyer_scope"
+                                value={option.value}
+                                checked={buyerScope === option.value}
+                                onChange={() => setBuyerScope(option.value)}
+                                className="mt-1 h-4 w-4 accent-[#E87722]"
+                            />
+                            <span>
+                                <span className="block text-sm font-semibold text-[#1A1F36]">{option.title}</span>
+                                <span className="block text-xs text-[#62748E]">{option.text}</span>
+                            </span>
+                        </label>
+                    ))}
+
+                    {buyerScope === "city" && (() => {
+                        const term = buyerCitySearch.trim().toLowerCase();
+                        const cities = buyerCities.filter((item) => !term || item.city.toLowerCase().includes(term));
+                        const selectedCity = buyerCities.find((item) => item.city === buyerCity);
+
+                        return (
+                            <div>
+                                <div className="flex items-center justify-between">
+                                    <label htmlFor="buyer_city_search" className={labelClass}>
+                                        City<span className="ml-1 text-red-500">*</span>
+                                    </label>
+                                    {!buyerCitiesLoading && (
+                                        <span className="text-xs text-[#62748E]">
+                                            {cities.length} {cities.length === 1 ? "city" : "cities"}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Search */}
+                                <div className="relative mt-1.5">
+                                    <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={15} />
+                                    <input
+                                        id="buyer_city_search"
+                                        value={buyerCitySearch}
+                                        onChange={(e) => setBuyerCitySearch(e.target.value)}
+                                        placeholder="Search city..."
+                                        autoComplete="off"
+                                        disabled={buyerCitiesLoading}
+                                        className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-9 pr-9 text-sm text-[#1A1F36] outline-none transition focus:border-[#E87722] focus:ring-2 focus:ring-orange-100 disabled:bg-gray-50"
+                                    />
+                                    {buyerCitySearch && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setBuyerCitySearch("")}
+                                            aria-label="Clear city search"
+                                            className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-[#94A3B8] hover:bg-gray-100 hover:text-[#1A1F36]"
+                                        >
+                                            <FiX size={14} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* City list */}
+                                <div
+                                    role="listbox"
+                                    aria-label="Select city"
+                                    className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white p-1"
+                                >
+                                    {buyerCitiesLoading ? (
+                                        <div className="flex items-center justify-center gap-2 py-6 text-sm text-[#62748E]">
+                                            <Spinner size="sm" /> Loading cities...
+                                        </div>
+                                    ) : buyerCities.length === 0 ? (
+                                        <p className="mb-0 px-3 py-6 text-center text-sm text-[#62748E]">No buyer has a city yet.</p>
+                                    ) : cities.length === 0 ? (
+                                        <p className="mb-0 px-3 py-6 text-center text-sm text-[#62748E]">No city matches your search.</p>
+                                    ) : (
+                                        cities.map((item) => {
+                                            const selected = item.city === buyerCity;
+
+                                            return (
+                                                <button
+                                                    key={item.city}
+                                                    type="button"
+                                                    role="option"
+                                                    aria-selected={selected}
+                                                    onClick={() => setBuyerCity(item.city)}
+                                                    className={`flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left transition ${
+                                                        selected ? "bg-orange-50 ring-1 ring-[#E87722]" : "hover:bg-gray-50"
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                                                            selected ? "bg-[#E87722] text-white" : "bg-orange-100 text-[#E87722]"
+                                                        }`}
+                                                    >
+                                                        <FiMapPin size={16} />
+                                                    </span>
+
+                                                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#1A1F36]">
+                                                        {item.city}
+                                                    </span>
+
+                                                    <span
+                                                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                                                            selected ? "bg-[#E87722] text-white" : "bg-gray-100 text-[#283A86]"
+                                                        }`}
+                                                    >
+                                                        {item.buyers} {item.buyers === 1 ? "buyer" : "buyers"}
+                                                    </span>
+
+                                                    <span
+                                                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                                            selected ? "border-[#E87722] bg-[#E87722] text-white" : "border-gray-300"
+                                                        }`}
+                                                        aria-hidden="true"
+                                                    >
+                                                        {selected && <FiCheck size={12} />}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })
+                                    )}
+                                </div>
+
+                                {/* Selected city summary */}
+                                {selectedCity && (
+                                    <p className="mb-0 mt-2 flex items-center gap-1.5 text-xs text-[#62748E]">
+                                        <FiCheck className="text-[#E87722]" size={13} />
+                                        Selected: <span className="font-semibold text-[#1A1F36]">{selectedCity.city}</span>
+                                        · {selectedCity.buyers} {selectedCity.buyers === 1 ? "buyer" : "buyers"} will be downloaded
+                                    </p>
+                                )}
+                            </div>
+                        );
+                    })()}
+
+                    {buyerScope === "one" && (() => {
+                        const term = buyerSearch.trim().toLowerCase();
+                        const buyers = (Array.isArray(users) ? users : [])
+                            .filter((u) => u?.role === "customer" && !u?.is_deleted)
+                            .filter((u) => !term || [u.name, u.email, u.phone, u.city].some((v) => String(v || "").toLowerCase().includes(term)));
+
+                        const selectedBuyer = (Array.isArray(users) ? users : []).find((u) => String(u.id) === buyerId);
+
+                        return (
+                            <div>
+                                <div className="flex items-center justify-between">
+                                    <label htmlFor="buyer_search" className={labelClass}>
+                                        Buyer<span className="ml-1 text-red-500">*</span>
+                                    </label>
+                                    <span className="text-xs text-[#62748E]">
+                                        {buyers.length} {buyers.length === 1 ? "buyer" : "buyers"}
+                                    </span>
+                                </div>
+
+                                {/* Search */}
+                                <div className="relative mt-1.5">
+                                    <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={15} />
+                                    <input
+                                        id="buyer_search"
+                                        value={buyerSearch}
+                                        onChange={(e) => setBuyerSearch(e.target.value)}
+                                        placeholder="Search name, email, phone or city..."
+                                        autoComplete="off"
+                                        className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-9 pr-9 text-sm text-[#1A1F36] outline-none transition focus:border-[#E87722] focus:ring-2 focus:ring-orange-100"
+                                    />
+                                    {buyerSearch && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setBuyerSearch("")}
+                                            aria-label="Clear search"
+                                            className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-[#94A3B8] hover:bg-gray-100 hover:text-[#1A1F36]"
+                                        >
+                                            <FiX size={14} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Buyer list */}
+                                <div
+                                    role="listbox"
+                                    aria-label="Select buyer"
+                                    className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white p-1"
+                                >
+                                    {buyers.length === 0 ? (
+                                        <p className="mb-0 px-3 py-6 text-center text-sm text-[#62748E]">No buyer matches your search.</p>
+                                    ) : (
+                                        buyers.map((u) => {
+                                            const selected = String(u.id) === buyerId;
+
+                                            return (
+                                                <button
+                                                    key={u.id}
+                                                    type="button"
+                                                    role="option"
+                                                    aria-selected={selected}
+                                                    onClick={() => setBuyerId(String(u.id))}
+                                                    className={`flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left transition ${
+                                                        selected ? "bg-orange-50 ring-1 ring-[#E87722]" : "hover:bg-gray-50"
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold uppercase ${
+                                                            selected ? "bg-[#E87722] text-white" : "bg-orange-100 text-[#E87722]"
+                                                        }`}
+                                                    >
+                                                        {(u.name || u.email || "?").trim().charAt(0)}
+                                                    </span>
+
+                                                    <span className="min-w-0 flex-1">
+                                                        <span className="block truncate text-sm font-semibold text-[#1A1F36]">{u.name || "-"}</span>
+                                                        <span className="block truncate text-xs text-[#62748E]">
+                                                            {[u.email, u.phone].filter(Boolean).join(" · ") || "-"}
+                                                        </span>
+                                                    </span>
+
+                                                    {u.city && (
+                                                        <span className="hidden shrink-0 items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-[#283A86] sm:flex">
+                                                            <FiMapPin size={10} /> {u.city}
+                                                        </span>
+                                                    )}
+
+                                                    <span
+                                                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                                            selected ? "border-[#E87722] bg-[#E87722] text-white" : "border-gray-300"
+                                                        }`}
+                                                        aria-hidden="true"
+                                                    >
+                                                        {selected && <FiCheck size={12} />}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })
+                                    )}
+                                </div>
+
+                                {/* Selected buyer summary */}
+                                {selectedBuyer && (
+                                    <p className="mb-0 mt-2 flex items-center gap-1.5 text-xs text-[#62748E]">
+                                        <FiCheck className="text-[#E87722]" size={13} />
+                                        Selected: <span className="font-semibold text-[#1A1F36]">{selectedBuyer.name || selectedBuyer.email}</span>
+                                    </p>
+                                )}
+                            </div>
+                        );
+                    })()}
+
+                    <p className="mb-0 text-xs text-[#62748E]">
+                        CSV opens in Excel / Google Sheets. You can also use the download icon in a buyer&apos;s row.
+                    </p>
                 </div>
             </Tmodal>
 

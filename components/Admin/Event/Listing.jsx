@@ -16,8 +16,11 @@ import {
     eventCityState,
     formatEventDateRange,
     formatEventTime,
+    isEventLive,
     isUpcomingEvent,
 } from "../../Innerpages/Events/eventUtils";
+import LiveBadge from "../../Common/LiveBadge";
+import useNow from "../../../utils/useNow";
 
 const EVENT_FALLBACK_IMAGE = "/assets/img/blog-img1.png";
 
@@ -31,9 +34,11 @@ const FILTERS = {
     inactive: (event) => !event.is_active,
 };
 
-// Status badge: Inactive / Completed / Upcoming
-const statusOf = (event) => {
+// Status badge: Inactive / Live / Completed / Upcoming
+const statusOf = (event, now) => {
     if (!event.is_active) return ["Inactive", "bg-gray-100 text-gray-600"];
+    // Happening right now (date + time, India time) -> LIVE badge
+    if (now && isEventLive(event, now)) return ["Live", null];
     if (!isUpcomingEvent(event)) return ["Completed", "bg-blue-50 text-blue-700"];
 
     return ["Upcoming", "bg-green-100 text-green-700"];
@@ -64,6 +69,8 @@ const saveEventsCache = (events) => {
 
 export default function Listing() {
     const can = useAdminPermission();
+    // Refreshes every 30 sec so an event turns LIVE (or back) without reload
+    const now = useNow(30000);
 
     const [events, setEvents] = useState(() => readEventsCache() || []);
     // Placeholder cards only on the very first load (nothing cached yet)
@@ -192,11 +199,11 @@ export default function Listing() {
 
             {/* Events cards */}
             {loading ? (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {[1, 2, 3, 4].map((key) => (
                         <div key={key} className="animate-pulse overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
-                            <div className="h-44 bg-gray-200" />
-                            <div className="space-y-3 p-4">
+                            <div className="h-36 bg-gray-200" />
+                            <div className="space-y-2.5 p-3">
                                 <div className="h-3 w-1/4 rounded-full bg-gray-200" />
                                 <div className="h-4 w-4/5 rounded bg-gray-200" />
                                 <div className="h-3 w-1/2 rounded bg-gray-100" />
@@ -207,9 +214,9 @@ export default function Listing() {
                     ))}
                 </div>
             ) : visibleEvents.length > 0 ? (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {visibleEvents.map((event) => {
-                        const [statusLabel, statusClass] = statusOf(event);
+                        const [statusLabel, statusClass] = statusOf(event, now);
 
                         return (
                             <div
@@ -217,33 +224,37 @@ export default function Listing() {
                                 className="flex flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                             >
                                 {/* Image + status / multiple images badges */}
-                                <div className="relative h-44 w-full shrink-0 bg-gray-100">
+                                <div className="relative h-36 w-full shrink-0 bg-gray-100">
                                     <img
                                         src={event.image || EVENT_FALLBACK_IMAGE}
                                         alt={event.title}
                                         className="h-full w-full object-cover"
                                     />
 
-                                    <span className={`absolute left-3 top-3 rounded-full px-3 py-1 text-xs font-semibold shadow-sm ${statusClass}`}>
-                                        {statusLabel}
-                                    </span>
+                                    {statusLabel === "Live" ? (
+                                        <LiveBadge size="sm" label="Live" className="absolute left-2 top-2 shadow-sm" />
+                                    ) : (
+                                        <span className={`absolute left-2 top-2 rounded-full px-2.5 py-0.5 text-[11px] font-semibold shadow-sm ${statusClass}`}>
+                                            {statusLabel}
+                                        </span>
+                                    )}
 
                                     {event.images?.length > 1 && (
-                                        <span className="absolute bottom-3 right-3 rounded bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white">
+                                        <span className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white">
                                             +{event.images.length - 1} photos
                                         </span>
                                     )}
                                 </div>
 
-                                <div className="flex flex-1 flex-col px-4 py-4">
+                                <div className="flex flex-1 flex-col px-3 py-3">
                                     {event.event_type_label && (
-                                        <span className="mb-2 inline-block max-w-full self-start truncate rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-[#E87722]">
+                                        <span className="mb-1.5 inline-block max-w-full self-start truncate rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-[#E87722]">
                                             {event.event_type_label}
                                         </span>
                                     )}
 
                                     <h3
-                                        className="break-words text-[15px] font-semibold leading-snug text-[#1A1F36]"
+                                        className="break-words text-[14px] font-semibold leading-snug text-[#1A1F36]"
                                         style={{
                                             display: "-webkit-box",
                                             WebkitLineClamp: 2,
@@ -262,7 +273,7 @@ export default function Listing() {
                                     )}
 
                                     {/* Date & time */}
-                                    <div className="mt-3 flex items-start gap-2 text-xs">
+                                    <div className="mt-2 flex items-start gap-2 text-xs">
                                         <FaRegCalendarAlt className="mt-0.5 shrink-0 text-[#E87722]" />
                                         <div className="min-w-0">
                                             <p className="text-[#1A1F36]">{formatEventDateRange(event) || "-"}</p>
@@ -273,7 +284,7 @@ export default function Listing() {
                                     </div>
 
                                     {/* Venue */}
-                                    <div className="mt-2 flex items-start gap-2 text-xs">
+                                    <div className="mt-1.5 flex items-start gap-2 text-xs">
                                         <FaMapMarkerAlt className="mt-0.5 shrink-0 text-[#E87722]" />
                                         <div className="min-w-0">
                                             <p className="truncate text-[#1A1F36]" title={event.location || ""}>
@@ -285,12 +296,12 @@ export default function Listing() {
                                 </div>
 
                                 {/* Footer: added by + actions */}
-                                <div className="flex items-center justify-between gap-2 border-t border-gray-100 px-4 py-3">
+                                <div className="flex items-center justify-between gap-2 border-t border-gray-100 px-3 py-2">
                                     <div className="min-w-0">
                                         <AddedBy creator={event.creator} />
                                     </div>
 
-                                    <div className="flex shrink-0 items-center gap-2">
+                                    <div className="flex shrink-0 items-center gap-1.5">
                                         {can("events.view") && (
                                             <Tooltip content="View Event">
                                                 <NextLink href={`/admin/event/detail/${event.id}`} className={actionButtonClass}>

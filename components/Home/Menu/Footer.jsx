@@ -204,26 +204,26 @@ export default function Footer() {
       {/* Major Cities */}
       {footer.show_cities && cities.length > 0 && (
         <div className="container">
-          <div className="border-t border-white/20 lg:py-4 pb-[50px] pt-[10px]">
+          <div className="border-t border-white/20 pb-[16px] pt-[14px] lg:py-4">
             <div className="grid grid-cols-12 gap-4">
               <div className="col-span-12">
-                <h6 className="text-[#fff] font-bold text-[15px] mb-4 uppercase">
+                <h6 className="mb-3 text-[14px] font-bold uppercase text-[#fff] lg:mb-4 lg:text-[15px]">
                   {footer.cities_title || "Major Cities in India"}
                 </h6>
               </div>
             </div>
             <div className="grid grid-cols-12 gap-4">
               <div className="col-span-12">
-                <ul className="flex flex-wrap gap-2">
+                <ul className="mb-0 flex flex-wrap gap-1.5 lg:gap-2">
                   {cities.map((city, index) => (
                     <React.Fragment key={city.id}>
                       {index > 0 && (
-                        <li aria-hidden="true" className="text-white text-[20px] px-1 font-thin relative top-[-3px]">|</li>
+                        <li aria-hidden="true" className="relative top-[-3px] hidden px-1 text-[20px] font-thin text-white lg:block">|</li>
                       )}
-                      <li className="mb-2">
+                      <li className="lg:mb-2">
                         <NextLink
                           href={`/web/property/searchProperties?city=${encodeURIComponent(city.name)}`}
-                          className="block bg-white/10 text-[#fff]/80 text-[12px] px-3 py-1 rounded-sm hover:bg-[var(--primary-color)] hover:text-white transition-colors"
+                          className="block whitespace-nowrap rounded-full bg-white/10 px-2.5 py-1 text-[12px] text-[#fff]/80 no-underline hover:no-underline lg:rounded-sm lg:px-3 hover:bg-[var(--primary-color)] hover:text-white transition-colors"
                         >
                           {city.name}
                         </NextLink>

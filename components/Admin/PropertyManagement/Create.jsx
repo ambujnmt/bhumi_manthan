@@ -1,18 +1,32 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import PageTitle from "../../Breadcrumb/PageTitle";
 import { createProperty, geocodeAddress } from "@/utils/adminFetchApi";
 import { FiPlus, FiX } from "react-icons/fi";
 import RichTextEditor from "../../RichTextEditor/RichTextEditor";
 import { showToast } from "../../../store/toast";
+import { useUser } from "../../../context/UserContext";
+import { getProfile } from "../../../utils/fetchApi";
 import { MAX_IMAGE_KB, pickImageFile } from "../../../utils/imageLimit";
 import LocationFields from "./LocationFields";
 import CategoryFields from "./CategoryFields";
 import PropertyVideoField, { appendVideo, emptyVideo } from "./PropertyVideoField";
 import PropertySeoFields from "./PropertySeoFields";
+import {
+    TYPE_FIELD_DEFAULTS,
+    applyFieldRules,
+    cleanHiddenFields,
+    getFieldRules,
+    withTypeFields,
+} from "./propertyFieldRules";
+
+// Sections that always show (they have their own content: category, location, agent checkbox)
+const KEEP_SECTIONS = ["Basic Property Information", "Location Details", "Agent Details"];
 
 const initialForm = {
+    // carpet / plot area, rent, PG ... (shown by property type)
+    ...TYPE_FIELD_DEFAULTS,
     title: "",
     slug: "",
     meta_title: "",
@@ -138,6 +152,9 @@ const fieldSections = [
     },
 ];
 
+// + carpet / plot area, rent and PG fields (shown by property type)
+const allSections = withTypeFields(fieldSections);
+
 const otherImageFields = [
     { name: "floor_plan_image", label: "Floor Plan Image" },
 ];
@@ -200,7 +217,27 @@ export default function Create() {
     const [message, setMessage] = useState("");
     const [messageType, setMessageType] = useState("");
     const [geoStatus, setGeoStatus] = useState(""); // "", loading, found, error
-const formRef = useRef(null);
+    const formRef = useRef(null);
+
+    // Category + Property Type + Listing Type -> fields to show / required
+    const [selection, setSelection] = useState({ categorySlug: "", subSlug: "" });
+    const rules = useMemo(
+        () => getFieldRules({ ...selection, listingType: form.listing_type }),
+        [selection, form.listing_type]
+    );
+    const sections = useMemo(() => applyFieldRules(allSections, rules, KEEP_SECTIONS), [rules]);
+
+    // Listing type / status not allowed for this type (e.g. PG -> Rent, Plot -> Ready to Register)
+    useEffect(() => {
+        setForm((previous) => {
+            const patch = {};
+
+            if (previous.listing_type !== rules.listing) patch.listing_type = rules.listing;
+            if (previous.status && !rules.statusOptions.includes(previous.status)) patch.status = rules.statusOptions[0];
+
+            return Object.keys(patch).length ? { ...previous, ...patch } : previous;
+        });
+    }, [rules]);
 
     // Auto latitude/longitude from address (debounced)
     useEffect(() => {
@@ -276,8 +313,31 @@ const formRef = useRef(null);
         }
     };
 
+    // Seller / broker listing limit (from /profile). Limit used -> banner + submit disabled.
+    const { user, updateUser } = useUser() || {};
+    const quota = user?.listing_quota;
+    const limitReached = Boolean(
+        quota && !quota.unlimited && quota.limit != null && Number(quota.remaining) <= 0
+    );
+
+    // Fresh quota after a property is added
+    const refreshQuota = async () => {
+        try {
+            const res = await getProfile();
+            if (res?.data?.user) updateUser?.({ ...user, ...res.data.user });
+        } catch {
+            // keep the old quota; the API still blocks over-limit listings
+        }
+    };
+
  const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (limitReached) {
+        setMessage(`Your free listing limit (${quota.limit}) is used. Please buy a plan or contact admin.`);
+        setMessageType("error");
+        return;
+    }
 
     setLoading(true);
     setMessage("");
@@ -287,8 +347,8 @@ const formRef = useRef(null);
         // Create FormData for the API request
         const formData = new FormData();
 
-        // Add all property form fields
-Object.entries(form).forEach(([key, value]) => {
+        // Add all property form fields (fields hidden for this property type are sent empty)
+Object.entries(cleanHiddenFields(form, rules)).forEach(([key, value]) => {
     if (value !== null && value !== undefined) {
         if (typeof value === "boolean") {
             // Laravel boolean validation accepts "1" or "0"
@@ -319,6 +379,7 @@ Object.entries(form).forEach(([key, value]) => {
 
         // Display success toast
         showToast(response?.message || "Property created successfully.");
+        refreshQuota();
 
         // Reset React form state
         setForm({ ...initialForm });
@@ -332,8 +393,7 @@ Object.entries(form).forEach(([key, value]) => {
         }
 
     } catch (error) {
-        console.error("Create property error:", error);
-
+        // No console.error: expected API errors (e.g. listing limit) would open the Next dev error overlay
         setMessage(
             error?.message || "Failed to create property."
         );
@@ -366,11 +426,45 @@ Object.entries(form).forEach(([key, value]) => {
                 <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           
 
-                    {message && (
+                    {/* Festival offer running: unlimited listings for everyone */}
+                    {quota?.offer && (
+                        <div role="status" className="mx-4 mt-5 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900">
+                            <b>{quota.offer.title || "Festival offer"}:</b> post as many properties as you like till{" "}
+                            <b>{new Date(quota.offer.ends_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</b>.
+                        </div>
+                    )}
+
+                    {limitReached && (
+                        <div
+                            role="alert"
+                            className="mx-4 mt-5 flex flex-col gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                            <div>
+                                <p className="mb-0 text-sm font-bold text-[#001737]">
+                                    {quota.plan_expired ? "Your plan has expired" : "Listing limit reached"}
+                                </p>
+                                <p className="mb-0 mt-0.5 text-sm text-[#62748E]">
+                                    {quota.plan_expired
+                                        ? `${quota.plan_name || "Your plan"} expired on ${quota.plan_expires_at}. Your ${quota.used} listed ${quota.used === 1 ? "property stays" : "properties stay"} on the website${quota.limit > 0 ? ` (free limit ${quota.limit})` : ""}. Renew your plan to add new properties.`
+                                        : `You have used ${quota.used} of ${quota.limit} ${quota.source === "plan" ? `listings in your ${quota.plan_name} plan` : "free listings"}. Buy a plan or contact admin to add more properties.`}
+                                </p>
+                            </div>
+                            <a
+                                href="/web/plans"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#E87722] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#cf681b]"
+                            >
+                                View Plans
+                            </a>
+                        </div>
+                    )}
+
+                    {message && !(limitReached && messageType === "error") && (
                         <div
                             role={messageType === "error" ? "alert" : "status"}
                             aria-live="polite"
-                            className={`mx-5 mt-5 rounded-lg border px-4 py-3 text-sm sm:mx-7 ${
+                            className={`mx-4 mt-5 rounded-lg border px-4 py-3 text-sm ${
                                 messageType === "success"
                                     ? " text-green-800"
                                     : " text-red-700"
@@ -385,8 +479,14 @@ Object.entries(form).forEach(([key, value]) => {
                         </div>
                     )}
 
-                    <form  ref={formRef} onSubmit={handleSubmit} className="p-5 sm:p-7">
-                        {fieldSections.map((section) => (
+                    <form  ref={formRef} onSubmit={handleSubmit} className="px-4 py-5 sm:py-7">
+                        {rules.kind && (
+                            <p className="mb-6 rounded-lg border border-orange-100 bg-orange-50 px-4 py-2.5 text-sm text-[#283A86]">
+                                Showing fields for <span className="font-semibold">{rules.listing}</span> of this property type. Fields marked <span className="text-red-500">*</span> are required.
+                            </p>
+                        )}
+
+                        {sections.map((section) => (
                             <section
                                 key={section.title}
                                 className="mb-8"
@@ -403,6 +503,7 @@ Object.entries(form).forEach(([key, value]) => {
                                             onChange={(patch) =>
                                                 setForm((previous) => ({ ...previous, ...patch }))
                                             }
+                                            onSelection={setSelection}
                                             inputClass={inputClass}
                                             labelClass={labelClass}
                                         />
@@ -793,7 +894,8 @@ Object.entries(form).forEach(([key, value]) => {
 
                             <button
                                 type="submit"
-                                disabled={loading}
+                                disabled={loading || limitReached}
+                                title={limitReached ? "Listing limit reached" : undefined}
                                 className="inline-flex min-w-[175px] items-center justify-center gap-2 rounded-lg bg-[#E87722] px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#cf681b] disabled:cursor-not-allowed disabled:opacity-70"
                             >
                                 {loading ? (

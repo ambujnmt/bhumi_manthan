@@ -10,6 +10,7 @@ import { CompareProvider } from "../context/CompareContext";
 import { GoogleOAuthProvider } from '@react-oauth/google'; // ✅ Import GoogleOAuthProvider
 import { RegisteredUserProvider } from "../context/RegisteredUserContext"; // ✅ Import RegisteredUserProvider
 import { toRolePath } from "../utils/adminPermissions";
+import useScrollRestoration from "../utils/useScrollRestoration";
 import '../styles/globals.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Toast from "../components/Toast";
@@ -46,6 +47,18 @@ function RoleAwareProviders({ children }) {
 
 function App({ Component, pageProps, websiteData }) {
   const getLayout = Component.getLayout || ((page) => page);
+
+  const router = useRouter();
+
+  // Back / forward returns to the same scroll position (not the top of the page)
+  useScrollRestoration(router);
+
+  // Dashboard panels (admin / seller / broker / user): body class for panel-only CSS
+  // (globals.css removes Bootstrap's link underline there)
+  useEffect(() => {
+    const isPanel = /^\/(admin|seller|broker|staff|user)(\/|$)/.test(router.pathname);
+    document.body.classList.toggle("dashboard-panel", isPanel);
+  }, [router.pathname]);
 
 
   return (

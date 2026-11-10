@@ -1,5 +1,4 @@
 import NextLink from "next/link";
-import Image from "next/image";
 import React, { useEffect, useMemo, useState } from "react";
 import { Spinner } from "@heroui/react";
 import {
@@ -19,20 +18,23 @@ import {
     FaChevronRight, // <-- add
 } from "react-icons/fa";
 import { getEvents } from "../../../utils/fetchApi";
+import useUserLocation from "../../../utils/useUserLocation";
+import useNow from "../../../utils/useNow";
+import LiveBadge from "../../Common/LiveBadge";
 import EventCard from "./EventCard";
+import PageBannerImage from "../../Common/PageBannerImage";
 import {
     eventCityState,
     formatEventDateRange,
     formatEventTime,
     googleCalendarUrl,
+    isEventLive,
     parseEventDate,
     splitEvents,
 } from "./eventUtils";
 
 const NAVY = "#12305F";
 
-// Banner image: public/images/events-banner.jpg
-const BANNER_IMAGE = "/images/events-banner.jpg";
 
 // Card icons: API se event.icon na aaye to index ke hisaab se ye use honge
 const EVENT_ICONS = [FaCalendarAlt, FaBuilding, FaHome, FaMicrophone, FaGem];
@@ -89,10 +91,19 @@ function Countdown({ event }) {
 
     const diff = start.getTime() - now;
 
+    if (isEventLive(event, now)) {
+        return (
+            <span className="inline-flex items-center gap-3">
+                <LiveBadge size="lg" />
+                <span className="text-[14px] font-semibold text-white/90">Happening now · till {formatEventTime(event.end_time) || "end of day"}</span>
+            </span>
+        );
+    }
+
     if (diff <= 0) {
         return (
-            <span className="inline-flex items-center gap-2 rounded-full bg-green-500/15 px-3 py-1.5 text-[13px] font-semibold text-green-300">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-green-400" /> Happening now
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[13px] font-semibold text-white/80">
+                Today&apos;s session is over · next from {formatEventTime(event.start_time) || "tomorrow"}
             </span>
         );
     }
@@ -116,9 +127,11 @@ function Countdown({ event }) {
     );
 }
 
-function FeaturedEvent({ event }) {
+function FeaturedEvent({ event, index = 0 }) {
     const href = `/web/events/${event.slug || event.id}`;
     const cityState = eventCityState(event);
+    const now = useNow(30000);
+    const live = Boolean(now) && isEventLive(event, now);
 
     return (
         <div
@@ -131,11 +144,15 @@ function FeaturedEvent({ event }) {
                     alt={event.title}
                     className="absolute inset-0 h-full w-full object-cover transition duration-500 hover:scale-105"
                 />
-                <span className="absolute left-4 top-4 rounded-full bg-[var(--primary-color)] px-3.5 py-1.5 text-[12px] font-bold uppercase tracking-wide text-white shadow">
-                    Next Big Event
-                </span>
+                {live ? (
+                    <LiveBadge size="lg" label="Live Now" className="absolute left-4 top-4" />
+                ) : (
+                    <span className="absolute left-4 top-4 rounded-full bg-[var(--primary-color)] px-3.5 py-1.5 text-[12px] font-bold uppercase tracking-wide text-white shadow">
+                        Next Big Event
+                    </span>
+                )}
                 {/* Card icon */}
-                <EventIcon event={event} index={0} className="absolute bottom-4 right-4" />
+                <EventIcon event={event} index={index} className="absolute bottom-4 right-4" />
             </NextLink>
 
             <div className="col-span-12 flex flex-col justify-center p-6 lg:col-span-6 lg:p-10">
@@ -229,7 +246,7 @@ function EmptyState({ title, text, onReset }) {
 }
 
 // initialEvents: loaded on server (pages/web/events), null = load in browser
-export default function EventList({ initialEvents = null }) {
+export default function EventList({ initialEvents = null, initialBanner }) {
     const [events, setEvents] = useState(initialEvents ?? []);
     const [loading, setLoading] = useState(initialEvents === null);
 
@@ -255,6 +272,35 @@ export default function EventList({ initialEvents = null }) {
         fetchEvents();
     }, [initialEvents]);
 
+    // Visitor location (IP) -> distance of nearby events (same as properties)
+    const { ready, location } = useUserLocation();
+    const [distances, setDistances] = useState({});
+
+    useEffect(() => {
+        if (!ready || !location) return;
+
+        let active = true;
+
+        getEvents(50, location)
+            .then((res) => {
+                if (!active) return;
+
+                const map = {};
+                (res?.data?.events || []).forEach((event) => {
+                    // Old API has no distance -> ignored
+                    if (event.distance_km != null) map[event.id] = event.distance_km;
+                });
+                setDistances(map);
+            })
+            .catch(() => {});
+
+        return () => {
+            active = false;
+        };
+    }, [ready, location]);
+
+    const now = useNow(30000);
+
     // Filter options from the events themselves
     const cities = useMemo(
         () => [...new Set(events.map((event) => event.city).filter(Boolean))].sort(),
@@ -271,7 +317,22 @@ export default function EventList({ initialEvents = null }) {
         return [...map.entries()];
     }, [events]);
 
-    const all = useMemo(() => splitEvents(events), [events]);
+    // Upcoming order: LIVE first, then nearby (nearest first), then by date
+    const all = useMemo(() => {
+        const withDistance = events.map((event) =>
+            distances[event.id] != null ? { ...event, distance_km: distances[event.id] } : event
+        );
+        const split = splitEvents(withDistance);
+
+        const rank = (event) => (now && isEventLive(event, now) ? 0 : event.distance_km != null ? 1 : 2);
+
+        // Array sort is stable -> same rank keeps date order
+        split.upcoming = [...split.upcoming].sort(
+            (a, b) => rank(a) - rank(b) || (rank(a) === 1 ? a.distance_km - b.distance_km : 0)
+        );
+
+        return split;
+    }, [events, distances, now]);
 
     const term = search.trim().toLowerCase();
     const filtering = Boolean(term || city || type);
@@ -286,9 +347,17 @@ export default function EventList({ initialEvents = null }) {
     const upcoming = all.upcoming.filter(matches);
     const past = all.past.filter(matches);
 
-    // Big card for the next event (only while not filtering)
-    const featured = !filtering && tab === "upcoming" ? all.upcoming[0] : null;
-    const list = (tab === "upcoming" ? upcoming : past).filter((event) => event !== featured);
+    // Big cards: all LIVE events (or the next event if none is live) - only while not filtering
+    const liveEvents = now ? all.upcoming.filter((event) => isEventLive(event, now)) : [];
+
+    const featuredList =
+        !filtering && tab === "upcoming"
+            ? liveEvents.length > 0
+                ? liveEvents
+                : all.upcoming.slice(0, 1)
+            : [];
+
+    const list = (tab === "upcoming" ? upcoming : past).filter((event) => !featuredList.includes(event));
 
     const resetFilters = () => {
         setSearch("");
@@ -306,13 +375,11 @@ export default function EventList({ initialEvents = null }) {
         <>
             {/* Hero with banner image (centered) */}
             <section className="relative overflow-hidden pb-24 pt-12 lg:pb-28 lg:pt-16">
-                <Image
-                    src={BANNER_IMAGE}
+                {/* Image: Admin -> Banner (type: Events Page) */}
+                <PageBannerImage
+                    type="events"
+                    initialBanner={initialBanner}
                     alt="Property events banner"
-                    fill
-                    priority
-                    sizes="100vw"
-                    className="object-cover"
                 />
                 <div
                     className="absolute inset-0"
@@ -455,15 +522,18 @@ export default function EventList({ initialEvents = null }) {
                             )}
                         </div>
 
-                        {featured && (
-                            <div className="mt-6">
-                                <FeaturedEvent event={featured} />
+                        {/* Featured: all LIVE events (or next event if none live) */}
+                        {featuredList.length > 0 && (
+                            <div className="mt-6 space-y-6">
+                                {featuredList.map((event, index) => (
+                                    <FeaturedEvent key={event.id} event={event} index={index} />
+                                ))}
                             </div>
                         )}
 
                         {list.length > 0 ? (
                             <>
-                                {featured && (
+                                {featuredList.length > 0 && (
                                     <h2 className="mb-0 mt-12 text-[22px] font-bold text-[var(--text-color1)]">More Upcoming Events</h2>
                                 )}
                                 <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -480,7 +550,7 @@ export default function EventList({ initialEvents = null }) {
                                     ))}
                                 </div>
                             </>
-                        ) : !featured ? (
+                        ) : featuredList.length === 0 ? (
                             <div className="mt-6">
                                 {filtering ? (
                                     <EmptyState
@@ -498,6 +568,7 @@ export default function EventList({ initialEvents = null }) {
                         ) : null}
                     </>
                 )}
+
 
                 {/* Why attend */}
                 <div className="mt-16">

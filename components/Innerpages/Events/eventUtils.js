@@ -71,6 +71,46 @@ export const isUpcomingEvent = (event) => {
     return Boolean(date) && date >= today;
 };
 
+// Current date + time in India (event times are IST, visitor may be anywhere)
+const indiaNow = (now = Date.now()) => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+    }).formatToParts(new Date(now));
+
+    const get = (type) => parts.find((part) => part.type === type)?.value;
+
+    return { date: `${get("year")}-${get("month")}-${get("day")}`, time: `${get("hour")}:${get("minute")}` };
+};
+
+/**
+ * Event is LIVE: today is one of its days and the time is between start and end time.
+ * No start time -> from 00:00, no end time -> till 23:59. End before start (18:00 - 02:00) = runs past midnight.
+ */
+export const isEventLive = (event, now = Date.now()) => {
+    if (!event?.event_date) return false;
+
+    const { date, time } = indiaNow(now);
+    const first = String(event.event_date).slice(0, 10);
+    const last = String(lastDay(event)).slice(0, 10);
+    const start = String(event.start_time || "00:00").slice(0, 5);
+    const end = String(event.end_time || "23:59").slice(0, 5);
+
+    if (end > start) {
+        return date >= first && date <= last && time >= start && time <= end;
+    }
+
+    // Overnight: started this evening, or still running after midnight from yesterday
+    const yesterday = indiaNow(now - 86400000).date;
+
+    return (date >= first && date <= last && time >= start) || (yesterday >= first && yesterday <= last && time <= end);
+};
+
 // Upcoming: soonest first, past: latest first
 export const splitEvents = (events = []) => {
     const byDate = (a, b) =>

@@ -3,10 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { Spinner } from "@heroui/react";
 import { useRouter } from "next/router";
-import { getProfile } from "../../../utils/fetchApi";
+import { getProfile, updateProfile } from "../../../utils/fetchApi";
+import { useUser } from "../../../context/UserContext";
+import { showToast } from "../../../store/toast";
 import { subscribeChatUnread } from "../../../utils/firebaseChat";
 import { clearPostLoginRedirect } from "../../../utils/postLoginRedirect";
-import { FiAward, FiCalendar, FiCheckCircle, FiFileText, FiMail, FiPhone, FiShield, FiUser } from "react-icons/fi";
+import { FiAward, FiCalendar, FiCheckCircle, FiEdit2, FiFileText, FiMail, FiMapPin, FiPhone, FiShield, FiUser } from "react-icons/fi";
 import ChatBox from "../../Admin/Chat/ChatBox";
 
 const PILL_TONES = {
@@ -37,7 +39,145 @@ function InfoRow({ icon: Icon, label, children }) {
   );
 }
 
-function ProfileDetails({ profile }) {
+const inputClass =
+  "mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-[var(--secondary-color)] outline-none transition focus:border-[var(--primary-color)] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-[#62748E]";
+
+const PHONE_PATTERN = /^\+?[0-9\s-]{7,20}$/;
+
+// Edit name + phone + city (email is verified with OTP, so it stays read only)
+function EditProfileForm({ profile, onCancel, onSaved }) {
+  const [form, setForm] = useState({ name: profile.name || "", phone: profile.phone || "", city: profile.city || "" });
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setForm((previous) => ({ ...previous, [name]: value }));
+    setErrors((previous) => ({ ...previous, [name]: undefined }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    const name = form.name.trim();
+    const phone = form.phone.trim();
+    const nextErrors = {};
+
+    if (!name) nextErrors.name = "Please enter your name.";
+    if (!phone) nextErrors.phone = "Please enter your phone number.";
+    else if (!PHONE_PATTERN.test(phone)) nextErrors.phone = "Please enter a valid phone number.";
+
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const res = await updateProfile({ name, phone, city: form.city.trim() });
+      showToast(res?.message || "Profile updated successfully.");
+      onSaved(res?.data?.user);
+    } catch (error) {
+      const fieldErrors = Object.fromEntries(
+        Object.entries(error?.errors || {}).map(([key, messages]) => [key, [].concat(messages)[0]])
+      );
+
+      setErrors(fieldErrors);
+      showToast(error?.message || "Unable to update profile.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} noValidate className="space-y-[14px] px-[10px]">
+      <div>
+        <label htmlFor="profile_name" className="text-xs font-medium text-[#62748E]">
+          Full Name <span className="text-red-500">*</span>
+        </label>
+        <input
+          id="profile_name"
+          name="name"
+          value={form.name}
+          onChange={handleChange}
+          maxLength={255}
+          autoComplete="name"
+          className={inputClass}
+          aria-invalid={Boolean(errors.name)}
+        />
+        {errors.name && <p className="mb-0 mt-1 text-xs text-red-600">{errors.name}</p>}
+      </div>
+
+      <div>
+        <label htmlFor="profile_phone" className="text-xs font-medium text-[#62748E]">
+          Phone Number <span className="text-red-500">*</span>
+        </label>
+        <input
+          id="profile_phone"
+          name="phone"
+          type="tel"
+          value={form.phone}
+          onChange={handleChange}
+          maxLength={20}
+          autoComplete="tel"
+          className={inputClass}
+          aria-invalid={Boolean(errors.phone)}
+        />
+        {errors.phone && <p className="mb-0 mt-1 text-xs text-red-600">{errors.phone}</p>}
+      </div>
+
+      <div>
+        <label htmlFor="profile_city" className="text-xs font-medium text-[#62748E]">
+          City
+        </label>
+        <input
+          id="profile_city"
+          name="city"
+          value={form.city}
+          onChange={handleChange}
+          maxLength={100}
+          placeholder="e.g. Noida"
+          autoComplete="address-level2"
+          className={inputClass}
+          aria-invalid={Boolean(errors.city)}
+        />
+        {errors.city && <p className="mb-0 mt-1 text-xs text-red-600">{errors.city}</p>}
+      </div>
+
+      <div>
+        <label htmlFor="profile_email" className="text-xs font-medium text-[#62748E]">
+          Email Address
+        </label>
+        <input id="profile_email" value={profile.email || ""} disabled className={inputClass} />
+        <p className="mb-0 mt-1 text-xs text-[#62748E]">Email is verified with OTP and can&apos;t be changed here.</p>
+      </div>
+
+      <div className="flex flex-wrap justify-end gap-2 pt-[4px]">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-[var(--secondary-color)] transition hover:bg-gray-50 disabled:opacity-60"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-[var(--primary-color)] px-5 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {saving && <Spinner size="sm" color="white" />}
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function ProfileDetails({ profile, onProfileUpdated }) {
+  const [editing, setEditing] = useState(false);
+
   const role = profile.role === "super_admin" ? "Admin" : (profile.role || "-").replace(/_/g, " ");
   const isActive = profile.status === "active";
   const memberSince = profile.created_at
@@ -57,9 +197,19 @@ function ProfileDetails({ profile }) {
             <h2 className="mb-[2px] break-words text-xl font-bold text-[var(--secondary-color)]">{profile.name || "-"}</h2>
             <div className="break-words text-sm text-[#62748E]">{profile.email || "-"}</div>
           </div>
-          <div className="flex flex-wrap gap-2 sm:pb-[4px]">
+          <div className="flex flex-wrap items-center gap-2 sm:pb-[4px]">
             <Pill tone="brand">{role}</Pill>
             <Pill tone={isActive ? "good" : "bad"}>{profile.status || "-"}</Pill>
+            {!editing && (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--primary-color)] px-3 py-1.5 text-xs font-semibold text-[var(--primary-color)] transition hover:bg-[var(--primary-color)] hover:text-white"
+              >
+                <FiEdit2 size={13} />
+                Edit Profile
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -67,13 +217,41 @@ function ProfileDetails({ profile }) {
       <div className="grid grid-cols-1 gap-[20px] xl:grid-cols-2">
         {/* Personal details */}
         <section className="rounded-2xl border border-gray-100 bg-white p-[16px] shadow-sm sm:p-[20px]">
-          <h3 className="mb-[12px] px-[10px] text-base font-bold text-[var(--secondary-color)]">Personal Information</h3>
-          <div className="space-y-[4px]">
-            <InfoRow icon={FiUser} label="Full Name">{profile.name || "-"}</InfoRow>
-            <InfoRow icon={FiMail} label="Email Address">{profile.email || "-"}</InfoRow>
-            <InfoRow icon={FiPhone} label="Phone Number">{profile.phone || "-"}</InfoRow>
-            <InfoRow icon={FiCalendar} label="Member Since">{memberSince}</InfoRow>
+          <div className="mb-[12px] flex items-center justify-between gap-2 px-[10px]">
+            <h3 className="mb-0 text-base font-bold text-[var(--secondary-color)]">
+              {editing ? "Edit Personal Information" : "Personal Information"}
+            </h3>
+            {!editing && (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-[var(--primary-color)] hover:underline"
+                aria-label="Edit personal information"
+              >
+                <FiEdit2 size={13} />
+                Edit
+              </button>
+            )}
           </div>
+
+          {editing ? (
+            <EditProfileForm
+              profile={profile}
+              onCancel={() => setEditing(false)}
+              onSaved={(user) => {
+                onProfileUpdated(user);
+                setEditing(false);
+              }}
+            />
+          ) : (
+            <div className="space-y-[4px]">
+              <InfoRow icon={FiUser} label="Full Name">{profile.name || "-"}</InfoRow>
+              <InfoRow icon={FiMail} label="Email Address">{profile.email || "-"}</InfoRow>
+              <InfoRow icon={FiPhone} label="Phone Number">{profile.phone || "-"}</InfoRow>
+              <InfoRow icon={FiMapPin} label="City">{profile.city || "-"}</InfoRow>
+              <InfoRow icon={FiCalendar} label="Member Since">{memberSince}</InfoRow>
+            </div>
+          )}
         </section>
 
         {/* Account state */}
@@ -99,6 +277,15 @@ function ProfileDetails({ profile }) {
 
 export default function Profile({ dashboard = false }) {
   const [profile, setProfile] = useState(null);
+  const { user: loggedInUser, updateUser } = useUser();
+
+  // Saved profile: page + logged in user (header name) update at once
+  const handleProfileUpdated = (user) => {
+    if (!user) return;
+
+    setProfile(user);
+    updateUser({ ...(loggedInUser || {}), ...user });
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -213,7 +400,7 @@ export default function Profile({ dashboard = false }) {
           <p className="mt-2 text-[#62748E]">
             {tab === "chat"
               ? "Chat with admin, brokers and sellers."
-              : "View your personal account information."}
+              : "View and edit your personal account information."}
           </p>
         </div>
       )}
@@ -253,7 +440,7 @@ export default function Profile({ dashboard = false }) {
           onPropertyChatDone={handlePropertyChatDone}
         />
       ) : (
-      <ProfileDetails profile={profile} />
+      <ProfileDetails profile={profile} onProfileUpdated={handleProfileUpdated} />
       )}
     </div>
   );

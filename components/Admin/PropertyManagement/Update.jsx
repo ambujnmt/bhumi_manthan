@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import PageTitle from "../../Breadcrumb/PageTitle";
 import { Spinner } from "@heroui/react";
 import { useRouter } from "next/router";
@@ -13,8 +13,20 @@ import LocationFields from "./LocationFields";
 import CategoryFields from "./CategoryFields";
 import PropertyVideoField, { appendVideo, emptyVideo, videoFromProperty } from "./PropertyVideoField";
 import PropertySeoFields from "./PropertySeoFields";
+import {
+    TYPE_FIELD_DEFAULTS,
+    applyFieldRules,
+    cleanHiddenFields,
+    getFieldRules,
+    withTypeFields,
+} from "./propertyFieldRules";
+
+// Sections that always show (they have their own content: category, location, agent checkbox)
+const KEEP_SECTIONS = ["Basic Property Information", "Location Details", "Agent Details"];
 
 const initialForm = {
+    // carpet / plot area, rent, PG ... (shown by property type)
+    ...TYPE_FIELD_DEFAULTS,
     title: "",
     slug: "",
     meta_title: "",
@@ -159,6 +171,9 @@ const fieldSections = [
     },
 ];
 
+// + carpet / plot area, rent and PG fields (shown by property type)
+const allSections = withTypeFields(fieldSections);
+
 const fileInputClass =
     "mt-1.5 block w-full rounded-lg border border-gray-300 bg-white text-sm text-[#62748E] file:mr-3 file:border-0 file:bg-[#001737] file:px-3 file:py-2.5 file:text-white hover:file:bg-[#E87722]";
 
@@ -243,6 +258,28 @@ export default function Update() {
 
     const [property, setProperty] = useState(null);
     const [form, setForm] = useState(initialForm);
+
+    // Category + Property Type + Listing Type -> fields to show / required
+    const [selection, setSelection] = useState({ categorySlug: "", subSlug: "" });
+    const rules = useMemo(
+        () => getFieldRules({ ...selection, listingType: form.listing_type }),
+        [selection, form.listing_type]
+    );
+    const sections = useMemo(() => applyFieldRules(allSections, rules, KEEP_SECTIONS), [rules]);
+
+    // Listing type / status not allowed for this type (e.g. PG -> Rent, Plot -> Ready to Register)
+    useEffect(() => {
+        if (!rules.kind) return; // categories / saved property not loaded yet -> keep saved values
+
+        setForm((previous) => {
+            const patch = {};
+
+            if (previous.listing_type !== rules.listing) patch.listing_type = rules.listing;
+            if (previous.status && !rules.statusOptions.includes(previous.status)) patch.status = rules.statusOptions[0];
+
+            return Object.keys(patch).length ? { ...previous, ...patch } : previous;
+        });
+    }, [rules]);
     const [images, setImages] = useState(initialImages);
     const [imagePreviews, setImagePreviews] = useState(initialPreviews);
 
@@ -479,7 +516,8 @@ export default function Update() {
             const formData = new FormData();
 
             // Add all property form fields
-            Object.entries(form).forEach(([key, value]) => {
+            // Fields hidden for this property type are sent empty (cleared)
+            Object.entries(cleanHiddenFields(form, rules)).forEach(([key, value]) => {
                 if (typeof value === "boolean") {
                     // Laravel boolean validation accepts "1" or "0"
                     formData.append(key, value ? "1" : "0");
@@ -581,7 +619,7 @@ export default function Update() {
                         <div
                             role={messageType === "error" ? "alert" : "status"}
                             aria-live="polite"
-                            className={`mx-5 mt-5 rounded-lg border px-4 py-3 text-sm sm:mx-7 ${
+                            className={`mx-4 mt-5 rounded-lg border px-4 py-3 text-sm ${
                                 messageType === "success"
                                     ? " text-green-800"
                                     : " text-red-700"
@@ -596,7 +634,7 @@ export default function Update() {
                         </div>
                     )}
 
-                    <form ref={formRef} onSubmit={handleSubmit} className="p-5 sm:p-7">
+                    <form ref={formRef} onSubmit={handleSubmit} className="px-4 py-5 sm:py-7">
                         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                             <p className="text-sm text-[#62748E]">
                                 {property?.property_id && (
@@ -619,7 +657,7 @@ export default function Update() {
                             </button>
                         </div>
 
-                        {fieldSections.map((section) => (
+                        {sections.map((section) => (
                             <section
                                 key={section.title}
                                 className="mb-8"
@@ -636,6 +674,7 @@ export default function Update() {
                                             onChange={(patch) =>
                                                 setForm((previous) => ({ ...previous, ...patch }))
                                             }
+                                            onSelection={setSelection}
                                             inputClass={inputClass}
                                             labelClass={labelClass}
                                         />

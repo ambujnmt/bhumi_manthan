@@ -10,8 +10,9 @@ import { getPropertyCategories } from "@/utils/fetchApi";
  *
  * values = { category_id, sub_category_id }
  * onChange(patch) -> merge into form
+ * onSelection({ categorySlug, subSlug }) -> selected slugs (form shows fields for that type)
  */
-export default function CategoryFields({ values, onChange, inputClass, labelClass }) {
+export default function CategoryFields({ values, onChange, inputClass, labelClass, onSelection }) {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -25,6 +26,15 @@ export default function CategoryFields({ values, onChange, inputClass, labelClas
     const selectedCategory = categories.find((c) => String(c.id) === String(values.category_id));
     const subCategories = selectedCategory?.children || [];
     const selectedSub = subCategories.find((c) => String(c.id) === String(values.sub_category_id));
+
+    // Tell the form which category / type is selected (also after a saved property loads)
+    const categorySlug = selectedCategory?.slug || "";
+    const subSlug = selectedSub?.slug || "";
+
+    useEffect(() => {
+        onSelection?.({ categorySlug, subSlug });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [categorySlug, subSlug]);
 
     return (
         <>

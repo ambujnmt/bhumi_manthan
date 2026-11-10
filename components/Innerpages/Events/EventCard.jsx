@@ -1,10 +1,18 @@
 import NextLink from "next/link";
 import React from "react";
 import { FaArrowRight, FaClock, FaMapMarkerAlt, FaUsers } from "react-icons/fa";
-import { dateBadge, eventVenue, formatEventTime, isUpcomingEvent } from "./eventUtils";
+import { FiNavigation } from "react-icons/fi";
+import { dateBadge, eventVenue, formatEventTime, isEventLive, isUpcomingEvent } from "./eventUtils";
+import { formatDistance } from "../../../utils/formatPrice";
+import useNow from "../../../utils/useNow";
+import LiveBadge from "../../Common/LiveBadge";
 
 // Event card: image with date badge + type, organizer, time, venue, highlights
+// Started and not ended -> red blinking LIVE badge (checked every 30 sec)
 export default function EventCard({ event }) {
+    const now = useNow(30000);
+    const live = Boolean(now) && isEventLive(event, now);
+    const distance = formatDistance(event.distance_km);
     const upcoming = isUpcomingEvent(event);
     const href = `/web/events/${event.slug || event.id}`;
     const badge = dateBadge(event);
@@ -12,7 +20,7 @@ export default function EventCard({ event }) {
     const highlights = (event.highlight_labels || []).slice(0, 2);
 
     return (
-        <div className="group flex h-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-[0_6px_24px_rgba(18,48,95,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_14px_34px_rgba(18,48,95,0.16)]">
+        <div className={`group flex h-full flex-col overflow-hidden rounded-2xl border bg-white shadow-[0_6px_24px_rgba(18,48,95,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_14px_34px_rgba(18,48,95,0.16)] ${live ? "border-red-300 ring-2 ring-red-500/20" : "border-gray-100"}`}>
             <NextLink href={href} className="relative block overflow-hidden no-underline">
                 <img
                     src={event.image || "/assets/img/blog-img1.png"}
@@ -30,6 +38,14 @@ export default function EventCard({ event }) {
                         {badge.days}
                     </p>
                 </div>
+
+                {live && <LiveBadge className="absolute right-3 top-3" />}
+
+                {distance && (
+                    <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white">
+                        <FiNavigation size={10} /> {distance}
+                    </span>
+                )}
 
                 {upcoming ? (
                     event.event_type_label && (

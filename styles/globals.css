@@ -89,6 +89,42 @@ body ul {
   text-decoration: none;
 }
 
+/* Dashboards: no underline on links / link-buttons (normal, hover, focus, click).
+   body class set in _app.js; stronger than Bootstrap's "a" and "a:hover" rules.
+   Links inside the blog editor keep their underline. */
+body.dashboard-panel a,
+body.dashboard-panel a:hover,
+body.dashboard-panel a:focus,
+body.dashboard-panel a:active,
+body.dashboard-panel button,
+body.dashboard-panel button:hover,
+body.dashboard-panel button:focus,
+body.dashboard-panel button:active {
+  text-decoration: none;
+}
+
+body.dashboard-panel .ql-editor a {
+  text-decoration: underline;
+}
+
+/* Home banner on phones: no arrows over the small banner (swipe changes slides) */
+@media (max-width: 639px) {
+  .heroSwiper .swiper-button-prev,
+  .heroSwiper .swiper-button-next {
+    display: none;
+  }
+}
+
+/* Hide the scrollbar but keep scrolling (swipe / trackpad / shift+wheel) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 #inner-content-block .table-wrapper {
   overflow-x: auto;
   width: 100%;
@@ -376,4 +412,52 @@ button{
 
 ul.flex.flex-wrap.gap-2 {
     padding-left: 0;
+}
+/* Red "LIVE" badge for events that have started (components/Common/LiveBadge.jsx)
+   Text stays solid; the dot blinks and the pill gives off a soft pulse. */
+@keyframes live-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+@keyframes live-ping {
+  0% { transform: scale(1); opacity: 0.75; }
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+
+@keyframes live-glow-red {
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55); }
+  70% { box-shadow: 0 0 0 7px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
+@keyframes live-glow-white {
+  0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+  70% { box-shadow: 0 0 0 7px rgba(255, 255, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+.live-blink {
+  animation: live-blink 1s ease-in-out infinite;
+}
+
+.live-ping {
+  animation: live-ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.live-glow-red {
+  animation: live-glow-red 1.6s ease-out infinite;
+}
+
+.live-glow-white {
+  animation: live-glow-white 1.6s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-blink,
+  .live-ping,
+  .live-glow-red,
+  .live-glow-white {
+    animation: none;
+  }
 }

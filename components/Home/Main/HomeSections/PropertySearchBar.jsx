@@ -18,14 +18,15 @@ export default function PropertySearchBar() {
 
   // Row is there from the first paint (skeleton until options load) -> box does not jump
   const popularSearches = (!options || popularCities.length > 0) && (
-    <div className="mt-4 flex min-h-[34px] flex-wrap items-center gap-2">
-      <span className="mr-1 text-sm text-white/60">Popular Searches:</span>
+    <div className="mt-4 sm:flex sm:min-h-[34px] sm:flex-wrap sm:items-center sm:gap-2">
+      <span className="mb-2 block text-sm text-white/60 sm:mb-0 sm:mr-1">Popular Searches:</span>
+      <div className="flex min-h-[34px] flex-wrap items-center gap-2 sm:contents">
       {!options
         ? [150, 140, 160, 160, 130].map((width, index) => (
             <span
               key={index}
               aria-hidden="true"
-              className="h-[34px] animate-pulse rounded-full bg-white/10"
+              className="h-[34px] shrink-0 animate-pulse rounded-full bg-white/10"
               style={{ width }}
             />
           ))
@@ -33,11 +34,12 @@ export default function PropertySearchBar() {
             <NextLink
               key={city.name}
               href={{ pathname: SEARCH_PATH, query: { city: city.name } }}
-              className="rounded-full border border-white/30 px-3 py-1.5 text-xs text-white/90 no-underline transition-colors hover:bg-white/10 hover:text-white sm:text-sm"
+              className="shrink-0 whitespace-nowrap rounded-full border border-white/30 px-3 py-1.5 text-xs text-white/90 no-underline transition-colors hover:bg-white/10 hover:text-white sm:text-sm"
             >
               Properties in {city.name}
             </NextLink>
           ))}
+      </div>
     </div>
   );
 

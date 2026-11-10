@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useEffect, useId, useRef, useState } from "react";
-import { FiBriefcase, FiCrosshair, FiHome, FiMapPin, FiPlus, FiSearch, FiX } from "react-icons/fi";
+import { FiBriefcase, FiCrosshair, FiHash, FiHome, FiMapPin, FiPlus, FiSearch, FiX } from "react-icons/fi";
 import SearchableSelect from "../../Admin/PropertyManagement/SearchableSelect";
-import { detectLocation, getNearMe, getSearchSuggest, getSimilarLocalities } from "../../../utils/fetchApi";
+import { detectLocation, getNearMe, getSearchSuggest, getSimilarLocalities, lookupPropertyById } from "../../../utils/fetchApi";
 import { showToast } from "../../../store/toast";
 import { useRouter } from "next/router";
 import useSearchFilters, {
@@ -112,7 +112,13 @@ export default function SearchBar({ mode = "page", footer = null }) {
     // "" / old key (buy, rent) -> real tab key
     const activeTab = resolveTab(options, type)?.key || "";
 
+    // Home: extra "Property ID" tab (find one property by its ID, any city)
+    const [idMode, setIdMode] = useState(false);
+
     const changeTab = (key) => {
+        // Any category tab leaves the Property ID tab (same tab again: just switch back)
+        setIdMode(false);
+
         if (key === activeTab) return;
 
         if (isHome) {
@@ -134,12 +140,12 @@ export default function SearchBar({ mode = "page", footer = null }) {
     }
 
     return (
-        <div className="relative z-10 w-full rounded-2xl bg-[#0B1B3A] px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
+        <div className="relative z-10 w-full rounded-2xl bg-[#0B1B3A] px-3 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
             {/* Tabs = category groups (skeleton until options load) */}
-            <div className="no-scrollbar mb-4 flex items-center gap-2 overflow-x-auto sm:gap-3">
+            <div className="scrollbar-hide mb-4 flex items-center gap-1 overflow-x-auto rounded-xl bg-white/10 p-1 sm:gap-3 sm:rounded-none sm:bg-transparent sm:p-0">
                 {!options &&
                     [0, 1, 2].map((i) => (
-                        <span key={i} className="h-9 w-24 shrink-0 animate-pulse rounded-lg bg-white/10" />
+                        <span key={i} className="h-9 flex-1 shrink-0 animate-pulse rounded-lg bg-white/10 sm:w-24 sm:flex-none" />
                     ))}
 
                 {(options?.tabs || []).map((tab) => (
@@ -147,14 +153,32 @@ export default function SearchBar({ mode = "page", footer = null }) {
                         key={tab.key}
                         type="button"
                         onClick={() => changeTab(tab.key)}
-                        className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                            activeTab === tab.key ? "bg-white text-[#0B1B3A]" : "text-white/80 hover:text-white"
+                        className={`flex-1 shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors sm:flex-none sm:px-4 sm:text-sm ${
+                            activeTab === tab.key && !idMode ? "bg-white text-[#0B1B3A]" : "text-white/80 hover:text-white"
                         }`}
                     >
                         {tab.label}
                     </button>
                 ))}
+
+                {isHome && options && (
+                    <button
+                        type="button"
+                        onClick={() => setIdMode(true)}
+                        className={`flex flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors sm:flex-none sm:px-4 sm:text-sm ${
+                            idMode ? "bg-white text-[#0B1B3A]" : "text-white/80 hover:text-white"
+                        }`}
+                    >
+                        <FiHash className="h-3.5 w-3.5" aria-hidden="true" />
+                        Property ID
+                    </button>
+                )}
             </div>
+
+            {idMode ? (
+                <PropertyIdSearch />
+            ) : (
+            <>
 
             {/* City + Locality + Search */}
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
@@ -209,6 +233,8 @@ export default function SearchBar({ mode = "page", footer = null }) {
                 localities={localities}
                 onAdd={(name) => setLocalities((previous) => [...previous, name])}
             />
+            </>
+            )}
 
             {/* e.g. home "Popular Searches" (inside the box, below Similar Localities) */}
             {footer}
@@ -527,22 +553,24 @@ function SimilarLocalities({ city, type, localities, onAdd }) {
     const badges = similar.filter((l) => !selectedLower.includes(l.name.toLowerCase()));
 
     return (
-        <div className="mt-4 flex min-h-[34px] flex-wrap items-center gap-2">
-            <span className="mr-1 text-sm text-white/60">Similar Localities:</span>
+        <div className="mt-4 sm:flex sm:min-h-[34px] sm:flex-wrap sm:items-center sm:gap-2">
+            <span className="mb-2 block text-sm text-white/60 sm:mb-0 sm:mr-1">Similar Localities:</span>
+
+            <div className="flex min-h-[34px] flex-wrap items-center gap-2 sm:contents">
 
             {!city ? (
-                <span className="text-sm text-white/40">Select a city to see its localities</span>
+                <span className="shrink-0 whitespace-nowrap text-sm text-white/40">Select a city to see its localities</span>
             ) : loading && badges.length === 0 ? (
                 [96, 140, 110].map((width) => (
                     <span
                         key={width}
                         aria-hidden="true"
-                        className="h-[34px] animate-pulse rounded-full bg-white/10"
+                        className="h-[34px] shrink-0 animate-pulse rounded-full bg-white/10"
                         style={{ width }}
                     />
                 ))
             ) : badges.length === 0 ? (
-                <span className="text-sm text-white/40">
+                <span className="shrink-0 whitespace-nowrap text-sm text-white/40">
                     {localities.length ? "No more localities" : `No localities in ${city} yet`}
                 </span>
             ) : (
@@ -551,7 +579,7 @@ function SimilarLocalities({ city, type, localities, onAdd }) {
                         key={l.name}
                         type="button"
                         onClick={() => onAdd(l.name)}
-                        className="inline-flex items-center gap-1 rounded-full border border-white/30 px-3 py-1.5 text-xs text-white/90 transition-colors hover:border-[#E87722] hover:bg-white/10 sm:text-sm"
+                        className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-white/30 px-3 py-1.5 text-xs text-white/90 transition-colors hover:border-[#E87722] hover:bg-white/10 sm:text-sm"
                         title={
                             [
                                 l.properties_count ? `${l.properties_count} ${l.properties_count === 1 ? "property" : "properties"}` : "",
@@ -569,6 +597,7 @@ function SimilarLocalities({ city, type, localities, onAdd }) {
                     </button>
                 ))
             )}
+            </div>
         </div>
     );
 }
@@ -587,4 +616,224 @@ function getBrowserPosition() {
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 5 * 60 * 1000 }
         );
     });
+}
+
+/*
+|--------------------------------------------------------------------------
+| Home "Property ID" tab: type an ID (e.g. PROP-NRMH0CNB) -> matching
+| properties from any city; pick one (or press Search) -> its detail page.
+| GET /api/properties/lookup?q=
+|--------------------------------------------------------------------------
+*/
+function PropertyIdSearch() {
+    const router = useRouter();
+    const listId = useId();
+    const boxRef = useRef(null);
+    const [value, setValue] = useState("");
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [open, setOpen] = useState(false);
+    const [highlight, setHighlight] = useState(0);
+    const [message, setMessage] = useState("");
+
+    const text = value.trim();
+
+    // Matches while typing (3+ characters)
+    useEffect(() => {
+        setMessage("");
+
+        if (text.length < 3) {
+            setResults([]);
+            setLoading(false);
+            return;
+        }
+
+        const controller = new AbortController();
+        setLoading(true);
+
+        const timer = setTimeout(() => {
+            lookupPropertyById(text, controller.signal)
+                .then((list) => {
+                    setResults(list);
+                    setHighlight(0);
+                    setOpen(true);
+                })
+                .catch((error) => {
+                    if (error?.name !== "AbortError") setResults([]);
+                })
+                .finally(() => setLoading(false));
+        }, SUGGEST_DEBOUNCE);
+
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [text]);
+
+    // Close the list on outside click
+    useEffect(() => {
+        const onDown = (event) => {
+            if (boxRef.current && !boxRef.current.contains(event.target)) setOpen(false);
+        };
+        document.addEventListener("mousedown", onDown);
+
+        return () => document.removeEventListener("mousedown", onDown);
+    }, []);
+
+    const openProperty = (property) => {
+        setOpen(false);
+        router.push(`/web/propertyDetail/${property.slug || property.id}`);
+    };
+
+    // Search button / Enter: exact ID -> open it; else highlighted / only match; else message
+    const search = async () => {
+        if (text.length < 3) {
+            setMessage("Enter at least 3 characters of the Property ID.");
+            return;
+        }
+
+        let list = results;
+
+        if (!list.length) {
+            setLoading(true);
+            try {
+                list = await lookupPropertyById(text);
+                setResults(list);
+            } catch (error) {
+                setMessage(error?.message || "Something went wrong. Please try again.");
+                return;
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        const exact = list.find((item) => item.property_id?.toUpperCase() === text.toUpperCase());
+        const pick = exact || (open && list[highlight]) || (list.length === 1 ? list[0] : null);
+
+        if (pick) {
+            openProperty(pick);
+        } else if (list.length) {
+            setOpen(true);
+            setMessage("Choose the property from the list.");
+        } else {
+            setMessage(`No property found with ID "${text}".`);
+        }
+    };
+
+    const onKeyDown = (event) => {
+        if (event.key === "ArrowDown" && results.length) {
+            event.preventDefault();
+            setOpen(true);
+            setHighlight((index) => (index + 1) % results.length);
+        } else if (event.key === "ArrowUp" && results.length) {
+            event.preventDefault();
+            setHighlight((index) => (index - 1 + results.length) % results.length);
+        } else if (event.key === "Enter") {
+            event.preventDefault();
+            search();
+        } else if (event.key === "Escape") {
+            setOpen(false);
+        }
+    };
+
+    const showList = open && text.length >= 3 && !loading;
+
+    return (
+        <div>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+                <div ref={boxRef} className="relative min-w-0 flex-1">
+                    <div className="flex h-[50px] items-center gap-2 rounded-lg bg-white px-3">
+                        <FiHash className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+                        <input
+                            type="text"
+                            value={value}
+                            onChange={(event) => setValue(event.target.value.toUpperCase())}
+                            onFocus={() => results.length && setOpen(true)}
+                            onKeyDown={onKeyDown}
+                            placeholder="Enter Property ID, e.g. PROP-NRMH0CNB"
+                            maxLength={50}
+                            autoComplete="off"
+                            spellCheck={false}
+                            role="combobox"
+                            aria-expanded={showList}
+                            aria-controls={listId}
+                            aria-label="Property ID"
+                            className="min-w-0 flex-1 bg-transparent text-sm font-medium uppercase tracking-wide text-gray-700 placeholder:normal-case placeholder:font-normal placeholder:tracking-normal placeholder-gray-400 outline-none"
+                        />
+                        {loading && (
+                            <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-gray-200 border-t-[#E87722]" aria-hidden="true" />
+                        )}
+                        {value && !loading && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setValue("");
+                                    setResults([]);
+                                    setMessage("");
+                                }}
+                                aria-label="Clear"
+                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                            >
+                                <FiX className="h-4 w-4" />
+                            </button>
+                        )}
+                    </div>
+
+                    {showList && (
+                        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl">
+                            <ul id={listId} role="listbox" className="mb-0 max-h-80 overflow-y-auto py-1 pl-0">
+                                {results.length === 0 ? (
+                                    <li role="presentation" className="px-3 py-4 text-center text-sm text-gray-400">
+                                        No property found with this ID
+                                    </li>
+                                ) : (
+                                    results.map((property, index) => (
+                                        <li
+                                            key={property.id}
+                                            role="option"
+                                            aria-selected={index === highlight}
+                                            onMouseEnter={() => setHighlight(index)}
+                                            onMouseDown={(event) => {
+                                                event.preventDefault();
+                                                openProperty(property);
+                                            }}
+                                            className={`flex cursor-pointer items-center gap-3 px-3 py-2 ${index === highlight ? "bg-orange-50" : ""}`}
+                                        >
+                                            <img
+                                                src={property.main_image || "/assets/img/prop-1.png"}
+                                                alt=""
+                                                className="h-10 w-14 shrink-0 rounded-md bg-gray-100 object-cover"
+                                            />
+                                            <span className="min-w-0 flex-1">
+                                                <span className="block truncate text-sm font-semibold text-[#1A1F36]">{property.title}</span>
+                                                <span className="block truncate text-xs text-gray-500">
+                                                    {[property.location, property.city].filter(Boolean).join(", ")}
+                                                </span>
+                                            </span>
+                                            <span className="shrink-0 rounded-md bg-[#FFE4CF] px-2 py-0.5 text-[11px] font-bold tracking-wide text-[#c25e12]">
+                                                {property.property_id}
+                                            </span>
+                                        </li>
+                                    ))
+                                )}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+
+                <button
+                    type="button"
+                    onClick={search}
+                    className="flex h-[50px] w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-[#E87722] px-8 text-sm font-semibold text-white transition hover:bg-[#cf681b] lg:w-auto"
+                >
+                    <FiSearch className="h-4 w-4" />
+                    Search
+                </button>
+            </div>
+
+            <p className={`mb-0 mt-3 text-sm ${message ? "text-[#FFB27A]" : "text-white/60"}`} role={message ? "alert" : undefined}>
+                {message || "Find any property directly by its ID, from any city. The ID is shown on every property page."}
+            </p>
+        </div>
+    );
 }

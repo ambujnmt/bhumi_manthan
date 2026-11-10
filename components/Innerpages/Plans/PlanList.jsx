@@ -1,5 +1,5 @@
 import NextLink from "next/link";
-import Image from "next/image";
+import PageBannerImage from "../../Common/PageBannerImage";
 import React, { useEffect, useState } from "react";
 import { Spinner } from "@heroui/react";
 import {
@@ -22,7 +22,12 @@ import {
 } from "react-icons/fa";
 import { FaFacebook, FaLinkedin, FaXTwitter } from "react-icons/fa6";
 import { SiGoogleads } from "react-icons/si";
-import { getPlans } from "../../../utils/fetchApi";
+import { getMyPlanOrders, getPlans } from "../../../utils/fetchApi";
+import { useRouter } from "next/router";
+import { useUser } from "../../../context/UserContext";
+import { showToast } from "../../../store/toast";
+import { rememberPostLoginRedirect } from "../../../utils/postLoginRedirect";
+import BuyPlanModal, { isFreePlan } from "./BuyPlanModal";
 import {
     EXTRA_CHARGES_KEY,
     PLAN_FEATURES,
@@ -37,18 +42,19 @@ const NAVY = "#12305F";
 const GOLD = "#D4961C";
 
 // Banner image: public/images/plans-banner.jpg
-const BANNER_IMAGE = "/images/plans-banner.jpg";
 
 const PERIOD_LABELS = {
     year: "/ Year",
     month: "/ Month",
     one_time: "One Time",
+    free: "",
 };
 
 const VALIDITY = {
     year: "Valid for 1 Year",
     month: "Valid for 1 Month",
     one_time: "One-time Payment",
+    free: "Free Forever (No Expiry)",
 };
 
 const MARKETING_ICONS = {
@@ -147,16 +153,17 @@ const checklist = (plan) => {
 function PlanIcon({ plan, index, popular }) {
     const Icon = popular ? FaCrown : PLAN_ICONS[index % PLAN_ICONS.length];
     const color = popular ? GOLD : NAVY;
+    const image = plan?.icon;
 
     return (
         <div
             className="mx-auto mb-3 flex h-[64px] w-[64px] items-center justify-center rounded-full bg-white shadow-md"
             style={{ border: `2px solid ${color}` }}
         >
-            {plan?.icon ? (
+            {image ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                    src={plan.icon}
+                    src={image}
                     alt={plan.name || "Plan icon"}
                     width={36}
                     height={36}
@@ -201,9 +208,16 @@ function MarketingBox({ plan }) {
     );
 }
 
-function PlanCard({ plan, index, popular }) {
+// state: "current" | "pending" | null (button text / disabled)
+function PlanCard({ plan, index, popular, state, onBuy }) {
     const listing = listingInfo(plan);
     const accent = popular ? GOLD : NAVY;
+    const disabled = state === "current" || state === "pending";
+    const buttonText =
+        state === "current" ? "Your Current Plan"
+            : state === "pending" ? "Request Pending"
+                : isFreePlan(plan) ? "Get Started Free"
+                    : "Buy Now";
 
     return (
         <div
@@ -257,7 +271,18 @@ function PlanCard({ plan, index, popular }) {
                         ))}
                     </div>
 
-                    <PlanIllustration index={index} className="-ml-6 h-[130px] min-w-0 flex-1" />
+                    {/* Admin plan image (Admin -> Plans), else the SVG illustration */}
+                    {plan.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={plan.image}
+                            alt={plan.name || "Plan image"}
+                            loading="lazy"
+                            className="-ml-6 h-[130px] min-w-0 flex-1 object-contain object-bottom mix-blend-multiply"
+                        />
+                    ) : (
+                        <PlanIllustration index={index} className="-ml-6 h-[130px] min-w-0 flex-1" />
+                    )}
                 </div>
 
                 {/* What's included */}
@@ -278,13 +303,17 @@ function PlanCard({ plan, index, popular }) {
                 <MarketingBox plan={plan} />
 
                 <div className="mt-auto pt-6">
-                    <NextLink
-                        href="/user/cms/contactUs"
-                        className="mx-auto flex w-full max-w-[280px] items-center no-underline justify-center gap-2 rounded-lg py-3 text-[18px] font-bold text-white shadow transition hover:opacity-90"
-                        style={{ backgroundColor: accent }}
+                    <button
+                        type="button"
+                        onClick={() => onBuy(plan)}
+                        disabled={disabled}
+                        className="mx-auto flex w-full max-w-[280px] items-center justify-center gap-2 rounded-lg py-3 text-[18px] font-bold text-white shadow transition hover:opacity-90 disabled:cursor-default disabled:opacity-60"
+                        style={{ backgroundColor: state === "current" ? "#16A34A" : accent }}
                     >
-                        Get Started <FaChevronRight size={14} />
-                    </NextLink>
+                        {state === "current" && <FaCheck size={14} />}
+                        {buttonText}
+                        {!disabled && <FaChevronRight size={14} />}
+                    </button>
                 </div>
             </div>
         </div>
@@ -361,7 +390,7 @@ function ComparisonTable({ plans, popular }) {
 }
 
 // initialPlans: loaded on server (pages/web/plans), null = load in browser
-export default function PlanList({ initialPlans = null }) {
+export default function PlanList({ initialPlans = null, initialBanner }) {
     const [plans, setPlans] = useState(initialPlans ?? []);
     const [loading, setLoading] = useState(initialPlans === null);
 
@@ -384,17 +413,66 @@ export default function PlanList({ initialPlans = null }) {
 
     const popular = highlightIndex(plans.length);
 
+    // Buying (cash / offline payment): seller / broker only
+    const router = useRouter();
+    const { user, updateUser } = useUser() || {};
+    const canBuy = ["seller", "broker"].includes(user?.role);
+    const [mine, setMine] = useState(null);
+    const [buyPlan, setBuyPlan] = useState(null);
+
+    const loadMine = async () => {
+        try {
+            const res = await getMyPlanOrders();
+            setMine(res.data);
+            // Keep the cached user (Add Property limit banner) up to date
+            if (res.data?.listing_quota && user) updateUser?.({ ...user, listing_quota: res.data.listing_quota });
+        } catch {
+            setMine(null);
+        }
+    };
+
+    useEffect(() => {
+        if (canBuy) loadMine();
+        else setMine(null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [canBuy, user?.id]);
+
+    const quota = mine?.listing_quota;
+    const pendingOrder = mine?.orders?.find((order) => order.status === "pending");
+    const activePlanId = quota?.source === "plan" ? quota.plan_id : null;
+
+    const planState = (plan) =>
+        plan.id === activePlanId ? "current" : pendingOrder?.plan_id === plan.id ? "pending" : null;
+
+    const handleBuy = (plan) => {
+        if (!user) {
+            rememberPostLoginRedirect("/web/plans");
+            router.push("/login");
+            return;
+        }
+
+        if (!canBuy) {
+            showToast("Plans are for sellers and brokers. Please contact us to list as a seller or broker.", "error", 5000);
+            return;
+        }
+
+        if (pendingOrder) {
+            showToast(`You already have a pending request (${pendingOrder.order_no}). Cancel it first to choose another plan.`, "error", 5000);
+            return;
+        }
+
+        setBuyPlan(plan);
+    };
+
     return (
         <>
             {/* Hero with banner image */}
             <section className="relative overflow-hidden py-12 lg:py-16">
-                <Image
-                    src={BANNER_IMAGE}
+                {/* Image: Admin -> Banner (type: Plans Page) */}
+                <PageBannerImage
+                    type="plans"
+                    initialBanner={initialBanner}
                     alt="Bhumimanthan plans banner"
-                    fill
-                    priority
-                    sizes="100vw"
-                    className="object-cover"
                 />
                 {/* Dark navy overlay taaki text clear dikhe */}
                 <div
@@ -438,7 +516,14 @@ export default function PlanList({ initialPlans = null }) {
                             className={`grid grid-cols-1 gap-x-5 gap-y-10 md:grid-cols-2 ${plans.length >= 3 ? "lg:grid-cols-3" : ""}`}
                         >
                             {plans.map((plan, index) => (
-                                <PlanCard key={plan.id} plan={plan} index={index} popular={index === popular} />
+                                <PlanCard
+                                    key={plan.id}
+                                    plan={plan}
+                                    index={index}
+                                    popular={index === popular}
+                                    state={canBuy ? planState(plan) : null}
+                                    onBuy={handleBuy}
+                                />
                             ))}
                         </div>
 
@@ -491,6 +576,14 @@ export default function PlanList({ initialPlans = null }) {
                     </>
                 )}
             </section>
+
+            {buyPlan && (
+                <BuyPlanModal
+                    plan={buyPlan}
+                    onClose={() => setBuyPlan(null)}
+                    onDone={loadMine}
+                />
+            )}
         </>
     );
 }

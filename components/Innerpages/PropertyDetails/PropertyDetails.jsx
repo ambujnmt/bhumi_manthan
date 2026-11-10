@@ -7,6 +7,8 @@ import PropertyImageSlider from './PropertyImageSlider';
 import SimilarProperties from './SimilarProperties';
 import PropertySideForm from './PropertySideForm';
 import AgentCard from './AgentCard';
+import PropertySpecs, { priceInfo } from './PropertySpecs';
+import TopAgents from '../../Home/Main/HomeSections/TopAgents';
 import { resolveVideo } from './PropertyVideo';
 import WishlistButton from '../../Common/WishlistButton';
 import CompareButton from '../../Common/CompareButton';
@@ -18,7 +20,7 @@ import { BsChatDotsFill } from "react-icons/bs";
 import PropertyDescription from './PropertyDescription';
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getPropertyDetails } from "@/utils/fetchApi";
+import { addRecentlyViewed, getPropertyDetails } from "@/utils/fetchApi";
 import {
     clearPostLoginRedirect,
     isBookingAfterLogin,
@@ -28,8 +30,92 @@ import {
 import { showToast } from "@/store/toast";
 import { useUser } from "@/context/UserContext";
 import { BookAppointmentButton } from "@/modules/appointments";
+import MetaTags from "../../Head/MetaTags";
+import { buildPropertySeo } from "@/utils/seo";
+import { FiCheck, FiCopy } from "react-icons/fi";
 
-export default function PropertyDetails() {
+// "ID: PROP-XXXX [copy]" pill. Clipboard API, with a fallback for http / older browsers.
+// variant "crumb": small breadcrumb pill, whole pill copies on click.
+function PropertyIdCopy({ id, variant = "default" }) {
+    const [copied, setCopied] = useState(false);
+
+    useEffect(() => {
+        if (!copied) return;
+        const timer = setTimeout(() => setCopied(false), 2000);
+
+        return () => clearTimeout(timer);
+    }, [copied]);
+
+    const copy = async () => {
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(id);
+            } else {
+                const field = document.createElement("textarea");
+                field.value = id;
+                field.setAttribute("readonly", "");
+                field.style.position = "fixed";
+                field.style.opacity = "0";
+                document.body.appendChild(field);
+                field.select();
+                document.execCommand("copy");
+                field.remove();
+            }
+
+            setCopied(true);
+            showToast("Property ID copied.");
+        } catch {
+            showToast("Could not copy. Please copy the ID manually.", "error");
+        }
+    };
+
+    if (variant === "crumb") {
+        return (
+            <button
+                type="button"
+                onClick={copy}
+                title={copied ? "Copied" : "Click to copy Property ID"}
+                aria-label={copied ? "Property ID copied" : `Property ID ${id}, click to copy`}
+                className={`group flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 font-semibold shadow-sm transition ${
+                    copied
+                        ? "border-green-200 bg-green-50 text-green-700"
+                        : "border-[#f3d9bf] bg-[#fdf3e7] text-[var(--secondary-color)] hover:border-[var(--primary-color)] hover:text-[var(--primary-color)]"
+                }`}
+            >
+                <span className="text-[11px] font-medium uppercase tracking-wide text-[#62748E]">ID</span>
+                <span className="tracking-wide">{id}</span>
+                {copied ? (
+                    <FiCheck size={13} aria-hidden="true" />
+                ) : (
+                    <FiCopy size={13} className="text-[var(--primary-color)] opacity-70 group-hover:opacity-100" aria-hidden="true" />
+                )}
+            </button>
+        );
+    }
+
+    return (
+        <div className="flex items-center overflow-hidden rounded-lg border border-[#f3d9bf] bg-white text-sm shadow-sm">
+            <span className="whitespace-nowrap px-3 py-1.5 text-gray-500">
+                Property ID:{" "}
+                <span className="select-all font-bold tracking-wide text-[var(--secondary-color)]">{id}</span>
+            </span>
+            <button
+                type="button"
+                onClick={copy}
+                aria-label={copied ? "Property ID copied" : `Copy Property ID ${id}`}
+                title={copied ? "Copied" : "Copy Property ID"}
+                className={`flex items-center gap-1.5 self-stretch border-l border-[#f3d9bf] px-3 text-xs font-semibold transition-colors ${
+                    copied ? "bg-green-50 text-green-700" : "bg-[#fdf3e7] text-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-white"
+                }`}
+            >
+                {copied ? <FiCheck size={14} aria-hidden="true" /> : <FiCopy size={14} aria-hidden="true" />}
+                {copied ? "Copied" : "Copy"}
+            </button>
+        </div>
+    );
+}
+
+export default function PropertyDetails({ clientSeo = false }) {
     const params = useParams();
     const id = params?.id;
     const router = useRouter();
@@ -75,6 +161,16 @@ export default function PropertyDetails() {
             cancelled = true;
         };
     }, [id]);
+
+    // Logged in customer opened this property -> save in dashboard "Recent View" (once per property per page)
+    const viewedId = property?.id;
+    const isCustomer = user?.role === "customer";
+
+    useEffect(() => {
+        if (!viewedId || !isCustomer) return;
+
+        addRecentlyViewed(viewedId);
+    }, [viewedId, isCustomer]);
 
     // /web/profile ignores the id and always shows the logged in user, which isn't known yet before login
     const contactSeller = () => {
@@ -163,7 +259,7 @@ export default function PropertyDetails() {
                 <p className="text-red-500">
                     {error || "Property not found."}
                 </p>
-                <Link href="/buy-properties">
+                <Link href="/web/property/searchProperties">
                     Back to Listings
                 </Link>
             </div>
@@ -171,6 +267,7 @@ export default function PropertyDetails() {
     }
     return (
         <>
+            {clientSeo && <MetaTags {...buildPropertySeo(property)} />}
             <section>
                 {/* Breadcrumb section */}
                 <div className="container">
@@ -198,7 +295,7 @@ export default function PropertyDetails() {
                                 {/* Buy Properties */}
                                 <li>
                                     <Link
-                                        href="/buy-properties"
+                                        href="/web/property/searchProperties"
                                         className="group flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 font-medium text-[#62748E] shadow-sm transition hover:border-[var(--primary-color)] hover:text-[var(--primary-color)]"
                                     >
                                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--secondary-color)]/10 text-[var(--secondary-color)] transition group-hover:bg-[var(--primary-color)]/10 group-hover:text-[var(--primary-color)]">
@@ -211,6 +308,19 @@ export default function PropertyDetails() {
                                 <li aria-hidden="true">
                                     <FaChevronRight className="text-[9px] text-gray-400" />
                                 </li>
+
+                                {/* Property ID (click to copy) */}
+                                {property.property_id && (
+                                    <>
+                                        <li>
+                                            <PropertyIdCopy id={property.property_id} variant="crumb" />
+                                        </li>
+
+                                        <li aria-hidden="true">
+                                            <FaChevronRight className="text-[9px] text-gray-400" />
+                                        </li>
+                                    </>
+                                )}
 
                                 {/* Current Page */}
                                 <li aria-current="page">
@@ -226,7 +336,7 @@ export default function PropertyDetails() {
 
                         {/* Back Button */}
                         <Link
-                            href="/buy-properties"
+                            href="/web/property/searchProperties"
                             className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--primary-color)] px-4 py-1.5 text-[13px] font-semibold text-[var(--primary-color)] transition hover:bg-[var(--primary-color)] hover:text-white"
                         >
                             <FaArrowLeft className="text-[11px]" />
@@ -250,11 +360,16 @@ export default function PropertyDetails() {
 
                             {/* highlights */}
                             <section className="w-full mt-[30px]">
-                                <div className="mb-2 flex items-center gap-2">
-                                    <FaCog className="text-[var(--primary-color)]" size={20} />
-                                    <h2 className="text-lg font-bold text-gray-900 mb-0">
-                                        Project Highlights
-                                    </h2>
+                                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <FaCog className="text-[var(--primary-color)]" size={20} />
+                                        <h2 className="text-lg font-bold text-gray-900 mb-0">
+                                            Project Highlights
+                                        </h2>
+                                    </div>
+
+                                    {/* Property ID + copy (same ID works in the home search "Property ID" tab) */}
+                                    {property.property_id && <PropertyIdCopy id={property.property_id} />}
                                 </div>
 
                                 {/* Highlights Box */}
@@ -379,12 +494,13 @@ export default function PropertyDetails() {
 
                                 {/* Price */}
                                 <div className="mt-2">
+                                    <p className="mb-0 text-xs font-semibold uppercase tracking-wide text-[#768198]">{priceInfo(property).label}</p>
                                     <p className="text-3xl font-bold text-[var(--primary-color)]">    {property.price != null
                                         ? Number(property.price).toLocaleString("en-IN", {
                                             style: "currency",
                                             currency: "INR",
                                             maximumFractionDigits: 0,
-                                        })
+                                        }) + (priceInfo(property).perMonth ? " / month" : "")
                                         : "Price on Request"}</p>
                                     <p className="mt-1 text-sm text-[#62748E]">
                                         {[property.location, property.city, property.state]
@@ -395,88 +511,8 @@ export default function PropertyDetails() {
 
                                 <CompareButton propertyId={property.id} />
 
-                                {/* Specs row */}
-                                <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 mb-4">
-                                    {/* <div className="flex items-center gap-3">
-                                        <FaRulerCombined className="shrink-0 text-[20px] text-[var(--primary-color)]" />
-                                        <div>
-                                            <p className="text-[14px] text-[#768198] mb-2">Carpet Area</p>
-                                            <p className="text-[16px] font-bold text-[#202D47] mb-0">1,230 sq. ft.</p>
-                                        </div>
-                                    </div> */}
-                                    <div className="flex items-center gap-3">
-                                        <FaVectorSquare className="shrink-0 text-[20px] text-[var(--primary-color)]" />
-                                        <div>
-                                            <p className="text-[14px] text-[#768198] mb-2">Super Area</p>
-                                            <p className="text-[16px] font-bold text-[#202D47] mb-0">{property.super_area != null
-                                                ? `${Number(property.super_area).toLocaleString("en-IN")} sq. ft.`
-                                                : "Not specified"}</p>
-                                        </div>
-                                    </div>
-                                        {/* Configuration / Bedrooms */}
-    <div className="flex items-center gap-3">
-        <FaVectorSquare className="shrink-0 text-[20px] text-[var(--primary-color)]" />
-        <div>
-            <p className="text-[14px] text-[#768198] mb-2">
-                Configuration
-            </p>
-            <p className="text-[16px] font-bold text-[#202D47] mb-0">
-                {property.configuration ||
-                    (property.bedrooms != null
-                        ? `${property.bedrooms} BHK`
-                        : "Not specified")}
-            </p>
-        </div>
-    </div>
-                                    <div className="flex items-center gap-3">
-                                        <FaBuilding className="shrink-0 text-[20px] text-[var(--primary-color)]" />
-                                        <div>
-                                            <p className="text-[14px] text-[#768198] mb-2">Floor</p>
-                                            <p className="text-[16px] font-bold text-[#202D47] mb-0">  {property.floor != null
-                    ? `${property.floor}${
-                          property.total_floors != null
-                              ? ` (out of ${property.total_floors})`
-                              : ""
-                      }`
-                    : "Not specified"}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <FaCar className="shrink-0 text-[20px] text-[var(--primary-color)]" />
-                                        <div>
-                                            <p className="text-[14px] text-[#768198] mb-2">Parking</p>
-                                            <p className="text-[16px] font-bold text-[#202D47] mb-0"> {property.parking || "Not specified"}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <FaCompass className="shrink-0 text-[20px] text-[var(--primary-color)]" />
-                                        <div>
-                                            <p className="text-[14px] text-[#768198] mb-2">Facing</p>
-                                            <p className="text-[16px] font-bold text-[#202D47] mb-0">  {property.facing}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <FaFileSignature className="shrink-0 text-[20px] text-[var(--primary-color)]" />
-                                        <div>
-                                            <p className="text-[14px] text-[#768198] mb-2">Type of Ownership</p>
-                                            <p className="text-[16px] font-bold text-[#202D47] mb-0"> {property.ownership || "Not specified"}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <FaCouch className="shrink-0 text-[20px] text-[var(--primary-color)]" />
-                                        <div>
-                                            <p className="text-[14px] text-[#768198] mb-2">Furnishing</p>
-                                            <p className="text-[16px] font-bold text-[#202D47] mb-0">{property.furnishing || "Not specified"}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <FaCity className="shrink-0 text-[20px] text-[var(--primary-color)]" />
-                                        <div>
-                                            <p className="text-[14px] text-[#768198] mb-2">Project</p>
-                                            <p className="text-[16px] font-bold text-[#202D47] mb-0">  {property.project || "Not specified"}</p>
-                                        </div>
-                                    </div>
-                                </div>
+                                {/* Specs: only the fields of this property type (same rules as admin form) */}
+                                <PropertySpecs property={property} />
 
                                 <AgentCard property={property} onChat={contactSeller} />
 
@@ -528,6 +564,15 @@ export default function PropertyDetails() {
                     </div>
                 </div>
             </section>
+
+            {/* Sellers / brokers near this property (same slider as home page) */}
+            <TopAgents
+                near={{ latitude: property.latitude, longitude: property.longitude, city: property.city }}
+                nearLabel={property.location || property.city || "This Property"}
+                properties={[property, ...similarProperties]}
+                propertiesNearby={false}
+                className="mt-10"
+            />
 
             {/* Floating chat button (same flow as Contact Seller) */}
             <button

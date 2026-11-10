@@ -13,7 +13,18 @@ import { getSearchOptions } from "./fetchApi";
 
 export const SEARCH_PATH = "/web/property/searchProperties";
 
-const LIST_KEYS = ["localities", "property_types", "bedrooms", "furnishing"];
+// + type based filters (only shown / applied for property types that have them)
+const LIST_KEYS = [
+  "localities",
+  "property_types",
+  "bedrooms",
+  "furnishing",
+  "listing_type",
+  "preferred_tenants",
+  "pg_sharing",
+  "pg_gender",
+  "pg_meals",
+];
 const TEXT_KEYS = ["type", "city", "q", "budget_min", "budget_max", "sort"];
 
 export const EMPTY_FILTERS = {
@@ -26,6 +37,11 @@ export const EMPTY_FILTERS = {
   property_types: [],
   bedrooms: [],
   furnishing: [],
+  listing_type: [],
+  preferred_tenants: [],
+  pg_sharing: [],
+  pg_gender: [],
+  pg_meals: [],
   sort: "newest",
 };
 
@@ -89,7 +105,12 @@ export const countActiveFilters = (filters) =>
   (filters.budget_max ? 1 : 0) +
   filters.property_types.length +
   filters.bedrooms.length +
-  filters.furnishing.length;
+  filters.furnishing.length +
+  filters.listing_type.length +
+  filters.preferred_tenants.length +
+  filters.pg_sharing.length +
+  filters.pg_gender.length +
+  filters.pg_meals.length;
 
 /**
  * { filters, setFilters(patch), resetFilters(), isReady, isSearch }

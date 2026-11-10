@@ -12,7 +12,17 @@ import { FaRegTrashCan } from "react-icons/fa6";
 import { FiPlus } from "react-icons/fi";
 import Tmodal from "../../Tmodal/Tmodal";
 
+// Banner type = website page where it shows
+const BANNER_TYPES = [
+    { value: "home", label: "Home Page", badge: "bg-blue-50 text-blue-700" },
+    { value: "events", label: "Events Page", badge: "bg-purple-50 text-purple-700" },
+    { value: "plans", label: "Plans Page", badge: "bg-orange-50 text-[#E87722]" },
+];
+
+const typeOf = (value) => BANNER_TYPES.find((type) => type.value === value) || BANNER_TYPES[0];
+
 const initialForm = {
+    type: "home",
     title: "",
     link: "",
     sort_order: "0",
@@ -28,6 +38,11 @@ export default function Listing() {
     const can = useAdminPermission();
     const [banners, setBanners] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [typeFilter, setTypeFilter] = useState("");
+
+    const visibleBanners = typeFilter
+        ? banners.filter((banner) => (banner.type || "home") === typeFilter)
+        : banners;
 
     // Add / Edit Modal
     const [formModalOpen, setFormModalOpen] = useState(false);
@@ -70,7 +85,8 @@ export default function Listing() {
     // Open Add Modal
     const openAddModal = () => {
         setEditingBanner(null);
-        setForm(initialForm);
+        // New banner gets the type being viewed
+        setForm({ ...initialForm, type: typeFilter || "home" });
         setImageFile(null);
         setImagePreview("");
         setFormError("");
@@ -81,6 +97,7 @@ export default function Listing() {
     const openEditModal = (banner) => {
         setEditingBanner(banner);
         setForm({
+            type: banner.type || "home",
             title: banner.title || "",
             link: banner.link || "",
             sort_order: String(banner.sort_order ?? 0),
@@ -121,6 +138,7 @@ export default function Listing() {
 
         try {
             const formData = new FormData();
+            formData.append("type", form.type || "home");
             formData.append("title", form.title);
             formData.append("link", form.link);
             formData.append("sort_order", form.sort_order || "0");
@@ -206,7 +224,36 @@ export default function Listing() {
                 title="Banner Management"
             />
 
-            <div className="flex justify-end items-center mt-6 mb-4">
+            <div className="flex flex-wrap justify-between items-center gap-3 mt-6 mb-4">
+                {/* Filter by type (page) */}
+                <div className="flex flex-wrap gap-2" role="tablist" aria-label="Banner type">
+                    {[{ value: "", label: "All" }, ...BANNER_TYPES].map((type) => {
+                        const count = type.value
+                            ? banners.filter((banner) => (banner.type || "home") === type.value).length
+                            : banners.length;
+                        const active = typeFilter === type.value;
+
+                        return (
+                            <button
+                                key={type.value || "all"}
+                                type="button"
+                                role="tab"
+                                aria-selected={active}
+                                onClick={() => setTypeFilter(type.value)}
+                                className={`flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition ${active
+                                    ? "border-[#E87722] bg-[#E87722] text-white"
+                                    : "border-gray-200 bg-white text-[#283A86] hover:border-[#E87722]"
+                                    }`}
+                            >
+                                {type.label}
+                                <span className={`rounded-full px-1.5 text-[11px] font-semibold ${active ? "bg-white/25 text-white" : "bg-gray-100 text-[#62748E]"}`}>
+                                    {count}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+
                 {can('banners.create') && (
                 <button
                     type="button"
@@ -224,8 +271,8 @@ export default function Listing() {
                     <thead className="bg-gray-100">
                         <tr>
                             <th className="px-4 py-3 text-left whitespace-nowrap">Banner</th>
+                            <th className="px-4 py-3 text-left whitespace-nowrap">Type</th>
                             <th className="px-4 py-3 text-left whitespace-nowrap">Title</th>
-                            <th className="px-4 py-3 text-left whitespace-nowrap">Link</th>
                             <th className="px-4 py-3 text-left whitespace-nowrap">Order</th>
                             <th className="px-4 py-3 text-left whitespace-nowrap">Status</th>
                             <th className="px-4 py-3 text-left whitespace-nowrap">Action</th>
@@ -241,8 +288,8 @@ export default function Listing() {
                                     </div>
                                 </td>
                             </tr>
-                        ) : banners.length > 0 ? (
-                            banners.map((banner) => (
+                        ) : visibleBanners.length > 0 ? (
+                            visibleBanners.map((banner) => (
                                 <tr key={banner.id} className="border-t">
                                     <td className="px-4 py-3">
                                         <img
@@ -253,11 +300,13 @@ export default function Listing() {
                                     </td>
 
                                     <td className="px-4 py-3 whitespace-nowrap">
-                                        {banner.title || "-"}
+                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${typeOf(banner.type).badge}`}>
+                                            {typeOf(banner.type).label}
+                                        </span>
                                     </td>
 
-                                    <td className="px-4 py-3 max-w-[200px] truncate whitespace-nowrap">
-                                        {banner.link || "-"}
+                                    <td className="px-4 py-3 whitespace-nowrap">
+                                        {banner.title || "-"}
                                     </td>
 
                                     <td className="px-4 py-3 whitespace-nowrap">
@@ -313,7 +362,7 @@ export default function Listing() {
                         ) : (
                             <tr>
                                 <td colSpan="6" className="text-center py-6 text-gray-500">
-                                    No banners found. Click "Add Banner" to create one.
+                                    {typeFilter ? `No ${typeOf(typeFilter).label} banner yet.` : "No banners found."} Click "Add Banner" to create one.
                                 </td>
                             </tr>
                         )}
@@ -361,6 +410,26 @@ export default function Listing() {
                             {formError}
                         </p>
                     )}
+
+                    <div>
+                        <label htmlFor="type" className={labelClass}>
+                            Banner Type (Page)<span className="ml-1 text-red-500">*</span>
+                        </label>
+                        <select
+                            id="type"
+                            name="type"
+                            value={form.type}
+                            onChange={handleChange}
+                            className={inputClass}
+                        >
+                            {BANNER_TYPES.map((type) => (
+                                <option key={type.value} value={type.value}>{type.label}</option>
+                            ))}
+                        </select>
+                        <p className="mt-1 text-xs text-[#62748E]">
+                            Banner shows on this website page. Home page shows a slider, Events / Plans pages show the first active banner.
+                        </p>
+                    </div>
 
                     <div>
                         <label htmlFor="banner_image" className={labelClass}>

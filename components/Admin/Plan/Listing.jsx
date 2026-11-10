@@ -10,12 +10,15 @@ import { useAdminPermission } from "../../../utils/adminPermissions";
 import { getAdminPlans, deleteAdminPlan } from "../../../utils/fetchApi";
 import { showToast } from "../../../store/toast";
 import Tmodal from "../../Tmodal/Tmodal";
+import ListingRules from "./ListingRules";
+import ListingOffer from "./ListingOffer";
 import { PLAN_FEATURES, featureRows } from "../../../utils/planFeatures";
 
 const BILLING_LABELS = {
   year: "/ year",
   month: "/ month",
   one_time: "one time",
+  free: "free",
 };
 
 const formatPrice = (price) =>
@@ -133,6 +136,12 @@ export default function Listing() {
         title="Plan Management"
       />
 
+      {/* Paid / free listing control */}
+      <ListingRules canEdit={can("plans.edit")} className="mt-6" />
+
+      {/* Festival offer: unlimited listings for all sellers / brokers for a few days */}
+      <ListingOffer canEdit={can("plans.edit")} className="mt-4" />
+
       {/* Add plan */}
       {can("plans.create") && (
         <div className="mt-6 mb-5 flex justify-end">
@@ -193,17 +202,28 @@ export default function Listing() {
                 <div className="flex flex-1 flex-col p-6">
                   {/* Name + status */}
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="truncate text-lg font-bold text-[#1A1F36]">
-                        {plan.name || "-"}
-                      </h3>
-
-                      {plan.support_level && (
-                        <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[#283A86]">
-                          <FaHeadset size={11} />
-                          {plan.support_level} support
-                        </p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      {plan.image_url && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={plan.image_url}
+                          alt=""
+                          className="h-12 w-12 flex-shrink-0 rounded-full border-2 border-orange-100 object-cover"
+                        />
                       )}
+
+                      <div className="min-w-0">
+                        <h3 className="truncate text-lg font-bold text-[#1A1F36]">
+                          {plan.name || "-"}
+                        </h3>
+
+                        {plan.support_level && (
+                          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[#283A86]">
+                            <FaHeadset size={11} />
+                            {plan.support_level} support
+                          </p>
+                        )}
+                      </div>
                     </div>
 
                     <span
