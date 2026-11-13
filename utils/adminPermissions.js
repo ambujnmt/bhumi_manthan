@@ -46,6 +46,7 @@ const ADMIN_PAGES = [
   ["locations.view", "/admin/location/locationList"],
   ["banners.view", "/admin/banner/bannerList"],
   ["youtuber_videos.view", "/admin/youtuberVideo/videoList"],
+  ["ads.view", "/admin/ads/adList"],
   ["events.view", "/admin/event/listing"],
   ["plans.view", "/admin/plan/listing"],
   ["settings.view", "/admin/settings/siteSettings"],

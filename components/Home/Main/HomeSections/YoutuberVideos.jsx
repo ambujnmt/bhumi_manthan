@@ -33,7 +33,7 @@ const thumbnailOf = (item, video) => {
 export const VideoCard = ({ item, playing, onPlay, onClose }) => {
   const video = resolveVideo(item);
   const thumbnail = thumbnailOf(item, video);
-  const label = item.title || `Video by ${item.youtuber_name}`;
+  const label = item.title || (item.youtuber_name ? `Video by ${item.youtuber_name}` : "Property video");
 
   if (!video) return null;
 
@@ -96,18 +96,6 @@ export const VideoCard = ({ item, playing, onPlay, onClose }) => {
             {cover}
           </button>
         )}
-      </div>
-
-      <div className="p-[14px]">
-        {item.title && (
-          <h3 className="mb-[4px] line-clamp-2 text-[15px] font-semibold text-[var(--text-color1)]">
-            {item.title}
-          </h3>
-        )}
-
-        <p className="mb-0 text-[13px] font-medium text-[var(--text-color2)]">
-          {item.youtuber_name}
-        </p>
       </div>
     </article>
   );

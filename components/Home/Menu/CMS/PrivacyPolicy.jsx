@@ -5,6 +5,7 @@ import Header from "../Header";
 import Footer from "../Footer";
 import { fetchPrivacyPolicies } from "../../../../utils/fetchApi";
 import { Spinner } from "@heroui/react";
+import SideAds from "../../../Common/Ads/SideAds";
 
 export default function PrivacyPolicy() {
 
@@ -33,33 +34,39 @@ export default function PrivacyPolicy() {
     <div className="mx-auto">
 
       <Header />
+      {/* Left / right ads beside the main section (Admin -> Ads) */}
+      <SideAds sticky={false} railClass="lg:mt-16">
 
-      {/* PRIVACY POLICY SECTION */}
-      <section className="w-full py-10 md:py-16 px-4 md:px-10 bg-[#f0f4fa]">
+        {/* PRIVACY POLICY SECTION */}
+        {/* Background full width, content same width as other pages (container) */}
+        <section className="w-full py-10 md:py-16 bg-[#f0f4fa]">
+            <div className="container">
 
-        {loading ? (
-          <div className="flex justify-center items-center h-40">
-            <Spinner size="lg" />
-          </div>
-        ) : (
-          <div className=" mx-auto bg-white p-6 md:p-10 rounded-xl shadow">
+              {loading ? (
+                <div className="flex justify-center items-center h-40">
+                  <Spinner size="lg" />
+                </div>
+              ) : (
+                <div className=" mx-auto bg-white p-6 md:p-10 rounded-xl shadow">
 
-            {/* TITLE */}
-            <h1 className="text-2xl md:text-3xl font-bold mb-6  text-[#004aad]">
-              {policy?.title}
-            </h1>
+                  {/* TITLE */}
+                  <h1 className="text-2xl md:text-3xl font-bold mb-6  text-[#004aad]">
+                    {policy?.title}
+                  </h1>
 
-            {/* CONTENT (HTML from React Quill) */}
-            <div
-              className="prose max-w-none"
-              dangerouslySetInnerHTML={{ __html: policy?.content }}
-            />
+                  {/* CONTENT (HTML from React Quill) */}
+                  <div
+                    className="prose max-w-none"
+                    dangerouslySetInnerHTML={{ __html: policy?.content }}
+                  />
 
-          </div>
-        )}
+                </div>
+              )}
 
-      </section>
+            </div>
+        </section>
 
+      </SideAds>
       <Footer />
 
     </div>

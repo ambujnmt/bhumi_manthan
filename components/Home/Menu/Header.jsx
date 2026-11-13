@@ -15,8 +15,41 @@ import useSiteLogo from "../../../utils/useSiteLogo";
 import { adminHomePath, hasAdminAccess } from "../../../utils/adminPermissions";
 import { SEARCH_PATH, findTab, useSearchOptions } from "../../../utils/useSearchFilters";
 import useLiveEvents from "../../../utils/useLiveEvents";
+import UserAvatar from "../../Common/UserAvatar";
 import LiveBadge from "../../Common/LiveBadge";
 import { formatEventTime } from "../../Innerpages/Events/eventUtils";
+import { PROJECT_CITIES, PROJECT_DEVELOPERS, PROJECT_STAGES, PROJECTS_PATH, projectsHref } from "../../../utils/projectFilters";
+
+// Search page link with filters: searchHref({ type: "rental", furnishing: "furnished" })
+const searchHref = (params) => {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value)).toString();
+  return query ? `${SEARCH_PATH}?${query}` : SEARCH_PATH;
+};
+
+const menuLinkClass = "text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors";
+
+// Simple list of { label, href } links inside a mega dropdown column (mobile: plain links, closes the menu)
+function MenuLinks({ links, mobile = false, onClick }) {
+  if (mobile) {
+    return links.map((link) => (
+      <Link key={link.href + link.label} href={link.href} onClick={onClick} className="block py-2 text-sm text-gray-700">
+        {link.label}
+      </Link>
+    ));
+  }
+
+  return (
+    <ul className="mt-3 space-y-3">
+      {links.map((link) => (
+        <li key={link.href + link.label}>
+          <Link href={link.href} className={menuLinkClass}>
+            {link.label}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 // Sub categories of a category group -> search page links (?type=rental&property_types=flats)
 function CategoryLinks({ tab, mobile = false, onClick }) {
@@ -66,6 +99,36 @@ export default function Header() {
   const rentTab = findTab(searchOptions, "rent");
   const commercialTab = findTab(searchOptions, "commercial");
 
+  // Tab keys from search options (fallback = backend keys)
+  const rentType = rentTab?.key || "rental";
+  const commercialType = commercialTab?.key || "commercial";
+
+  // Cities that have listings (search options order), city names exactly as saved on properties
+  const popularCities = (searchOptions?.cities || []).map((city) => city.name).filter(Boolean).slice(0, 4);
+
+  const rentLinks = {
+    furnishing: [
+      { label: "Fully Furnished", href: searchHref({ type: rentType, furnishing: "furnished" }) },
+      { label: "Semi-Furnished", href: searchHref({ type: rentType, furnishing: "semi-furnished" }) },
+      { label: "Unfurnished", href: searchHref({ type: rentType, furnishing: "unfurnished" }) },
+      { label: "All Rentals", href: searchHref({ type: rentType }) },
+    ],
+    cities: popularCities.map((city) => ({ label: `Rent in ${city}`, href: searchHref({ type: rentType, city }) })),
+  };
+
+  const projectLinks = {
+    stages: PROJECT_STAGES.map((stage) => ({ label: stage.label, href: projectsHref({ launch_status: stage.value }) })),
+    developers: PROJECT_DEVELOPERS.map((developer) => ({ label: developer.label, href: projectsHref({ builder: developer.value }) })),
+    cities: PROJECT_CITIES.map((city) => ({ label: `Projects in ${city}`, href: projectsHref({ city }) })),
+  };
+
+  const commercialLinks = [
+    { label: "Commercial for sale", href: searchHref({ type: commercialType, listing_type: "sale" }) },
+    { label: "Commercial for rent", href: searchHref({ type: commercialType, listing_type: "rent" }) },
+    { label: "Commercial on lease", href: searchHref({ type: commercialType, listing_type: "lease" }) },
+    { label: "All Commercial", href: searchHref({ type: commercialType }) },
+  ];
+
   const {
     user,
     logout,
@@ -92,7 +155,6 @@ export default function Header() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const userMenuRef = useRef(null);
-  const userInitial = user?.name?.trim().charAt(0).toUpperCase() || "U";
 
   useEffect(() => {
     if (!userMenuOpen) return;
@@ -455,7 +517,7 @@ const handleLogout = () => {
                       }}
                     >
                       <Link
-                        href="#"
+                        href={searchHref({ type: rentType })}
                         className="capitalize flex items-center gap-1 text-[14px] font-semibold text-black hover:text-[var(--secondary-color)] transition-colors py-2 px-[7px]"
                       >
                         Rent
@@ -492,59 +554,17 @@ const handleLogout = () => {
                               {/* Column 2 */}
                               <div>
                                 <h4 className="text-[15px] font-semibold text-black">Furnishing</h4>
-                                <ul className="mt-3 space-y-3">
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Fully Furnished
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Semi-Furnished
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Unfurnished
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Move-in Ready
-                                    </Link>
-                                  </li>
-                                </ul>
+                                <MenuLinks links={rentLinks.furnishing} />
                               </div>
- 
+
                               {/* Column 3 */}
                               <div>
                                 <h4 className="text-[15px] font-semibold text-black">Popular Cities</h4>
-                                <ul className="mt-3 space-y-3">
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Rent Gurugram
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Rent in Noida
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Rent in New Delhi
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Rent in Bengaluru
-                                    </Link>
-                                  </li>
-                                </ul>
+                                <MenuLinks links={rentLinks.cities} />
                               </div>
                             </div>
                           </div>
- 
+
                           {/* Right: image */}
                           <div className="hidden lg:block shrink-0">
                             <img
@@ -570,7 +590,7 @@ const handleLogout = () => {
                       }}
                     >
                       <Link
-                        href="#"
+                        href={PROJECTS_PATH}
                         className="capitalize flex items-center gap-1 text-[14px] font-semibold text-black hover:text-[var(--secondary-color)] transition-colors py-2 px-[7px]"
                       >
                         New Projects
@@ -601,77 +621,19 @@ const handleLogout = () => {
                               {/* Column 1 */}
                               <div>
                                 <h4 className="text-[15px] font-semibold text-black">Project Stage</h4>
-                                <ul className="mt-3 space-y-3">
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      New Launches
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Under Construction
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Ready to Move
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Upcoming Projects
-                                    </Link>
-                                  </li>
-                                </ul>
+                                <MenuLinks links={projectLinks.stages} />
                               </div>
- 
+
                               {/* Column 2 */}
                               <div>
                                 <h4 className="text-[15px] font-semibold text-black">Top Developers</h4>
-                                <ul className="mt-3 space-y-3">
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      DLF
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Godrej Properties
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      M3M India
-                                    </Link>
-                                  </li>
-                                </ul>
+                                <MenuLinks links={projectLinks.developers} />
                               </div>
- 
+
                               {/* Column 3 */}
                               <div>
                                 <h4 className="text-[15px] font-semibold text-black">Popular Cities</h4>
-                                <ul className="mt-3 space-y-3">
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Rent Gurugram
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Rent in Noida
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Rent in New Delhi
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Rent in Bengaluru
-                                    </Link>
-                                  </li>
-                                </ul>
+                                <MenuLinks links={projectLinks.cities} />
                               </div>
                             </div>
                           </div>
@@ -700,7 +662,7 @@ const handleLogout = () => {
                       }}
                     >
                       <Link
-                        href="#"
+                        href={searchHref({ type: commercialType })}
                         className="capitalize flex items-center gap-1 text-[14px] font-semibold text-black hover:text-[var(--secondary-color)] transition-colors py-2 px-[7px]"
                       >
                         Commercial
@@ -737,28 +699,7 @@ const handleLogout = () => {
                               {/* Column 2 */}
                               <div>
                                 <h4 className="text-[15px] font-semibold text-black">Transaction</h4>
-                                <ul className="mt-3 space-y-3">
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Commercial for sale
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Commercial for rent
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Pre-leased Assets
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link href="#" className="text-sm text-slate-500 hover:text-[var(--primary-color)] transition-colors">
-                                      Investment Property
-                                    </Link>
-                                  </li>
-                                </ul>
+                                <MenuLinks links={commercialLinks} />
                               </div>
                             </div>
                           </div>
@@ -912,9 +853,9 @@ const handleLogout = () => {
                             aria-expanded={userMenuOpen}
                             title={user.name}
                             onClick={() => setUserMenuOpen((open) => !open)}
-                            className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--primary-color)] text-base font-bold text-white transition-colors hover:bg-[var(--secondary-color)]"
+                            className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--primary-color)] text-base font-bold text-white transition-colors hover:bg-[var(--secondary-color)] overflow-hidden ring-2 ring-transparent hover:ring-[var(--primary-color)]/40"
                           >
-                            {userInitial}
+                            <UserAvatar user={user} className="h-full w-full" />
                           </button>
 
                           <div
@@ -927,9 +868,7 @@ const handleLogout = () => {
                             <span className="absolute -top-[6px] right-[14px] h-3 w-3 rotate-45 border-l border-t border-gray-100 bg-[#FFF6EA]" aria-hidden="true" />
 
                             <div className="flex items-center gap-3 rounded-t-2xl bg-[#FFF6EA] p-[16px]">
-                              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--primary-color)] text-lg font-bold text-white" aria-hidden="true">
-                                {userInitial}
-                              </span>
+                              <UserAvatar user={user} className="h-11 w-11 bg-[var(--primary-color)] text-lg text-white" />
                               <div className="min-w-0">
                                 <div className="truncate text-sm font-bold text-[var(--secondary-color)]">{user.name}</div>
                                 {user.email && <div className="truncate text-xs text-[#62748E]">{user.email}</div>}
@@ -1102,16 +1041,10 @@ const handleLogout = () => {
                 <CategoryLinks tab={rentTab} mobile onClick={() => setMobileOpen(false)} />
  
                 <h6 className="mb-0 pb-1 pt-3 text-sm font-bold text-[var(--primary-color)]">Furnishing</h6>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Fully Furnished</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Semi-Furnished</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Unfurnished</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Move-in Ready</Link>
- 
+                <MenuLinks links={rentLinks.furnishing} mobile onClick={() => setMobileOpen(false)} />
+
                 <h6 className="mb-0 pb-1 pt-3 text-sm font-bold text-[var(--primary-color)]">Popular Cities</h6>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Rent Gurugram</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Rent in Noida</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Rent in New Delhi</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Rent in Bengaluru</Link>
+                <MenuLinks links={rentLinks.cities} mobile onClick={() => setMobileOpen(false)} />
               </div>
             </div>
             {/* // Rent TAB */}
@@ -1136,21 +1069,13 @@ const handleLogout = () => {
                 }`}
               >
                 <h6 className="mb-0 pb-1 pt-3 text-sm font-bold text-[var(--primary-color)]">Project Stage</h6>
-                <Link href="#" className="block py-2 text-sm text-gray-700">New Launches</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Under Construction</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Ready to Move</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Upcoming Projects</Link>
- 
+                <MenuLinks links={projectLinks.stages} mobile onClick={() => setMobileOpen(false)} />
+
                 <h6 className="mb-0 pb-1 pt-3 text-sm font-bold text-[var(--primary-color)]">Top Developers</h6>
-                <Link href="#" className="block py-2 text-sm text-gray-700">DLF</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Godrej Properties</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">M3M India</Link>
- 
+                <MenuLinks links={projectLinks.developers} mobile onClick={() => setMobileOpen(false)} />
+
                 <h6 className="mb-0 pb-1 pt-3 text-sm font-bold text-[var(--primary-color)]">Popular Cities</h6>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Rent Gurugram</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Rent in Noida</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Rent in New Delhi</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Rent in Bengaluru</Link>
+                <MenuLinks links={projectLinks.cities} mobile onClick={() => setMobileOpen(false)} />
               </div>
             </div>
             {/* // New Projects */}
@@ -1178,10 +1103,7 @@ const handleLogout = () => {
                 <CategoryLinks tab={commercialTab} mobile onClick={() => setMobileOpen(false)} />
  
                 <h6 className="mb-0 pb-1 pt-3 text-sm font-bold text-[var(--primary-color)]">Transaction</h6>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Commercial for sale</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Commercial for rent</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Pre-leased Assets</Link>
-                <Link href="#" className="block py-2 text-sm text-gray-700">Investment Property</Link>
+                <MenuLinks links={commercialLinks} mobile onClick={() => setMobileOpen(false)} />
               </div>
             </div>
             {/* // Commercial */}

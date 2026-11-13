@@ -39,6 +39,7 @@ export default function Header({ menuOpen, toggleMenu }) {
   const userPhone = user?.phone || "";
 
   const userAvatar =
+    user?.profile_image ||
     user?.avatar ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(
       userName

@@ -4,11 +4,12 @@ import React, { useEffect, useState } from "react";
 import { Spinner } from "@heroui/react";
 import { useRouter } from "next/router";
 import { getProfile, updateProfile } from "../../../utils/fetchApi";
+import ProfilePhotoEditor from "../../Common/ProfilePhotoEditor";
 import { useUser } from "../../../context/UserContext";
 import { showToast } from "../../../store/toast";
 import { subscribeChatUnread } from "../../../utils/firebaseChat";
 import { clearPostLoginRedirect } from "../../../utils/postLoginRedirect";
-import { FiAward, FiCalendar, FiCheckCircle, FiEdit2, FiFileText, FiMail, FiMapPin, FiPhone, FiShield, FiUser } from "react-icons/fi";
+import { FiAward, FiCalendar, FiCheckCircle, FiEdit2, FiFileText, FiGlobe, FiHash, FiHome, FiMail, FiMap, FiMapPin, FiPhone, FiShield, FiUser } from "react-icons/fi";
 import ChatBox from "../../Admin/Chat/ChatBox";
 
 const PILL_TONES = {
@@ -44,15 +45,30 @@ const inputClass =
 
 const PHONE_PATTERN = /^\+?[0-9\s-]{7,20}$/;
 
-// Edit name + phone + city (email is verified with OTP, so it stays read only)
+// Address fields (backend users table). full = whole row.
+const ADDRESS_FIELDS = [
+  { name: "address", label: "Address", maxLength: 500, full: true, placeholder: "House no., street, area", autoComplete: "street-address" },
+  { name: "city", label: "City", maxLength: 100, placeholder: "e.g. Noida", autoComplete: "address-level2" },
+  { name: "state", label: "State", maxLength: 100, placeholder: "e.g. Uttar Pradesh", autoComplete: "address-level1" },
+  { name: "country", label: "Country", maxLength: 100, placeholder: "e.g. India", autoComplete: "country-name" },
+  { name: "pin_code", label: "PIN Code", maxLength: 10, placeholder: "e.g. 201301", inputMode: "numeric", autoComplete: "postal-code" },
+];
+
+const PIN_PATTERN = /^[0-9]{4,10}$/;
+
+// Edit name + phone + address (email is verified with OTP, so it stays read only)
 function EditProfileForm({ profile, onCancel, onSaved }) {
-  const [form, setForm] = useState({ name: profile.name || "", phone: profile.phone || "", city: profile.city || "" });
+  const [form, setForm] = useState(() => ({
+    name: profile.name || "",
+    phone: profile.phone || "",
+    ...Object.fromEntries(ADDRESS_FIELDS.map(({ name }) => [name, profile[name] || ""])),
+  }));
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setForm((previous) => ({ ...previous, [name]: value }));
+    setForm((previous) => ({ ...previous, [name]: name === "pin_code" ? value.replace(/\D/g, "") : value }));
     setErrors((previous) => ({ ...previous, [name]: undefined }));
   };
 
@@ -67,6 +83,12 @@ function EditProfileForm({ profile, onCancel, onSaved }) {
     if (!phone) nextErrors.phone = "Please enter your phone number.";
     else if (!PHONE_PATTERN.test(phone)) nextErrors.phone = "Please enter a valid phone number.";
 
+    const address = Object.fromEntries(ADDRESS_FIELDS.map(({ name: field }) => [field, form[field].trim()]));
+
+    if (address.pin_code && !PIN_PATTERN.test(address.pin_code)) {
+      nextErrors.pin_code = "PIN code must be 4 to 10 digits.";
+    }
+
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
       return;
@@ -75,7 +97,7 @@ function EditProfileForm({ profile, onCancel, onSaved }) {
     setSaving(true);
 
     try {
-      const res = await updateProfile({ name, phone, city: form.city.trim() });
+      const res = await updateProfile({ name, phone, ...address });
       showToast(res?.message || "Profile updated successfully.");
       onSaved(res?.data?.user);
     } catch (error) {
@@ -127,22 +149,25 @@ function EditProfileForm({ profile, onCancel, onSaved }) {
         {errors.phone && <p className="mb-0 mt-1 text-xs text-red-600">{errors.phone}</p>}
       </div>
 
-      <div>
-        <label htmlFor="profile_city" className="text-xs font-medium text-[#62748E]">
-          City
-        </label>
-        <input
-          id="profile_city"
-          name="city"
-          value={form.city}
-          onChange={handleChange}
-          maxLength={100}
-          placeholder="e.g. Noida"
-          autoComplete="address-level2"
-          className={inputClass}
-          aria-invalid={Boolean(errors.city)}
-        />
-        {errors.city && <p className="mb-0 mt-1 text-xs text-red-600">{errors.city}</p>}
+      {/* Address (all optional) */}
+      <div className="grid grid-cols-1 gap-[14px] sm:grid-cols-2">
+        {ADDRESS_FIELDS.map(({ name, label, full, ...input }) => (
+          <div key={name} className={full ? "sm:col-span-2" : ""}>
+            <label htmlFor={`profile_${name}`} className="text-xs font-medium text-[#62748E]">
+              {label}
+            </label>
+            <input
+              id={`profile_${name}`}
+              name={name}
+              value={form[name]}
+              onChange={handleChange}
+              className={inputClass}
+              aria-invalid={Boolean(errors[name])}
+              {...input}
+            />
+            {errors[name] && <p className="mb-0 mt-1 text-xs text-red-600">{errors[name]}</p>}
+          </div>
+        ))}
       </div>
 
       <div>
@@ -190,9 +215,12 @@ function ProfileDetails({ profile, onProfileUpdated }) {
       <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
         <div className="h-[96px] bg-gradient-to-r from-[var(--secondary-color)] to-[var(--primary-color)]" />
         <div className="flex flex-col gap-[12px] px-[20px] pb-[20px] sm:flex-row sm:items-end sm:gap-[20px] sm:px-[24px]">
-          <span className="-mt-[44px] flex h-[88px] w-[88px] shrink-0 items-center justify-center rounded-full border-4 border-white bg-[var(--primary-color)] text-[36px] font-bold text-white shadow-md" aria-hidden="true">
-            {profile.name?.trim().charAt(0).toUpperCase() || "U"}
-          </span>
+          <ProfilePhotoEditor
+            profile={profile}
+            onProfileUpdated={onProfileUpdated}
+            className="-mt-[44px] !items-start sm:!items-center"
+            avatarClassName="h-[88px] w-[88px] border-4 border-white bg-[var(--primary-color)] text-[36px] text-white shadow-md"
+          />
           <div className="min-w-0 flex-1 sm:pt-[12px]">
             <h2 className="mb-[2px] break-words text-xl font-bold text-[var(--secondary-color)]">{profile.name || "-"}</h2>
             <div className="break-words text-sm text-[#62748E]">{profile.email || "-"}</div>
@@ -248,7 +276,11 @@ function ProfileDetails({ profile, onProfileUpdated }) {
               <InfoRow icon={FiUser} label="Full Name">{profile.name || "-"}</InfoRow>
               <InfoRow icon={FiMail} label="Email Address">{profile.email || "-"}</InfoRow>
               <InfoRow icon={FiPhone} label="Phone Number">{profile.phone || "-"}</InfoRow>
+              <InfoRow icon={FiHome} label="Address">{profile.address || "-"}</InfoRow>
               <InfoRow icon={FiMapPin} label="City">{profile.city || "-"}</InfoRow>
+              <InfoRow icon={FiMap} label="State">{profile.state || "-"}</InfoRow>
+              <InfoRow icon={FiGlobe} label="Country">{profile.country || "-"}</InfoRow>
+              <InfoRow icon={FiHash} label="PIN Code">{profile.pin_code || "-"}</InfoRow>
               <InfoRow icon={FiCalendar} label="Member Since">{memberSince}</InfoRow>
             </div>
           )}
@@ -364,7 +396,7 @@ export default function Profile({ dashboard = false }) {
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-10">
+      <div className="container py-10">
         <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-red-600">
           {error}
         </div>
@@ -376,7 +408,7 @@ export default function Profile({ dashboard = false }) {
 
   if (!profile) {
     return (
-      <div className="container mx-auto px-4 py-10">
+      <div className="container py-10">
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 text-gray-600">
           Profile information not available.
         </div>
@@ -387,7 +419,7 @@ export default function Profile({ dashboard = false }) {
   /* ================= PROFILE ================= */
 
   return (
-    <div className={dashboard ? (tab === "chat" ? "h-full" : "") : "container mx-auto px-4 py-10"}>
+    <div className={dashboard ? (tab === "chat" ? "h-full" : "") : "container py-10"}>
 
       {/* Page Heading */}
       {/* Dashboard: the sidebar already says which page this is */}

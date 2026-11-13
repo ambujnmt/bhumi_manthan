@@ -6,6 +6,13 @@ import Pagination from "../../../Common/Pagination";
 import { cardSpecs, priceInfo, propertyTypeLabel } from "../../../Innerpages/PropertyDetails/PropertySpecs";
 import { formatDistance, formatPropertyPrice, imageFallback } from "../../../../utils/formatPrice";
 import WishlistButton from "../../../Common/WishlistButton";
+import AdMedia from "../../../Common/Ads/AdMedia";
+import { AD_PLACEMENTS, fetchAd, peekAd } from "../../../../utils/ads";
+
+const knownHomeAds = () => ({
+    left: peekAd(AD_PLACEMENTS.HOME_FEATURED_LEFT) || null,
+    right: peekAd(AD_PLACEMENTS.HOME_FEATURED_RIGHT) || null,
+});
 
 const badgeColors = {
     FEATURED: "bg-[#22C55E]",
@@ -59,6 +66,26 @@ export default function FeaturedProperties({ loading = false, properties = [], n
         setPage(1);
     }, [properties]);
 
+    // Side ads (Admin -> Ads, "Home (Featured Properties)"). Only set ads show, no default card.
+    // First render: ads from the server (pages/index.jsx) / cache -> layout right away, no jump
+    const [ads, setAds] = useState(knownHomeAds);
+
+    useEffect(() => {
+        let active = true;
+
+        Promise.all([fetchAd(AD_PLACEMENTS.HOME_FEATURED_LEFT), fetchAd(AD_PLACEMENTS.HOME_FEATURED_RIGHT)]).then(([left, right]) => {
+            // Same ads -> keep the same state (no re-render, image does not reload)
+            if (active) setAds((previous) => (previous.left === left && previous.right === right ? previous : { left, right }));
+        });
+
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    // No ad on either side -> same width as the search box (container), no side columns
+    const withAds = Boolean(ads.left || ads.right);
+
     // Loading: same section + skeleton cards (nothing moves when data arrives)
     if (!loading && properties.length === 0) {
         return null;
@@ -81,11 +108,13 @@ export default function FeaturedProperties({ loading = false, properties = [], n
 
     return (
         <>
-            <section ref={sectionRef} className="container-fluid mx-[15px] scroll-mt-28">
+            {/* Phones / tablets: same width as other pages (container), ads included.
+                Desktop with ads: wider (full width, 27px each side) so the side ad columns fit */}
+            <section ref={sectionRef} className={`container ${withAds ? "lg:!max-w-none lg:!px-[27px]" : ""} scroll-mt-28`}>
                 {/* Phone: less space above the heading; empty side columns only on lg+ (they made an empty row) */}
                 <div className="grid grid-cols-12 gap-4 mt-6 lg:mt-[60px]">
-                    <div className="hidden lg:block lg:col-span-1"></div>
-                    <div className="col-span-12 xl:col-span-10 lg:col-span-10 gap-4 xl:flex lg:flex block items-center justify-between">
+                    {withAds && <div className="hidden lg:block lg:col-span-1"></div>}
+                    <div className={`col-span-12 ${withAds ? "xl:col-span-10 lg:col-span-10" : ""} gap-4 xl:flex lg:flex block items-center justify-between`}>
                         <div className="">
                             <h2 className="text-[28px] font-bold text-[var(--text-color1)]">
                                 {nearby ? "Featured Properties Near You" : "Featured Properties"}
@@ -102,29 +131,17 @@ export default function FeaturedProperties({ loading = false, properties = [], n
                             </Link>
                         </div>
                     </div>
-                    <div className="hidden lg:block lg:col-span-1"></div>
+                    {withAds && <div className="hidden lg:block lg:col-span-1"></div>}
                 </div>
 
                 <div className="grid grid-cols-12 gap-4 mt-4 lg:mt-[30px]">
-                    <div className="col-span-12 xl:col-span-1 lg:col-span-1 md:col-span-6">
-                        <div className="bg-[var(--secondary-color)] p-2 rounded-lg">
-                            <h6 className="text-[var(--primary-color)] text-[10px] mb-[10px] text-center">LOW INTEREST</h6>
-                            <h3 className="text-white text-[24px] font-bold leading-[33px] mb-[10px] text-center">HOME LOAN</h3>
-                            <p className="text-white/80 text-[10px] mb-[8px] text-center">Interest Rate</p>
-                            <h2 className="text-[var(--primary-color)] text-[21px] font-bold text-center">8.40%*</h2>
-                            <p className="text-white/80 text-[10px] mb-[8px] text-center">p.a.</p>
-                            <div className="border border-slate-500 w-full my-[15px]"></div>
-                            <p className="text-white/80 text-[10px] mb-[5px]">Quick Approval</p>
-                            <p className="text-white/80 text-[10px] mb-[5px]">Lowest Interest</p>
-                            <p className="text-white/80 text-[10px] mb-[5px]">Minimal Docs</p>
-                            <p className="text-white/80 text-[10px] mb-[5px]">Trusted Partners</p>
-                            <Link href="#" className="mt-[20px] flex items-center hover:bg-[var(--secondary-color)] text-white px-1 py-2 rounded-lg border text-[11px] font-medium leading-[100%] bg-[var(--primary-color)] hover:text-white transition-all duration-500 ease-in-out text-center">
-                                APPLY NOW
-                            </Link>
-                            <img src="/assets/img/property-img.png" alt="Featured Properties" className="w-full h-[70px] object-cover mt-4 rounded-lg" />
+                    {/* Left ad column (only when a side has an ad). Phones: shown only with a mobile image (full width); desktop: kept so cards stay centred */}
+                    {withAds && (
+                        <div className={`${ads.left?.mobile_image ? "col-span-12" : "hidden"} lg:col-span-1 lg:block xl:col-span-1`}>
+                            {ads.left && <AdMedia ad={ads.left} />}
                         </div>
-                    </div>
-                    <div className="col-span-12 xl:col-span-10 lg:col-span-10 gap-4">
+                    )}
+                    <div className={`col-span-12 ${withAds ? "xl:col-span-10 lg:col-span-10" : ""} gap-4`}>
                         <div className="grid grid-cols-12 gap-4">
                             {loading && Array.from({ length: PER_PAGE }).map((_, index) => (
                                 <div key={`skeleton-${index}`} className="col-span-12 flex xl:col-span-3 lg:col-span-3 md:col-span-6">
@@ -213,24 +230,12 @@ export default function FeaturedProperties({ loading = false, properties = [], n
                             </div>
                         </div>
                     </div>
-                    <div className="col-span-12 xl:col-span-1 lg:col-span-1 md:col-span-6">
-                        <div className="bg-[var(--secondary-color)] p-2 rounded-lg">
-                            <h6 className="text-[var(--primary-color)] text-[10px] mb-[10px] text-center">GET INSTANT</h6>
-                            <h3 className="text-white text-[24px] font-bold leading-[33px] mb-[10px] text-center">GOLD LOAN</h3>
-                            <p className="text-white/80 text-[10px] mb-[8px] text-center">Loan Upto</p>
-                            <h2 className="text-[var(--primary-color)] text-[21px] font-bold text-center">₹20 Lakhs*</h2>
-                            <p className="text-white/80 text-[10px] mb-[8px] text-center">Instant Disbursal</p>
-                            <div className="border border-slate-500 w-full my-[15px]"></div>
-                            <p className="text-white/80 text-[10px] mb-[5px]">Quick Disbursal</p>
-                            <p className="text-white/80 text-[10px] mb-[5px]">Minimal Documents</p>
-                            <p className="text-white/80 text-[10px] mb-[5px]">Lowest Interest</p>
-                            <p className="text-white/80 text-[10px] mb-[5px]">Trusted Partners</p>
-                            <Link href="#" className="mt-[20px] flex items-center hover:bg-[var(--secondary-color)] text-white px-1 py-2 rounded-lg border text-[11px] font-medium leading-[100%] bg-[var(--primary-color)] hover:text-white transition-all duration-500 ease-in-out text-center">
-                                APPLY NOW
-                            </Link>
-                            <img src="/assets/img/gold-loan.png" alt="Featured Properties" className="w-full h-[70px] object-cover mt-4 rounded-lg" />
+                    {/* Right ad column. Phones: -mb-12 pulls the next section (mt-[60px] py-10) closer, so no big gap under the ad */}
+                    {withAds && (
+                        <div className={`${ads.right?.mobile_image ? "col-span-12 -mb-12" : "hidden"} lg:col-span-1 lg:mb-0 lg:block xl:col-span-1`}>
+                            {ads.right && <AdMedia ad={ads.right} />}
                         </div>
-                    </div>
+                    )}
                 </div>
             </section>
         </>

@@ -9,7 +9,8 @@ export default function propertyDetails({ seo }) {
         <>
             {seo && <MetaTags {...seo} />}
             <Header />
-            {/* No server meta on in-app navigation: the page sets the title from its own fetch */}
+            {/* No server meta on in-app navigation: the page sets the title from its own fetch.
+                Ads of this page sit beside the image section (inside PropertyDetails) */}
             <PropertyDetails clientSeo={!seo} />
             <Footer />
         </>

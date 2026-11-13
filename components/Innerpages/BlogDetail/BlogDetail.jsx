@@ -10,8 +10,12 @@ import {
     FaTag,
     FaLightbulb,
     FaHome,
+    FaChevronRight,
+    FaNewspaper,
+    FaFileAlt,
 } from "react-icons/fa";
 import "react-quill/dist/quill.snow.css";
+import SideAds from "../../Common/Ads/SideAds";
 
 const formatDate = (value) =>
     value
@@ -40,20 +44,75 @@ export default function BlogDetail({ blog = null, moreBlogs = [] }) {
     }
 
     return (
-        <section className="container py-8 sm:py-12">
-            <div className="mx-auto max-w-6xl">
+        <section className="blog-detail container pb-8 sm:pb-12">
+            {/* Same width as the blog list page (container, no extra max width) */}
+            <div className="w-full">
 
-                {/* Back navigation */}
-                <NextLink
-                    href="/"
-                    className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-[var(--primary-color)] transition-all hover:gap-3"
-                >
-                    <FaArrowLeft size={13} />
-                    Back to Home
-                </NextLink>
+                {/* Breadcrumb (same look as property / project / event detail) */}
+                <div className="flex flex-col gap-3 py-[40px] sm:flex-row sm:items-center sm:justify-between">
+                    <nav aria-label="Breadcrumb" className="min-w-0">
+                        <ol className="mb-0 flex flex-wrap items-center gap-1.5 pl-0 text-[13px]">
+                            {/* Home */}
+                            <li>
+                                <NextLink
+                                    href="/"
+                                    className="group flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 font-medium text-[#62748E] no-underline shadow-sm transition hover:border-[var(--primary-color)] hover:text-[var(--primary-color)]"
+                                >
+                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--secondary-color)]/10 text-[var(--secondary-color)] transition group-hover:bg-[var(--primary-color)]/10 group-hover:text-[var(--primary-color)]">
+                                        <FaHome className="text-[10px]" />
+                                    </span>
+                                    Home
+                                </NextLink>
+                            </li>
+
+                            <li aria-hidden="true">
+                                <FaChevronRight className="text-[9px] text-gray-400" />
+                            </li>
+
+                            {/* Blogs */}
+                            <li>
+                                <NextLink
+                                    href="/web/blog"
+                                    className="group flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 font-medium text-[#62748E] no-underline shadow-sm transition hover:border-[var(--primary-color)] hover:text-[var(--primary-color)]"
+                                >
+                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--secondary-color)]/10 text-[var(--secondary-color)] transition group-hover:bg-[var(--primary-color)]/10 group-hover:text-[var(--primary-color)]">
+                                        <FaNewspaper className="text-[10px]" />
+                                    </span>
+                                    Blogs
+                                </NextLink>
+                            </li>
+
+                            <li aria-hidden="true">
+                                <FaChevronRight className="text-[9px] text-gray-400" />
+                            </li>
+
+                            {/* Current Page (long titles cut with "...") */}
+                            <li aria-current="page" className="min-w-0 max-w-full">
+                                <span className="flex items-center gap-2 rounded-full bg-[var(--secondary-color)] px-3.5 py-1.5 font-semibold text-white shadow-md">
+                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--primary-color)] text-white">
+                                        <FaFileAlt className="text-[10px]" />
+                                    </span>
+                                    <span className="truncate sm:max-w-[420px]">{blog.title}</span>
+                                </span>
+                            </li>
+                        </ol>
+                    </nav>
+
+                    {/* Back Button */}
+                    <NextLink
+                        href="/web/blog"
+                        className="inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-[var(--primary-color)] px-4 py-1.5 text-[13px] font-semibold text-[var(--primary-color)] no-underline transition hover:bg-[var(--primary-color)] hover:text-white"
+                    >
+                        <FaArrowLeft className="text-[11px]" />
+                        Back to Blogs
+                    </NextLink>
+                </div>
+
+                {/* Accent line */}
+                <div className="-mt-6 mb-8 h-[3px] w-full rounded-full bg-gradient-to-r from-[var(--primary-color)] via-[var(--primary-color)]/30 to-transparent" />
 
                 {/* Blog heading */}
-                <div className="mb-7 grid grid-cols-1 items-end gap-6 lg:grid-cols-[1fr_250px]">
+                <div className="mb-7">
                     <div>
                         {blog.category && (
                             <div className="mb-3 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[var(--primary-color)]">
@@ -89,46 +148,24 @@ export default function BlogDetail({ blog = null, moreBlogs = [] }) {
                             )}
                         </div>
                     </div>
-
-                    {/* Brand callout */}
-                    <div
-                        className="flex items-start gap-4 rounded-2xl p-4"
-                        style={{
-                            backgroundColor: "rgba(232, 119, 34, 0.08)",
-                            border: "1px solid rgba(232, 119, 34, 0.15)",
-                        }}
-                    >
-                        <FaHome
-                            className="mt-1 shrink-0 text-[var(--primary-color)]"
-                            size={28}
-                        />
-                        <div>
-                            <h3 className="font-bold text-[var(--text-color1)]">
-                                Better Spaces,
-                                <br />
-                                Brighter Futures
-                            </h3>
-                            <p className="mt-2 text-xs leading-relaxed text-[var(--text-color2)]">
-                                Discover ideas, insights and inspiration for
-                                better living.
-                            </p>
-                        </div>
-                    </div>
                 </div>
 
-                {/* Hero image */}
+                {/* Hero image. Ads (Admin -> Ads, "Blog Detail") sit left / right of it;
+                    article, Article Overview card and related blogs below keep the full width */}
                 {blog.image && (
-                    <div className="group mb-10 overflow-hidden rounded-2xl border border-gray-100 shadow-sm">
-                        <img
-                            src={blog.image}
-                            alt={blog.title || "Blog cover"}
-                            className="h-[240px] w-full object-cover transition-transform duration-700 group-hover:scale-[1.02] sm:h-[360px] lg:h-[430px]"
-                        />
-                    </div>
+                    <SideAds page="blog_detail" sticky={false} railClass="lg:mt-0" wrapClass="">
+                        <div className="group mb-10 overflow-hidden rounded-2xl border border-gray-100 shadow-sm">
+                            <img
+                                src={blog.image}
+                                alt={blog.title || "Blog cover"}
+                                className="h-[240px] w-full object-cover transition-transform duration-700 group-hover:scale-[1.02] sm:h-[360px] lg:h-[430px]"
+                            />
+                        </div>
+                    </SideAds>
                 )}
 
-                {/* Article and sidebar */}
-                <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_290px] lg:gap-10">
+                {/* Article and sidebar (a little space below the image / ads row) */}
+                <div className="mt-4 grid grid-cols-1 items-start gap-8 lg:mt-6 lg:grid-cols-[minmax(0,1fr)_290px] lg:gap-10">
 
                     {/* Main article */}
                     <article className="min-w-0">
@@ -172,112 +209,68 @@ export default function BlogDetail({ blog = null, moreBlogs = [] }) {
                         </div>
                     </article>
 
-                    {/* Article information sidebar */}
-                    <aside className="lg:sticky lg:top-6">
+                    {/* Article Overview sidebar */}
+                    {/* top-28: stays below the fixed header while scrolling */}
+                    <aside className="lg:sticky lg:top-28">
                         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                            {/* Title */}
+                            <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-4">
+                                <span className="h-5 w-1 rounded-full bg-[var(--primary-color)]" />
+                                <h2 className="mb-0 text-[17px] font-bold text-[var(--text-color1)]">
+                                    Article Overview
+                                </h2>
+                            </div>
 
-                            <div className="border-b border-gray-100 p-5">
-                                <div className="mb-4 flex items-center gap-2">
-                                    <span className="h-5 w-1 rounded-full bg-[var(--primary-color)]" />
-                                    <h2 className="font-bold text-[var(--text-color1)]">
-                                        Article Overview
-                                    </h2>
+                            {/* Author */}
+                            {blog.author_name && (
+                                <div className="flex items-center gap-3 border-b border-gray-100 px-5 py-4">
+                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--primary-color)] text-[16px] font-bold uppercase text-white">
+                                        {String(blog.author_name).trim().charAt(0) || <FaUser size={16} />}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="mb-0 truncate text-[15px] font-bold text-[var(--text-color1)]">
+                                            {blog.author_name}
+                                        </p>
+                                        <p className="mb-0 text-xs text-[var(--text-color2)]">Article Author</p>
+                                    </div>
                                 </div>
+                            )}
 
-                                {blog.author_name && (
-                                    <div className="flex items-center gap-3">
-                                        <div
-                                            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
-                                            style={{
-                                                backgroundColor:
-                                                    "rgba(232, 119, 34, 0.10)",
-                                            }}
-                                        >
-                                            <FaUser
-                                                className="text-[var(--primary-color)]"
-                                                size={18}
-                                            />
-                                        </div>
+                            {/* Details */}
+                            {(blog.published_at || blog.read_time || blog.category) && (
+                                <ul className="mb-0 divide-y divide-gray-100 px-5 py-1 pl-5">
+                                    {[
+                                        blog.published_at && { icon: FaCalendarAlt, label: "Published on", value: formatDate(blog.published_at) },
+                                        blog.read_time && { icon: FaClock, label: "Reading time", value: `${blog.read_time} min read` },
+                                        blog.category && { icon: FaTag, label: "Category", value: blog.category, accent: true },
+                                    ]
+                                        .filter(Boolean)
+                                        .map(({ icon: Icon, label, value, accent }) => (
+                                            <li key={label} className="flex items-center gap-3 py-3">
+                                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(232,119,34,0.10)] text-[var(--primary-color)]">
+                                                    <Icon size={14} />
+                                                </span>
+                                                <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                                                    <span className="text-[13px] text-[var(--text-color2)]">{label}</span>
+                                                    <span className={`truncate text-right text-[13px] font-semibold ${accent ? "text-[var(--primary-color)]" : "text-[var(--text-color1)]"}`}>
+                                                        {value}
+                                                    </span>
+                                                </div>
+                                            </li>
+                                        ))}
+                                </ul>
+                            )}
 
-                                        <div className="min-w-0">
-                                            <p className="font-bold text-[var(--text-color1)]">
-                                                {blog.author_name}
-                                            </p>
-                                            <p className="mt-1 text-xs text-[var(--text-color2)]">
-                                                Article Author
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <p className="mt-5 text-sm leading-6 text-[var(--text-color2)]">
-                                    Read the latest insights and discover
-                                    ideas that matter to you.
-                                </p>
-                            </div>
-
-                            <div className="space-y-5 p-5">
-                                {blog.published_at && (
-                                    <div className="flex gap-3">
-                                        <FaCalendarAlt
-                                            className="mt-1 shrink-0 text-[var(--primary-color)]"
-                                            size={17}
-                                        />
-                                        <div>
-                                            <p className="text-xs text-[var(--text-color2)]">
-                                                Published on
-                                            </p>
-                                            <p className="mt-1 text-sm font-semibold text-[var(--text-color1)]">
-                                                {formatDate(blog.published_at)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {blog.read_time && (
-                                    <div className="flex gap-3">
-                                        <FaClock
-                                            className="mt-1 shrink-0 text-[var(--primary-color)]"
-                                            size={18}
-                                        />
-                                        <div>
-                                            <p className="text-xs text-[var(--text-color2)]">
-                                                Reading time
-                                            </p>
-                                            <p className="mt-1 text-sm font-semibold text-[var(--text-color1)]">
-                                                {blog.read_time} min read
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {blog.category && (
-                                    <div className="flex gap-3">
-                                        <FaTag
-                                            className="mt-1 shrink-0 text-[var(--primary-color)]"
-                                            size={17}
-                                        />
-                                        <div>
-                                            <p className="text-xs text-[var(--text-color2)]">
-                                                Category
-                                            </p>
-                                            <p className="mt-1 text-sm font-semibold text-[var(--primary-color)]">
-                                                {blog.category}
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="border-t border-gray-100 p-5">
-                                <p className="mb-3 text-sm font-bold text-[var(--text-color1)]">
-                                    Explore More
+                            {/* Explore more */}
+                            <div className="border-t border-gray-100 bg-gray-50 px-5 py-4">
+                                <p className="mb-3 text-[13px] leading-5 text-[var(--text-color2)]">
+                                    Read the latest insights and discover ideas that matter to you.
                                 </p>
                                 <NextLink
-                                    href="/"
-                                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary-color)] px-4 py-3 text-sm font-bold text-white transition-all hover:opacity-90"
+                                    href="/web/blog"
+                                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary-color)] px-4 py-3 text-sm font-bold text-white no-underline transition-all hover:opacity-90"
                                 >
-                                    Visit Homepage
+                                    Explore More Blogs
                                     <FaArrowRight size={12} />
                                 </NextLink>
                             </div>
@@ -401,8 +394,15 @@ export default function BlogDetail({ blog = null, moreBlogs = [] }) {
 
                 .blog-article-content .ql-editor a {
                     color: var(--primary-color);
-                    text-decoration: underline;
-                    text-underline-offset: 3px;
+                    text-decoration: none;
+                }
+
+                /* No underline on any link of this page (Bootstrap underlines "a") */
+                .blog-detail a,
+                .blog-detail a:hover,
+                .blog-detail a:focus,
+                .blog-detail a:active {
+                    text-decoration: none;
                 }
 
                 .blog-article-content .ql-editor img {

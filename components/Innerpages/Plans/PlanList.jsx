@@ -37,6 +37,7 @@ import {
     toFeatureMap,
 } from "../../../utils/planFeatures";
 import { PlanIllustration } from "./PlanIllustrations";
+import SideAds from "../../Common/Ads/SideAds";
 
 const NAVY = "#12305F";
 const GOLD = "#D4961C";
@@ -511,21 +512,23 @@ export default function PlanList({ initialPlans = null, initialBanner }) {
                     <p className="py-16 text-center text-[var(--text-color2)]">Plans will be available soon.</p>
                 ) : (
                     <>
-                        {/* Plan cards */}
-                        <div
-                            className={`grid grid-cols-1 gap-x-5 gap-y-10 md:grid-cols-2 ${plans.length >= 3 ? "lg:grid-cols-3" : ""}`}
-                        >
-                            {plans.map((plan, index) => (
-                                <PlanCard
-                                    key={plan.id}
-                                    plan={plan}
-                                    index={index}
-                                    popular={index === popular}
-                                    state={canBuy ? planState(plan) : null}
-                                    onBuy={handleBuy}
-                                />
-                            ))}
-                        </div>
+                        {/* Plan cards. Ads (Admin -> Ads, "Pricing Plans") sit left / right of them */}
+                        <SideAds page="plans" sticky={false} railClass="lg:mt-0" wrapClass="">
+                            <div
+                                className={`grid grid-cols-1 gap-x-5 gap-y-10 md:grid-cols-2 ${plans.length >= 3 ? "lg:grid-cols-3" : ""}`}
+                            >
+                                {plans.map((plan, index) => (
+                                    <PlanCard
+                                        key={plan.id}
+                                        plan={plan}
+                                        index={index}
+                                        popular={index === popular}
+                                        state={canBuy ? planState(plan) : null}
+                                        onBuy={handleBuy}
+                                    />
+                                ))}
+                            </div>
+                        </SideAds>
 
                         {/* Trust strip */}
                         <div className="mt-8 grid grid-cols-2 gap-5 rounded-xl bg-[#EEF4FB] px-6 py-5 lg:grid-cols-4">

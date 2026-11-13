@@ -1,8 +1,12 @@
 import React from "react";
 import Main from "../components/Home/Main/Main";
 import { loadDefaultListings } from "../utils/useHomeListings";
+import { AD_PLACEMENTS, loadAdsOnServer, primeAds } from "../utils/ads";
 
-export default function HomePage({ banners, listings, youtuberVideos }) {
+export default function HomePage({ banners, listings, youtuberVideos, ads = null }) {
+  // Featured Properties side ads come with the HTML -> right layout on the first paint (no jump)
+  primeAds(ads);
+
   return (
       <Main banners={banners} listings={listings} youtuberVideos={youtuberVideos} />
   );
@@ -67,10 +71,16 @@ export async function getStaticProps() {
     }
   };
 
-  await Promise.all([loadBanners(), loadListings(), loadYoutuberVideos()]);
+  let ads = null;
+  const loadAds = async () => {
+    // null = API down -> the section loads them in browser
+    ads = await loadAdsOnServer([AD_PLACEMENTS.HOME_FEATURED_LEFT, AD_PLACEMENTS.HOME_FEATURED_RIGHT]);
+  };
+
+  await Promise.all([loadBanners(), loadListings(), loadYoutuberVideos(), loadAds()]);
 
   return {
-    props: { banners, listings, youtuberVideos },
+    props: { banners, listings, youtuberVideos, ads },
     revalidate: 60,
   };
 }

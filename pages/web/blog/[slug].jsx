@@ -18,6 +18,7 @@ export default function blogDetail({ blog, moreBlogs }) {
                 canonical={siteUrl ? `${siteUrl}/web/blog/${blog.slug}` : undefined}
             />
             <Header />
+            {/* Ads of this page sit beside the hero image (inside BlogDetail) */}
             <BlogDetail blog={blog} moreBlogs={moreBlogs} />
             <Footer />
         </>

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import NextLink from "next/link";
-import { FiCalendar, FiHeart, FiMessageCircle } from "react-icons/fi";
+import { FiCalendar, FiHeart, FiMessageCircle, FiUsers } from "react-icons/fi";
 import { useUser } from "../../../context/UserContext";
 import { useWishlist } from "../../../context/WishlistContext";
 import { getMyAppointments } from "../../../modules/appointments/api";
-import { getWishlist } from "../../../utils/fetchApi";
+import { getNearbyAgents, getWishlist } from "../../../utils/fetchApi";
+import useUserLocation from "../../../utils/useUserLocation";
 import { subscribeChatUnread } from "../../../utils/firebaseChat";
 import { formatPropertyPrice, imageFallback } from "../../../utils/formatPrice";
 
@@ -62,6 +63,40 @@ export default function DashboardOverview() {
 
   useEffect(() => subscribeChatUnread(setUnread), []);
 
+  // Brokers / sellers active near the user (IP location, same as home "Top Rated Sellers & Brokers")
+  const { ready: locationReady, location } = useUserLocation();
+  const [agents, setAgents] = useState(null); // { nearby, city, brokers, sellers }
+
+  useEffect(() => {
+    if (!locationReady) return;
+
+    let cancelled = false;
+
+    getNearbyAgents(location, 1).then((res) => {
+      if (cancelled) return;
+
+      const counts = res?.data?.counts;
+
+      // API failed / older API without counts -> show "-" instead of a wrong 0
+      if (!res?.status || !counts) {
+        setAgents({ unknown: true });
+        return;
+      }
+
+      // Nobody near the user (or IP location is wrong, e.g. VPN) -> API already sends counts of all agents
+      setAgents({
+        nearby: Boolean(res.data.nearby),
+        city: location?.city || null,
+        brokers: counts.brokers,
+        sellers: counts.sellers,
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locationReady, location]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -99,10 +134,20 @@ export default function DashboardOverview() {
       <h1 className="mb-[4px] text-2xl font-bold text-[var(--secondary-color)]">Hello, {user.name}</h1>
       <p className="mb-[20px] text-sm text-[#62748E]">Here is what is happening with your account.</p>
 
-      <div className="mb-[20px] grid grid-cols-1 gap-[16px] sm:grid-cols-3">
+      <div className="mb-[20px] grid grid-cols-1 gap-[16px] sm:grid-cols-2 xl:grid-cols-4">
         <StatCard href={`/user/myWishlist/myWishlist/${user.id}`} icon={FiHeart} label="Saved properties" value={idsLoaded ? ids.length : null} />
         <StatCard href="/user/appointments" icon={FiCalendar} label="Upcoming appointments" value={appointments?.pagination.total} />
         <StatCard href={`/web/profile/${user.id}?tab=chat`} icon={FiMessageCircle} label="Unread messages" value={unread} />
+        <StatCard
+          href="/user/nearbyAgents"
+          icon={FiUsers}
+          label={
+            !agents || agents.unknown
+              ? "Brokers & sellers near you"
+              : `${agents.brokers} ${agents.brokers === 1 ? "broker" : "brokers"} & ${agents.sellers} ${agents.sellers === 1 ? "seller" : "sellers"} active ${agents.nearby ? `near ${agents.city || "you"}` : "across all cities"}`
+          }
+          value={agents && !agents.unknown ? agents.brokers + agents.sellers : null}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-[20px] xl:grid-cols-2">

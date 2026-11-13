@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/router';
 import { MdOutlineLogout, MdOutlineMonitor } from "react-icons/md";
 import { HiMenu } from "react-icons/hi";
-import { FaBuilding, FaCity, FaClipboardList, FaCog, FaEnvelope, FaImages, FaLayerGroup, FaMapMarkedAlt, FaMoneyBillWave, FaNewspaper, FaRegCalendarCheck, FaSearch, FaUser, FaUserShield, FaUserTie, FaYoutube } from 'react-icons/fa';
+import { FaBuilding, FaBullhorn, FaCity, FaClipboardList, FaCog, FaEnvelope, FaImages, FaLayerGroup, FaMapMarkedAlt, FaMoneyBillWave, FaNewspaper, FaRegCalendarCheck, FaSearch, FaUser, FaUserShield, FaUserTie, FaYoutube } from 'react-icons/fa';
 import { RxDotFilled } from "react-icons/rx";
 import { BsChatDotsFill } from "react-icons/bs";
 import { FiMail } from "react-icons/fi";
@@ -14,6 +14,7 @@ import { useUser } from "../../../../context/UserContext";
 import { hasAdminAccess, hasPermission, isSeoOnly, PANEL_URL_PREFIX } from "../../../../utils/adminPermissions";
 import { subscribeChatUnread } from "../../../../utils/firebaseChat";
 import Tmodal from "../../../Tmodal/Tmodal";
+import UserAvatar from "../../../Common/UserAvatar";
 
 // Menu scroll position: every admin page mounts its own SideMenu,
 // so keep it between pages (menu does not jump back to top on click)
@@ -163,6 +164,7 @@ export default function SideMenu({
   const isSettingsActive = isActive('/admin/settings');
   const isBannerActive = isActive('/admin/banner');
   const isYoutuberVideoActive = isActive('/admin/youtuberVideo');
+  const isAdsActive = isActive('/admin/ads');
   const isContactActive = isActive('/admin/contact');
   const isEnquiryActive = isActive('/admin/enquiry');
   const isAppointmentActive = isActive('/admin/appointment');
@@ -998,6 +1000,37 @@ export default function SideMenu({
             </Link>
           )}
 
+          {/* ads (website ads on any page) */}
+          {can('ads.view') && (
+            <Link
+              href="/admin/ads/adList"
+              onClick={toggleMenu}
+              aria-label={isCollapsed ? 'Ads' : undefined}
+              title={isCollapsed ? 'Ads' : undefined}
+              className={`group relative mb-2 flex w-full cursor-pointer items-center rounded-lg px-2.5 py-2.5 transition-all duration-200 ${
+                isAdsActive ? 'bg-orange-50 text-[#E87722]' : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+              } ${isCollapsed ? 'justify-center' : 'justify-between'}`}
+            >
+              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+                <FaBullhorn
+                  className={`h-[18px] w-[18px] flex-shrink-0 transition-colors duration-200 ${
+                    isAdsActive ? 'text-[#E87722]' : 'text-[#62748E] group-hover:text-[#E87722]'
+                  }`}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Ads
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isAdsActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+
           {/* banner */}
           {can('banners.view') && (
             <Link
@@ -1599,7 +1632,7 @@ export default function SideMenu({
               title="Profile"
               className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-sm font-bold uppercase text-[#E87722] no-underline transition hover:ring-2 hover:ring-orange-200"
             >
-              {userName.trim().charAt(0)}
+              <UserAvatar user={{ ...user, name: userName }} className="h-full w-full" />
             </Link>
 
             <button
@@ -1620,9 +1653,7 @@ export default function SideMenu({
               title="Profile"
               className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1 no-underline transition hover:bg-orange-50"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-bold uppercase text-[#E87722]">
-                {userName.trim().charAt(0)}
-              </span>
+              <UserAvatar user={{ ...user, name: userName }} className="h-9 w-9 bg-orange-100 text-sm uppercase text-[#E87722]" />
 
               <div className="min-w-0 flex-1 leading-tight">
                 <p className="mb-0 truncate text-[13px] font-semibold text-[#1A1F36]">

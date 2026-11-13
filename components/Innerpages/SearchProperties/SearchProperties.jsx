@@ -6,6 +6,7 @@ import SearchPropertiesLeftCol from './SearchPropertiesLeftCol';
 import SearchPropertiesRightCol from './SearchPropertiesRightCol';
 import useSearchFilters, { resolveTab, useSearchOptions } from '../../../utils/useSearchFilters';
 import HeroCarousel from '../../Home/Main/HomeSections/HeroCarousel'
+import SideAds from "../../Common/Ads/SideAds";
 /**
  * Property search page
  * Search bar: tab -> city -> localities (+ similar)
@@ -48,8 +49,10 @@ export default function SearchProperties() {
                 </div>
               </div>
 
+                {/* Filters + results. Ads (Admin -> Ads, "Search Properties") sit left / right of it */}
+                <SideAds page="search_properties" sticky={false} railClass="lg:mt-11">
                 <div className="min-h-screen mt-5">
-                  <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+                  <div className="container py-6">
                     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
                       {/* Sidebar Filters */}
                       <SearchPropertiesLeftCol />
@@ -59,6 +62,7 @@ export default function SearchProperties() {
                     </div>
                   </div>
                 </div>
+                </SideAds>
             </section>
         </>
     )

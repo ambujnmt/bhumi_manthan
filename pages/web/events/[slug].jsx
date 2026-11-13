@@ -8,6 +8,7 @@ export default function EventDetailPage({ event, moreEvents }) {
     return (
         <>
             <Header />
+            {/* Ads of this page sit beside the image + details (inside EventDetail) */}
             <EventDetail key={event.id} event={event} moreEvents={moreEvents} />
             <Footer />
         </>

@@ -8,6 +8,8 @@ import { getMyPlanOrders, getProfile, updateProfile } from "../../../utils/fetch
 import { useUser } from "../../../context/UserContext";
 import { showToast } from "../../../store/toast";
 import MyPlanCard from "./MyPlanCard";
+import ProfilePhotoEditor from "../../Common/ProfilePhotoEditor";
+import BusinessDetailsCard from "../../Common/BusinessDetailsCard";
 
 // Same module keys as backend AdminRole::MODULES
 const MODULE_LABELS = {
@@ -371,12 +373,16 @@ export default function Profile() {
 
               <div className="flex flex-col justify-between gap-5 p-5 sm:flex-row sm:items-center sm:p-7">
                 <div className="flex min-w-0 items-center gap-4">
-                  {/* First letter avatar */}
-                  <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-[#001737] sm:h-20 sm:w-20">
-                    <span className="text-2xl font-bold uppercase text-white sm:text-3xl">
-                      {(profile.name || profile.email || "U").trim().charAt(0)}
-                    </span>
-                  </div>
+                  {/* Photo (or first letter) + camera button to change it -> admin header too */}
+                  <ProfilePhotoEditor
+                    profile={profile}
+                    onProfileUpdated={(user) => {
+                      if (!user) return;
+                      setProfile(user);
+                      updateUser({ ...(loggedInUser || {}), ...user });
+                    }}
+                    avatarClassName="h-16 w-16 bg-[#001737] text-2xl uppercase text-white sm:h-20 sm:w-20 sm:text-3xl"
+                  />
 
                   <div className="min-w-0">
                     <p className="mb-1 text-xs font-medium uppercase tracking-wider text-gray-400">
@@ -508,6 +514,18 @@ export default function Profile() {
                 </div>
               </div>
             </div>
+
+            {/* Seller / broker: address + agency + RERA (edit here) */}
+            {["seller", "broker"].includes(profile.role) && (
+              <BusinessDetailsCard
+                profile={profile}
+                onSaved={(user) => {
+                  if (!user) return;
+                  setProfile(user);
+                  updateUser({ ...(loggedInUser || {}), ...user });
+                }}
+              />
+            )}
 
             {/* ========================================================= */}
             {/* MY PLAN (seller / broker / staff) */}

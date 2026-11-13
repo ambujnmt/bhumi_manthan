@@ -10,7 +10,8 @@ const initialForm = {
     agree: true,
 };
 
-export default function PropertySideForm({ propertyId }) {
+// propertyId: property detail page; projectSlug: project detail page (same form, same admin inbox)
+export default function PropertySideForm({ propertyId = null, projectSlug = null }) {
     const [formData, setFormData] = useState(initialForm);
     const [loading, setLoading] = useState(false);
     const [successMsg, setSuccessMsg] = useState("");
@@ -29,7 +30,11 @@ export default function PropertySideForm({ propertyId }) {
         setErrorMsg("");
 
         const { agree, ...payload } = formData;
-        const res = await submitEnquiryForm({ ...payload, property: propertyId });
+        const res = await submitEnquiryForm({
+            ...payload,
+            ...(propertyId && { property: String(propertyId) }),
+            ...(projectSlug && { project: String(projectSlug) }),
+        });
 
         if (res?.status) {
             setSuccessMsg(res.message);

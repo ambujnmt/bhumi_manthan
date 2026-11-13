@@ -3,11 +3,22 @@
 import React, { useEffect, useState } from "react";
 import { Spinner } from "@heroui/react";
 import { getProfile } from "../../../utils/fetchApi";
+import { useUser } from "../../../context/UserContext";
+import ProfilePhotoEditor from "../../Common/ProfilePhotoEditor";
+import BusinessDetailsCard from "../../Common/BusinessDetailsCard";
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const { user: loggedInUser, updateUser } = useUser();
+
+  // New photo / saved details: page + logged in user (header) update at once
+  const handlePhotoUpdated = (user) => {
+    if (!user) return;
+    setProfile(user);
+    updateUser({ ...(loggedInUser || {}), ...user });
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -86,12 +97,13 @@ export default function Profile() {
         <div className="bg-[#001737] px-6 py-8">
           <div className="flex items-center gap-5">
 
-            {/* Avatar */}
-            <div className="w-20 h-20 rounded-full bg-[#E87722] flex items-center justify-center">
-              <span className="text-white text-3xl font-bold">
-                {profile?.name?.charAt(0)?.toUpperCase()}
-              </span>
-            </div>
+            {/* Avatar: photo (or first letter) + camera button to change it -> header too */}
+            <ProfilePhotoEditor
+              profile={profile}
+              onProfileUpdated={handlePhotoUpdated}
+              avatarClassName="h-20 w-20 bg-[#E87722] text-3xl text-white"
+              removeClassName="text-white/70 hover:text-white"
+            />
 
             <div>
               <h2 className="text-2xl font-bold text-white">
@@ -226,6 +238,9 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {/* Address + agency + RERA (edit here) */}
+      <BusinessDetailsCard profile={profile} onSaved={handlePhotoUpdated} className="mt-6" />
     </div>
   );
 }

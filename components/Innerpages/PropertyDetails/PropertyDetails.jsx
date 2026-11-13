@@ -33,6 +33,7 @@ import { BookAppointmentButton } from "@/modules/appointments";
 import MetaTags from "../../Head/MetaTags";
 import { buildPropertySeo } from "@/utils/seo";
 import { FiCheck, FiCopy } from "react-icons/fi";
+import SideAds from "../../Common/Ads/SideAds";
 
 // "ID: PROP-XXXX [copy]" pill. Clipboard API, with a fallback for http / older browsers.
 // variant "crumb": small breadcrumb pill, whole pill copies on click.
@@ -350,7 +351,8 @@ export default function PropertyDetails({ clientSeo = false }) {
                 {/* // Breadcrumb section */}
 
 
-                {/* Overview Tab */}
+                {/* Overview Tab (image slider + enquiry form). Ads (Admin -> Ads, "Property Detail") sit left / right of it */}
+                <SideAds page="property_detail" sticky={false} railClass="lg:mt-0">
                 <div className="container">
                     <div className="grid grid-cols-12 gap-4">
 
@@ -447,6 +449,7 @@ export default function PropertyDetails({ clientSeo = false }) {
                         {/* // Form section */}
                     </div>
                 </div>
+                </SideAds>
                 {/* // Overview Tab */}
 
 
