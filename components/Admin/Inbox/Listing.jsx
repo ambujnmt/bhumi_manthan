@@ -34,7 +34,32 @@ const SectionTitle = ({ children }) => (
 );
 
 // Property details in enquiry "View" modal
-const PropertyDetails = ({ property, fallbackTitle, eventTitle }) => {
+const PropertyDetails = ({ property, fallbackTitle, eventTitle, project, projectTitle }) => {
+    // Project detail page "Enquire Now" form
+    if (!property && (project || projectTitle)) {
+        return (
+            <div className="mb-5">
+                <SectionTitle>Project Enquiry</SectionTitle>
+                <div className="rounded-lg border border-orange-100 bg-orange-50 px-4 py-3 text-sm text-[#283A86]">
+                    Enquiry for project <span className="font-semibold text-[#1A1F36]">{project?.name || projectTitle}</span>
+                    {project?.builder_name && <> by {project.builder_name}</>}
+                    {project && [project.location, project.city].filter(Boolean).length > 0 && (
+                        <> · {[project.location, project.city].filter(Boolean).join(", ")}</>
+                    )}
+                    {project?.is_active && project.slug && (
+                        <>
+                            {" "}
+                            <NextLink href={`/web/project/projectDetail/${project.slug}`} target="_blank" className="font-semibold text-[#E87722] hover:underline">
+                                View project
+                            </NextLink>
+                        </>
+                    )}
+                    {!project && <> (project no longer available)</>}
+                </div>
+            </div>
+        );
+    }
+
     if (!property && eventTitle) {
         return (
             <div className="mb-5">
@@ -149,6 +174,8 @@ const CONFIG = {
                     ["Attendees", item.attendees],
                 ]
                 : []),
+            // Project detail page enquiry form
+            ...(item.project_title ? [["Project", item.project_title]] : []),
             ["Name", item.name],
             ["Phone", item.phone],
             ["Email", item.email],
@@ -471,7 +498,7 @@ export default function Listing({ type = "contact" }) {
                     // Enquiry: property + enquiry side by side on desktop
                     <div className={isEnquiry ? "grid grid-cols-1 gap-x-6 md:grid-cols-2" : ""}>
                         {isEnquiry && (
-                            <PropertyDetails property={viewItem.property} fallbackTitle={viewItem.property_title} eventTitle={viewItem.event_title} />
+                            <PropertyDetails property={viewItem.property} fallbackTitle={viewItem.property_title} eventTitle={viewItem.event_title} project={viewItem.project} projectTitle={viewItem.project_title} />
                         )}
 
                         <div>

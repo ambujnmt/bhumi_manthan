@@ -32,6 +32,7 @@ import {
     parseEventDate,
     splitEvents,
 } from "./eventUtils";
+import SideAds from "../../Common/Ads/SideAds";
 
 const NAVY = "#12305F";
 
@@ -317,18 +318,23 @@ export default function EventList({ initialEvents = null, initialBanner }) {
         return [...map.entries()];
     }, [events]);
 
-    // Upcoming order: LIVE first, then nearby (nearest first), then by date
+    // Upcoming order (location known): nearby LIVE, nearby (nearest first), other LIVE, rest by date.
+    // Location not known -> LIVE first, then by date (as before).
     const all = useMemo(() => {
         const withDistance = events.map((event) =>
             distances[event.id] != null ? { ...event, distance_km: distances[event.id] } : event
         );
         const split = splitEvents(withDistance);
 
-        const rank = (event) => (now && isEventLive(event, now) ? 0 : event.distance_km != null ? 1 : 2);
+        const rank = (event) => {
+            const live = Boolean(now && isEventLive(event, now));
+            if (event.distance_km != null) return live ? 0 : 1;
+            return live ? 2 : 3;
+        };
 
-        // Array sort is stable -> same rank keeps date order
+        // Array sort is stable -> same rank keeps date order; nearby ones nearest first
         split.upcoming = [...split.upcoming].sort(
-            (a, b) => rank(a) - rank(b) || (rank(a) === 1 ? a.distance_km - b.distance_km : 0)
+            (a, b) => rank(a) - rank(b) || (rank(a) <= 1 ? a.distance_km - b.distance_km : 0)
         );
 
         return split;
@@ -344,18 +350,26 @@ export default function EventList({ initialEvents = null, initialBanner }) {
             [event.title, event.organizer_name, event.brand_name, event.location, event.city, event.builders_attending]
                 .some((value) => String(value || "").toLowerCase().includes(term)));
 
-    const upcoming = all.upcoming.filter(matches);
+    // Events within 50 km of the visitor (location from IP), nearest first
+    const nearbyEvents = all.upcoming.filter((event) => event.distance_km != null);
+
+    // Upcoming tab: events near visitor -> only those (far cities hidden).
+    // Search / city / type filter -> all matching events, so other cities can still be found.
+    // None nearby / location unknown -> all events (as before).
+    const upcoming = (filtering || nearbyEvents.length === 0 ? all.upcoming : nearbyEvents).filter(matches);
     const past = all.past.filter(matches);
 
-    // Big cards: all LIVE events (or the next event if none is live) - only while not filtering
+    // Big cards - only while not filtering:
+    // events near visitor -> nearby LIVE events (or the nearest event if none is live);
+    // none nearby / location unknown -> all LIVE events (or the next event if none is live)
     const liveEvents = now ? all.upcoming.filter((event) => isEventLive(event, now)) : [];
+    const nearbyLive = nearbyEvents.filter((event) => liveEvents.includes(event));
 
-    const featuredList =
-        !filtering && tab === "upcoming"
-            ? liveEvents.length > 0
-                ? liveEvents
-                : all.upcoming.slice(0, 1)
-            : [];
+    const featuredSource = nearbyEvents.length > 0
+        ? (nearbyLive.length > 0 ? nearbyLive : nearbyEvents.slice(0, 1))
+        : (liveEvents.length > 0 ? liveEvents : all.upcoming.slice(0, 1));
+
+    const featuredList = !filtering && tab === "upcoming" ? featuredSource : [];
 
     const list = (tab === "upcoming" ? upcoming : past).filter((event) => !featuredList.includes(event));
 
@@ -522,13 +536,16 @@ export default function EventList({ initialEvents = null, initialBanner }) {
                             )}
                         </div>
 
-                        {/* Featured: all LIVE events (or next event if none live) */}
+                        {/* Featured: all LIVE events (or next event if none live).
+                            Ads (Admin -> Ads, "Events") sit left / right of this big card */}
                         {featuredList.length > 0 && (
-                            <div className="mt-6 space-y-6">
-                                {featuredList.map((event, index) => (
-                                    <FeaturedEvent key={event.id} event={event} index={index} />
-                                ))}
-                            </div>
+                            <SideAds page="events" sticky={false} railClass="lg:mt-6" wrapClass="" mobileGap="mt-6">
+                                <div className="mt-6 space-y-6">
+                                    {featuredList.map((event, index) => (
+                                        <FeaturedEvent key={event.id} event={event} index={index} />
+                                    ))}
+                                </div>
+                            </SideAds>
                         )}
 
                         {list.length > 0 ? (

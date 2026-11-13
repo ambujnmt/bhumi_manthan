@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import NextLink from "next/link";
 import { useRouter } from "next/router";
-import { FiCalendar, FiChevronRight, FiClock, FiGrid, FiHeart, FiLogOut, FiMenu, FiMessageCircle, FiSend, FiUser, FiX } from "react-icons/fi";
+import { FiCalendar, FiChevronRight, FiClock, FiGrid, FiHeart, FiLogOut, FiMenu, FiMessageCircle, FiSend, FiUser, FiUsers, FiX } from "react-icons/fi";
 import Header from "../../Home/Menu/Header";
 import PrivateRoute from "../../PrivateRoute/PrivateRoute";
 import { useUser } from "../../../context/UserContext";
@@ -9,6 +9,8 @@ import { useWishlist } from "../../../context/WishlistContext";
 import { subscribeChatUnread } from "../../../utils/firebaseChat";
 import { getMyEnquiryCount } from "../../../utils/fetchApi";
 import LogoutConfirm from "../../Common/LogoutConfirm";
+import SideAds from "../../Common/Ads/SideAds";
+import UserAvatar from "../../Common/UserAvatar";
 
 const Badge = ({ count }) =>
   count > 0 ? (
@@ -63,6 +65,7 @@ function DashboardShell({ children }) {
     { label: "My Enquiries", href: "/user/myEnquiries", icon: FiSend, active: router.pathname === "/user/myEnquiries", count: enquiryCount },
     { label: "Recent View", href: "/user/recentView", icon: FiClock, active: router.pathname === "/user/recentView" },
     { label: "My Appointments", href: "/user/appointments", icon: FiCalendar, active: router.pathname === "/user/appointments" },
+    { label: "Brokers & Sellers", href: "/user/nearbyAgents", icon: FiUsers, active: router.pathname === "/user/nearbyAgents" },
   ];
 
   const handleLogout = () => {
@@ -127,9 +130,7 @@ function DashboardShell({ children }) {
             } lg:static lg:z-auto lg:w-full lg:max-w-none lg:min-h-0 lg:flex-1 lg:translate-x-0 lg:shadow-none lg:transition-none`}
           >
             <div className="flex items-center gap-3 border-b border-gray-100 p-[16px]">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--primary-color)] text-lg font-bold text-white" aria-hidden="true">
-                {user.name?.trim().charAt(0).toUpperCase() || "U"}
-              </span>
+              <UserAvatar user={user} className="h-11 w-11 bg-[var(--primary-color)] text-lg text-white" />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-bold text-[var(--secondary-color)]">{user.name}</div>
                 {user.email && <div className="truncate text-xs text-[#62748E]">{user.email}</div>}
@@ -186,7 +187,9 @@ function DashboardShell({ children }) {
           </div>
         </aside>
 
-        <div data-dashboard-content className={`min-h-0 min-w-0 w-full flex-1 px-[16px] pb-[24px] pt-[20px] lg:px-[24px] lg:pt-[24px] ${isChatPage ? "overflow-hidden" : "overflow-y-auto"}`}>{children}</div>
+        <div data-dashboard-content className={`min-h-0 min-w-0 w-full flex-1 px-[16px] pb-[24px] pt-[20px] lg:px-[24px] lg:pt-[24px] ${isChatPage ? "overflow-hidden" : "overflow-y-auto"}`}>{/* Side ads (Admin -> Ads, Customer Dashboard). Chat keeps the full width */}
+          {isChatPage ? children : <SideAds page="user_dashboard" top="top-0" wrapClass="">{children}</SideAds>}
+        </div>
       </div>
 
       <LogoutConfirm isOpen={logoutOpen} onClose={() => setLogoutOpen(false)} onConfirm={handleLogout} />

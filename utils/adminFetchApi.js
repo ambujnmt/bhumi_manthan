@@ -1004,6 +1004,37 @@ export const saveYoutuberVideo = async (formData, id = null) => {
   return data;
 };
 
+// bhumi-admin-ads (website ads, any placement) -> { ads, placements }
+export const getAdminAds = () => adminJsonRequest("ads/all");
+
+export const deleteAd = (id) => adminJsonRequest(`ads/delete/${id}`, "DELETE");
+
+// formData: placement, one of image | video | video_url, sort_order, is_active
+export const saveAd = async (formData, id = null) => {
+  const token = Cookies.get("accessToken") || Cookies.get("token");
+
+  const response = await fetch(`${BASE_URL}admin/ads/${id ? `update/${id}` : "add"}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data.status !== true) {
+    // Laravel 413 / PHP upload limit -> no JSON
+    if (response.status === 413) throw new Error("File is too large to upload.");
+
+    const validationErrors = data.errors ? [...new Set(Object.values(data.errors).flat())].join(" ") : "";
+    throw new Error(validationErrors || data.message || "Something went wrong.");
+  }
+
+  return data;
+};
+
 // bhumi-admin-buyer-export
 // Cities that have buyers (profile city + property activity), with counts
 export const getBuyerCities = () => adminJsonRequest("buyers/cities");

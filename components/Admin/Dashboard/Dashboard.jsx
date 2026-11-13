@@ -649,7 +649,7 @@ export default function Dashboard() {
                     </div>
 
                     <p className="truncate text-[11px] leading-4 text-gray-400">
-                      {enquiry.property?.title || enquiry.property_title || "General enquiry"}
+                      {enquiry.property?.title || enquiry.property_title || enquiry.project_title || "General enquiry"}
                     </p>
 
                     <p className="text-[10px] text-gray-400">

@@ -1,5 +1,5 @@
 import NextLink from "next/link";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     FaArrowLeft,
     FaBuilding,
@@ -11,6 +11,7 @@ import {
     FaMapMarkerAlt,
     FaUsers,
 } from "react-icons/fa";
+import { FaChevronRight, FaHome } from "react-icons/fa";
 import EventCard from "./EventCard";
 import EventRegistrationForm from "./EventRegistrationForm";
 import {
@@ -21,9 +22,44 @@ import {
     isUpcomingEvent,
     mapUrl,
 } from "./eventUtils";
+import SideAds from "../../Common/Ads/SideAds";
+import useUserLocation from "../../../utils/useUserLocation";
+import { getEvents } from "../../../utils/fetchApi";
 
-export default function EventDetail({ event, moreEvents = [] }) {
+export default function EventDetail({ event, moreEvents: serverMoreEvents = [] }) {
     const upcoming = isUpcomingEvent(event);
+
+    // More Events: visitor location (IP) known and events within 50 km -> only those, nearest first
+    // (same as the events page). None nearby / location unknown -> list from the server (as before).
+    const { ready, location } = useUserLocation();
+    const [nearbyEvents, setNearbyEvents] = useState(null);
+
+    useEffect(() => {
+        if (!ready || !location) return;
+
+        let active = true;
+
+        getEvents(50, location)
+            .then((res) => {
+                if (!active) return;
+
+                const nearby = (res?.data?.events || []).filter((item) => item.distance_km != null);
+
+                // Nothing near the visitor -> keep the server list
+                if (nearby.length === 0) return;
+
+                // Events near the visitor -> only those (other than this one); far cities hidden
+                setNearbyEvents(nearby.filter((item) => item.id !== event.id).slice(0, 3));
+            })
+            .catch(() => {});
+
+        return () => {
+            active = false;
+        };
+    }, [ready, location, event.id]);
+
+    // null = not checked / nothing nearby -> server list; [] = only this event is nearby -> section hidden
+    const moreEvents = nearbyEvents ?? serverMoreEvents;
     const images = event.images?.length ? event.images : event.image ? [{ url: event.image }] : [];
     const [activeImage, setActiveImage] = useState(0);
 
@@ -52,40 +88,99 @@ export default function EventDetail({ event, moreEvents = [] }) {
     ].filter((item) => item.value);
 
     return (
-        <section className="container py-10">
-            <NextLink
-                href="/web/events"
-                className="inline-flex items-center gap-2 no-underline text-[14px] font-semibold text-[var(--text-color2)] hover:text-[var(--primary-color)] transition-colors"
-            >
-                <FaArrowLeft size={12} /> All Events
-            </NextLink>
+        <section className="container pb-10">
+            {/* Breadcrumb (same look as property / project detail) */}
+            <div className="flex flex-col gap-3 py-[40px] sm:flex-row sm:items-center sm:justify-between">
+                <nav aria-label="Breadcrumb" className="min-w-0">
+                    <ol className="mb-0 flex flex-wrap items-center gap-1.5 pl-0 text-[13px]">
+                        {/* Home */}
+                        <li>
+                            <NextLink
+                                href="/"
+                                className="group flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 font-medium text-[#62748E] no-underline shadow-sm transition hover:border-[var(--primary-color)] hover:text-[var(--primary-color)]"
+                            >
+                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--secondary-color)]/10 text-[var(--secondary-color)] transition group-hover:bg-[var(--primary-color)]/10 group-hover:text-[var(--primary-color)]">
+                                    <FaHome className="text-[10px]" />
+                                </span>
+                                Home
+                            </NextLink>
+                        </li>
 
-            <div className="mt-5 grid grid-cols-12 gap-6">
+                        <li aria-hidden="true">
+                            <FaChevronRight className="text-[9px] text-gray-400" />
+                        </li>
+
+                        {/* Events */}
+                        <li>
+                            <NextLink
+                                href="/web/events"
+                                className="group flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 font-medium text-[#62748E] no-underline shadow-sm transition hover:border-[var(--primary-color)] hover:text-[var(--primary-color)]"
+                            >
+                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--secondary-color)]/10 text-[var(--secondary-color)] transition group-hover:bg-[var(--primary-color)]/10 group-hover:text-[var(--primary-color)]">
+                                    <FaCalendarAlt className="text-[10px]" />
+                                </span>
+                                Events
+                            </NextLink>
+                        </li>
+
+                        <li aria-hidden="true">
+                            <FaChevronRight className="text-[9px] text-gray-400" />
+                        </li>
+
+                        {/* Current Page */}
+                        <li aria-current="page" className="min-w-0">
+                            <span className="flex items-center gap-2 rounded-full bg-[var(--secondary-color)] px-3.5 py-1.5 font-semibold text-white shadow-md">
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--primary-color)] text-white">
+                                    <FaUsers className="text-[11px]" />
+                                </span>
+                                <span className="truncate">{event.title}</span>
+                            </span>
+                        </li>
+                    </ol>
+                </nav>
+
+                {/* Back Button */}
+                <NextLink
+                    href="/web/events"
+                    className="inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-[var(--primary-color)] px-4 py-1.5 text-[13px] font-semibold text-[var(--primary-color)] no-underline transition hover:bg-[var(--primary-color)] hover:text-white"
+                >
+                    <FaArrowLeft className="text-[11px]" />
+                    Back to Events
+                </NextLink>
+            </div>
+
+            {/* Accent line */}
+            <div className="-mt-6 mb-6 h-[3px] w-full rounded-full bg-gradient-to-r from-[var(--primary-color)] via-[var(--primary-color)]/30 to-transparent" />
+
+            <div className="grid grid-cols-12 gap-6">
                 {/* Main content */}
                 <div className="col-span-12 lg:col-span-8">
+                    {/* Event image. Ads (Admin -> Ads, "Event Detail") sit left / right of it */}
                     {images.length > 0 && (
-                        <div>
-                            <img
-                                src={images[activeImage]?.url}
-                                alt={event.title}
-                                className="w-full h-[260px] sm:h-[420px] rounded-2xl object-cover shadow-md"
-                            />
+                        <SideAds page="event_detail" sticky={false} railClass="lg:mt-0" wrapClass="">
+                            <div>
+                                <img
+                                    src={images[activeImage]?.url}
+                                    alt={event.title}
+                                    className="w-full h-[260px] sm:h-[420px] rounded-2xl object-cover shadow-md"
+                                />
 
-                            {images.length > 1 && (
-                                <div className="mt-3 flex gap-2 overflow-x-auto">
-                                    {images.map((image, index) => (
-                                        <button
-                                            key={image.url}
-                                            type="button"
-                                            onClick={() => setActiveImage(index)}
-                                            className={`h-16 w-24 shrink-0 overflow-hidden rounded-lg border-2 ${index === activeImage ? "border-[var(--primary-color)]" : "border-transparent"}`}
-                                        >
-                                            <img src={image.url} alt="" className="h-full w-full object-cover" />
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                                {images.length > 1 && (
+                                    <div className="mt-3 flex gap-2 overflow-x-auto">
+                                        {images.map((image, index) => (
+                                            <button
+                                                key={image.url}
+                                                type="button"
+                                                onClick={() => setActiveImage(index)}
+                                                className={`h-16 w-24 shrink-0 overflow-hidden rounded-lg border-2 ${index === activeImage ? "border-[var(--primary-color)]" : "border-transparent"}`}
+                                            >
+                                                <img src={image.url} alt="" className="h-full w-full object-cover" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </SideAds>
                     )}
 
                     <div className="mt-6 flex flex-wrap items-center gap-2">

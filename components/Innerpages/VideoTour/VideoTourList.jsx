@@ -5,6 +5,7 @@ import Link from "next/link";
 import { FaChevronRight, FaHome, FaPlay } from "react-icons/fa";
 import { VideoCard } from "../../Home/Main/HomeSections/YoutuberVideos";
 import { getYoutuberVideos } from "../../../utils/fetchApi";
+import SideAds from "../../Common/Ads/SideAds";
 
 /**
  * Bhumi Manthan Video Tour page (footer -> Video Tour)
@@ -48,6 +49,8 @@ export default function VideoTourList({ initialVideos = null }) {
                 </div>
             </div>
 
+            {/* Videos. Ads (Admin -> Ads, "Video Tour") sit left / right of it (heading band keeps full width) */}
+            <SideAds page="video_tour" sticky={false} railClass="lg:mt-10">
             <div className="container mt-10">
                 {loading ? (
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
@@ -85,6 +88,7 @@ export default function VideoTourList({ initialVideos = null }) {
                     </div>
                 )}
             </div>
+            </SideAds>
         </section>
     );
 }

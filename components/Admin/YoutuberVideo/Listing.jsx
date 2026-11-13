@@ -2,13 +2,14 @@
 
 import React, { useEffect, useState } from "react";
 import { Spinner, Tooltip } from "@heroui/react";
-import { FaPen } from "react-icons/fa";
+import { FaPen, FaPlay } from "react-icons/fa";
 import { FaRegTrashCan } from "react-icons/fa6";
 import { FiPlus, FiX } from "react-icons/fi";
 import { actionButtonClass } from "../actionButtonClass";
 import PropertyVideoField, { appendVideo, emptyVideo, videoFromProperty } from "../PropertyManagement/PropertyVideoField";
 import PageTitle from "../../Breadcrumb/PageTitle";
 import Tmodal from "../../Tmodal/Tmodal";
+import PropertyVideoPlayer, { resolveVideo } from "../../Innerpages/PropertyDetails/PropertyVideo";
 import { showToast } from "../../../store/toast";
 import {
     deleteYoutuberVideo,
@@ -19,13 +20,45 @@ import { useAdminPermission } from "../../../utils/adminPermissions";
 
 const MAX_THUMBNAIL_MB = 2;
 
-// Video categories (same values as backend YoutuberVideo::CATEGORIES)
-const CATEGORIES = [
-    { value: "tour", label: "Tour Videos" },
-    { value: "property", label: "Properties Videos" },
-];
+const YOUTUBE_EMBED = /youtube-nocookie\.com\/embed\/([\w-]+)/;
 
-const categoryLabel = (value) => CATEGORIES.find((item) => item.value === value)?.label || "Tour Videos";
+// Admin thumbnail, else YouTube picture (uploaded file -> its first frame, see VideoPreview)
+const thumbnailOf = (item, resolved) => {
+    if (item.thumbnail) return item.thumbnail;
+
+    const youtubeId = resolved?.src.match(YOUTUBE_EMBED)?.[1];
+    return youtubeId ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` : null;
+};
+
+// Small preview in the list, click -> plays in a popup
+function VideoPreview({ item, onPlay }) {
+    const resolved = resolveVideo(item);
+    const thumbnail = thumbnailOf(item, resolved);
+
+    if (!resolved) return <span className="text-gray-400">-</span>;
+
+    return (
+        <button
+            type="button"
+            onClick={() => (resolved.type === "link" ? window.open(resolved.src, "_blank", "noopener,noreferrer") : onPlay(resolved))}
+            aria-label="Play video"
+            className="group relative block aspect-video w-[112px] overflow-hidden rounded-md bg-black"
+        >
+            {thumbnail ? (
+                <img src={thumbnail} alt="" className="h-full w-full object-cover" />
+            ) : resolved.type === "file" ? (
+                // #t=0.1 -> browser shows the first frame as the picture
+                <video src={`${resolved.src}#t=0.1`} preload="metadata" muted playsInline className="h-full w-full object-cover" />
+            ) : null}
+
+            <span className="absolute inset-0 flex items-center justify-center bg-black/25 transition group-hover:bg-black/40">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-[#E87722] shadow transition group-hover:scale-110">
+                    <FaPlay size={10} className="ml-0.5" />
+                </span>
+            </span>
+        </button>
+    );
+}
 
 const initialForm = {
     category: "tour",
@@ -52,18 +85,8 @@ export default function Listing() {
     const [videos, setVideos] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Category tab: "all" | "tour" | "property"
-    const [activeCategory, setActiveCategory] = useState("all");
-    const categoryOf = (item) => item.category || "tour";
-    const visibleVideos =
-        activeCategory === "all" ? videos : videos.filter((item) => categoryOf(item) === activeCategory);
-    const tabs = [
-        { value: "all", label: "All Videos", count: videos.length },
-        ...CATEGORIES.map((item) => ({
-            ...item,
-            count: videos.filter((video) => categoryOf(video) === item.value).length,
-        })),
-    ];
+    // Video playing in the popup ({ type, src })
+    const [playing, setPlaying] = useState(null);
 
     // Add / Edit Modal
     const [formOpen, setFormOpen] = useState(false);
@@ -106,7 +129,7 @@ export default function Listing() {
                       sort_order: String(item.sort_order ?? 0),
                       is_active: !!item.is_active,
                   }
-                : { ...initialForm, category: activeCategory === "all" ? "tour" : activeCategory }
+                : initialForm
         );
         setVideo(item ? videoFromProperty(item) : emptyVideo());
         setThumbnailFile(null);
@@ -150,11 +173,6 @@ export default function Listing() {
     };
 
     const handleSave = async () => {
-        if (!form.youtuber_name.trim()) {
-            setFormError("YouTuber name is required.");
-            return;
-        }
-
         if (!hasVideo(video)) {
             setFormError("Add a video file or a video link.");
             return;
@@ -166,9 +184,9 @@ export default function Listing() {
         try {
             const formData = new FormData();
 
-            formData.append("category", form.category);
-            formData.append("youtuber_name", form.youtuber_name.trim());
-            formData.append("title", form.title.trim());
+            // Category / YouTuber name / title are not in the form any more:
+            // new video -> category of the open tab; update -> saved values stay as they are
+            if (!editing) formData.append("category", form.category);
             formData.append("sort_order", form.sort_order || "0");
             formData.append("is_active", form.is_active ? "1" : "0");
             appendVideo(formData, video);
@@ -241,36 +259,9 @@ export default function Listing() {
             />
 
             <div className="mb-4 mt-6 flex flex-wrap items-center justify-between gap-3">
-                {/* Category tabs */}
-                <div role="tablist" aria-label="Video category" className="flex flex-wrap gap-2">
-                    {tabs.map((tab) => {
-                        const active = activeCategory === tab.value;
-
-                        return (
-                            <button
-                                key={tab.value}
-                                type="button"
-                                role="tab"
-                                aria-selected={active}
-                                onClick={() => setActiveCategory(tab.value)}
-                                className={`flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition ${
-                                    active
-                                        ? "bg-[#001737] text-white shadow-sm"
-                                        : "border border-gray-300 bg-white text-[#283A86] hover:border-[#E87722] hover:text-[#E87722]"
-                                }`}
-                            >
-                                <span>{tab.label}</span>
-                                <span
-                                    className={`rounded-full px-2 py-0.5 text-xs ${
-                                        active ? "bg-white/20 text-white" : "bg-gray-100 text-[#62748E]"
-                                    }`}
-                                >
-                                    {tab.count}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
+                <p className="mb-0 text-sm font-semibold text-[#283A86]">
+                    {loading ? "" : `${videos.length} ${videos.length === 1 ? "video" : "videos"}`}
+                </p>
 
                 {can("youtuber_videos.create") && (
                     <button
@@ -288,9 +279,6 @@ export default function Listing() {
                 <table className="w-full text-sm">
                     <thead className="bg-gray-100">
                         <tr>
-                            <th className="whitespace-nowrap px-4 py-3 text-left">YouTuber</th>
-                            <th className="whitespace-nowrap px-4 py-3 text-left">Category</th>
-                            <th className="whitespace-nowrap px-4 py-3 text-left">Title</th>
                             <th className="whitespace-nowrap px-4 py-3 text-left">Video</th>
                             <th className="whitespace-nowrap px-4 py-3 text-left">Order</th>
                             <th className="whitespace-nowrap px-4 py-3 text-left">Status</th>
@@ -301,37 +289,17 @@ export default function Listing() {
                     <tbody>
                         {loading ? (
                             <tr>
-                                <td colSpan="7">
+                                <td colSpan="4">
                                     <div className="flex items-center justify-center py-16">
                                         <Spinner size="md" />
                                     </div>
                                 </td>
                             </tr>
-                        ) : visibleVideos.length > 0 ? (
-                            visibleVideos.map((item) => (
+                        ) : videos.length > 0 ? (
+                            videos.map((item) => (
                                 <tr key={item.id} className="border-t">
-                                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-[#1A1F36]">{item.youtuber_name}</td>
-                                    <td className="whitespace-nowrap px-4 py-3">
-                                        <span
-                                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                                                categoryOf(item) === "property"
-                                                    ? "bg-blue-100 text-blue-700"
-                                                    : "bg-orange-100 text-[#c25e12]"
-                                            }`}
-                                        >
-                                            {categoryLabel(categoryOf(item))}
-                                        </span>
-                                    </td>
-                                    <td className="max-w-[280px] truncate px-4 py-3">{item.title || "-"}</td>
-                                    <td className="whitespace-nowrap px-4 py-3">
-                                        <a
-                                            href={item.video_file || item.video_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="font-medium text-[#E87722] no-underline hover:no-underline"
-                                        >
-                                            {item.video_file ? "Uploaded file" : "Link"}
-                                        </a>
+                                    <td className="px-4 py-2">
+                                        <VideoPreview item={item} onPlay={setPlaying} />
                                     </td>
                                     <td className="whitespace-nowrap px-4 py-3">{item.sort_order}</td>
                                     <td className="whitespace-nowrap px-4 py-3">
@@ -354,7 +322,7 @@ export default function Listing() {
                                                 <Tooltip content="Update Video">
                                                     <button
                                                         type="button"
-                                                        aria-label={`Update video of ${item.youtuber_name}`}
+                                                        aria-label={`Update video ${item.title || item.youtuber_name || item.id}`}
                                                         onClick={() => openForm(item)}
                                                         className={actionButtonClass}
                                                     >
@@ -367,7 +335,7 @@ export default function Listing() {
                                                 <Tooltip content="Delete Video">
                                                     <button
                                                         type="button"
-                                                        aria-label={`Delete video of ${item.youtuber_name}`}
+                                                        aria-label={`Delete video ${item.title || item.youtuber_name || item.id}`}
                                                         onClick={() => setDeleteTarget(item)}
                                                         className={actionButtonClass}
                                                     >
@@ -381,16 +349,23 @@ export default function Listing() {
                             ))
                         ) : (
                             <tr>
-                                <td colSpan="7" className="py-6 text-center text-gray-500">
-                                    {activeCategory === "all"
-                                        ? "No videos yet. The home page section stays hidden until one is added."
-                                        : `No ${categoryLabel(activeCategory).toLowerCase()} yet.`}
+                                <td colSpan="4" className="py-6 text-center text-gray-500">
+                                    No videos yet. The home page section stays hidden until one is added.
                                 </td>
                             </tr>
                         )}
                     </tbody>
                 </table>
             </div>
+
+            {/* Play Video Modal */}
+            <Tmodal isOpen={Boolean(playing)} onClose={() => setPlaying(null)} size="3xl" title="Video" noScroll>
+                {playing && (
+                    <div className="relative mb-3 aspect-video w-full">
+                        <PropertyVideoPlayer video={playing} title="YouTuber video" onClose={() => setPlaying(null)} />
+                    </div>
+                )}
+            </Tmodal>
 
             {/* Add / Edit Modal */}
             <Tmodal
@@ -433,53 +408,6 @@ export default function Listing() {
                             {formError}
                         </p>
                     )}
-
-                    <div>
-                        <label htmlFor="video_category" className={labelClass}>
-                            Category <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                            id="video_category"
-                            name="category"
-                            value={form.category}
-                            onChange={handleChange}
-                            className={inputClass}
-                        >
-                            {CATEGORIES.map((item) => (
-                                <option key={item.value} value={item.value}>
-                                    {item.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label htmlFor="youtuber_name" className={labelClass}>
-                            YouTuber Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            id="youtuber_name"
-                            name="youtuber_name"
-                            maxLength={255}
-                            value={form.youtuber_name}
-                            onChange={handleChange}
-                            placeholder="Channel or creator name"
-                            className={inputClass}
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="video_title" className={labelClass}>Video Title</label>
-                        <input
-                            id="video_title"
-                            name="title"
-                            maxLength={255}
-                            value={form.title}
-                            onChange={handleChange}
-                            placeholder="Property tour in Noida"
-                            className={inputClass}
-                        />
-                    </div>
 
                     <PropertyVideoField
                         value={video}
@@ -583,8 +511,10 @@ export default function Listing() {
                 }
             >
                 <p className="text-gray-600">
-                    Are you sure you want to delete the video of{" "}
-                    <span className="font-semibold text-gray-900">{deleteTarget?.youtuber_name}</span>?
+                    Are you sure you want to delete{" "}
+                    <span className="font-semibold text-gray-900">
+                        {deleteTarget?.title || (deleteTarget?.youtuber_name ? `the video of ${deleteTarget.youtuber_name}` : "this video")}
+                    </span>?
                     An uploaded video file and thumbnail will also be removed.
                 </p>
             </Tmodal>

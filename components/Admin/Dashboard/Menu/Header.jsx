@@ -55,6 +55,7 @@ export default function Header({ menuOpen, toggleMenu }) {
   const userRole = (user?.role || "super_admin").replace(/_/g, " ");
 
   const userAvatar =
+    user?.profile_image ||
     user?.avatar ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(
       userName

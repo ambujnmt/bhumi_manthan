@@ -49,11 +49,11 @@ export default function NewProjects({
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
                 <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-[var(--text-color1)]">
+                    <h2 className="mb-0 text-xl sm:text-2xl font-bold text-[var(--text-color1)]">
                         New Launch &amp; Premium Projects
                     </h2>
 
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="mb-0 mt-1 text-sm text-gray-500">
                         {nearby
                             ? "Newly launched projects closest to your location"
                             : "Explore newly introduced landmark developments from India's most trusted real estate builders"}
@@ -106,18 +106,18 @@ export default function NewProjects({
 
                                 {/* Builder Name */}
                                 {project.builder_name && (
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-color2)] mb-1">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-color2)] mb-0.5">
                                         {project.builder_name}
                                     </p>
                                 )}
 
                                 {/* Project Name */}
-                                <h3 className="text-[18px] font-bold text-[var(--text-color1)] group-hover:text-[var(--primary-color)] transition-colors">
+                                <h3 className="mb-0 text-[18px] font-bold text-[var(--text-color1)] group-hover:text-[var(--primary-color)] transition-colors">
                                     {project.name}
                                 </h3>
 
                                 {/* Location */}
-                                <p className="text-[13px] text-[var(--text-color2)] mt-0.5">
+                                <p className="mb-0 mt-0.5 text-[13px] text-[var(--text-color2)]">
                                     {[
                                         project.location,
                                         project.city,
@@ -128,14 +128,14 @@ export default function NewProjects({
 
                                 {/* Starting Price */}
                                 {priceText(project) && (
-                                    <p className="text-[14px] font-bold text-[var(--primary-color)] mt-2">
+                                    <p className="mb-0 mt-1.5 text-[14px] font-bold text-[var(--primary-color)]">
                                         {priceText(project)}
                                     </p>
                                 )}
 
                                 {/* Configuration */}
                                 {project.configuration && (
-                                    <p className="text-[11px] text-[var(--text-color2)] mt-0.5">
+                                    <p className="mb-0 mt-0.5 text-[11px] text-[var(--text-color2)]">
                                         {project.configuration}
                                     </p>
                                 )}

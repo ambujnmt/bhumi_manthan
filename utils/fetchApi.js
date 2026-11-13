@@ -288,8 +288,15 @@ export const getYoutuberVideos = async () => {
 };
 
 // bhumi-project-list (frontend - New Launch & Premium Projects)
-export const getProjects = async (limit = 5) => {
-  const response = await fetch(`${BASE_URL}projects?limit=${limit}`, {
+// filters (optional): { launch_status, builder, city }
+export const getProjects = async (limit = 5, filters = {}) => {
+  const params = new URLSearchParams({ limit: String(limit) });
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, String(value));
+  });
+
+  const response = await fetch(`${BASE_URL}projects?${params.toString()}`, {
     method: "GET",
     headers: {
       Accept: "application/json",
@@ -1297,3 +1304,33 @@ export const lookupPropertyById = async (q, signal) => {
 
   return data.data?.properties || [];
 };
+
+// Profile photo: upload (jpg / png / webp, max 2 MB) -> { data: { user } } with profile_image URL
+const profilePhotoRequest = async (path, body) => {
+  const token = Cookies.get("accessToken");
+
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body,
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || !data?.status) {
+    throw new Error(data?.message || "Unable to update profile photo.");
+  }
+
+  return data;
+};
+
+export const uploadProfilePhoto = (file) => {
+  const formData = new FormData();
+  formData.append("image", file);
+  return profilePhotoRequest("profile/photo", formData);
+};
+
+export const removeProfilePhoto = () => profilePhotoRequest("profile/photo/remove");
