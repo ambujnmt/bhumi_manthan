@@ -16,7 +16,9 @@ import {
 import { FaTimesCircle } from "react-icons/fa";
 import { registerUser } from "@/utils/fetchApi";
 
-export default function Signup() {
+// modal: inside the header "Register" popup (components/Common/RegisterModal) - no full-page background.
+// onLogin: "Login" link action in the popup (else it opens /login). onDone: called when going to OTP page.
+export default function Signup({ modal = false, onLogin = null, onDone = null }) {
   const router = useRouter();
 
   const [form, setForm] = useState({
@@ -240,6 +242,7 @@ export default function Signup() {
       // Go to OTP page
       setTimeout(() => {
         router.push("/verifyOtp");
+        onDone?.();
       }, 1000);
 
     } catch (error) {
@@ -323,7 +326,13 @@ export default function Signup() {
   );
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8 bg-gradient-to-br from-[#f8fafc] via-[#eef2f7] to-[#f8fafc] font-['Inter']">
+    <div
+      className={
+        modal
+          ? "w-full font-['Inter']"
+          : "min-h-screen w-full flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8 bg-gradient-to-br from-[#f8fafc] via-[#eef2f7] to-[#f8fafc] font-['Inter']"
+      }
+    >
 
       {/* ==========================================
           MAIN CARD
@@ -750,12 +759,22 @@ export default function Signup() {
 
               Already have an account?{" "}
 
-              <Link
-                href="/login"
-                className="text-[#E87722] font-semibold hover:underline"
-              >
-                Login
-              </Link>
+              {onLogin ? (
+                <button
+                  type="button"
+                  onClick={onLogin}
+                  className="text-[#E87722] font-semibold hover:underline"
+                >
+                  Login
+                </button>
+              ) : (
+                <Link
+                  href="/login"
+                  className="text-[#E87722] font-semibold hover:underline"
+                >
+                  Login
+                </Link>
+              )}
 
             </p>
 
@@ -767,7 +786,7 @@ export default function Signup() {
           TERMS MODAL
       ========================================== */}
       {showTermsModal && (
-        <div className="fixed inset-0 bg-[#001737]/70 flex justify-center items-center z-50 px-4">
+        <div className="fixed inset-0 bg-[#001737]/70 flex justify-center items-center z-[10000] px-4">
 
           <div className="bg-white w-full max-w-[650px] max-h-[85vh] rounded-xl shadow-2xl relative overflow-hidden">
 
