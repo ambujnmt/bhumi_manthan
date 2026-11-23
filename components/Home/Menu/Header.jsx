@@ -342,7 +342,8 @@ const handleLogout = () => {
 
   setMobileOpen(false);
 
-  router.push("/login");
+  // Home page with login popup open (StickyLoginForm reads ?login=1)
+  router.push("/?login=1");
 };
   return (
     <>

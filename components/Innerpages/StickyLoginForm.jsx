@@ -1,7 +1,8 @@
 "use client";
 import NextLink from "next/link";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   FiMail,
   FiLock,
@@ -16,11 +17,14 @@ import {
   FiPlusCircle,
 } from "react-icons/fi";
 import { Spinner } from "@heroui/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { loginUser } from "@/utils/fetchApi";
 import { useUser } from "../../context/UserContext";
 import { adminHomePath, hasAdminAccess } from "../../utils/adminPermissions";
 import { onOpenLoginPopup } from "../../utils/loginPopup";
+
+// "Create an account" -> sign-up popup (same as header Register)
+const RegisterModal = dynamic(() => import("../Common/RegisterModal"), { ssr: false });
 
 // Post Property button: opens the login popup (this href is only the no-JS fallback)
 const POST_PROPERTY_HREF = "/login";
@@ -51,6 +55,7 @@ export default function StickyLoginForm() {
   const { login, user, accessToken } = useUser();
 
   const [open, setOpen] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [form, setForm] = useState({
@@ -86,6 +91,34 @@ export default function StickyLoginForm() {
       setOpen(true);
     });
   }, [user, accessToken]);
+
+  // After logout header sends "/?login=1" -> open popup (even if dismissed earlier), then clean the URL
+  const searchParams = useSearchParams();
+  const loginParam = searchParams?.get("login");
+
+  useEffect(() => {
+    if (!loginParam || user || accessToken) return;
+
+    setError("");
+    setOpen(true);
+    router.replace("/", { scroll: false });
+  }, [loginParam, user, accessToken]);
+
+  // Login popup -> sign-up popup, and "Already have an account? Login" -> back to login popup
+  const openRegister = (event) => {
+    event.preventDefault();
+    if (loading) return;
+    setOpen(false);
+    setRegisterOpen(true);
+  };
+
+  const closeRegister = useCallback(() => setRegisterOpen(false), []);
+
+  const registerToLogin = useCallback(() => {
+    setRegisterOpen(false);
+    setError("");
+    setOpen(true);
+  }, []);
 
   // User ne popup khud band kiya — time save karo
   const dismissPopup = () => {
@@ -433,6 +466,7 @@ export default function StickyLoginForm() {
                     Don't have an account?{" "}
                     <NextLink
                       href="/signUp"
+                      onClick={openRegister}
                       className="inline-flex items-center gap-1 font-bold text-[var(--primary-color)] hover:underline"
                     >
                       Create an account
@@ -475,6 +509,8 @@ export default function StickyLoginForm() {
           </NextLink>
         </div>
       )}
+
+      {registerOpen && <RegisterModal open onClose={closeRegister} onLogin={registerToLogin} />}
 
       {/* Popup Animation */}
       <style jsx global>{`
