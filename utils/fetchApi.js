@@ -713,6 +713,8 @@ export const getSearchOptions = (signal) => searchGet("options", {}, signal);
 
 // { city, q, type } -> { localities, projects, builders }
 export const getSearchSuggest = (params, signal) => searchGet("suggest", params, signal);
+// Home search box: { cities, localities (with city), projects, builders } as you type
+export const getSearchAutocomplete = (params, signal) => searchGet("autocomplete", params, signal);
 
 // { city, localities, type } -> { localities: [{ name, properties_count, distance_km }] }
 export const getSimilarLocalities = (params, signal) => searchGet("similar-localities", params, signal);

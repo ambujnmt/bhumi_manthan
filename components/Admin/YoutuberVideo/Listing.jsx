@@ -184,9 +184,10 @@ export default function Listing() {
         try {
             const formData = new FormData();
 
-            // Category / YouTuber name / title are not in the form any more:
+            // Category / YouTuber name are not in the form any more:
             // new video -> category of the open tab; update -> saved values stay as they are
             if (!editing) formData.append("category", form.category);
+            formData.append("title", form.title.trim()); // optional, empty = no title
             formData.append("sort_order", form.sort_order || "0");
             formData.append("is_active", form.is_active ? "1" : "0");
             appendVideo(formData, video);
@@ -280,6 +281,7 @@ export default function Listing() {
                     <thead className="bg-gray-100">
                         <tr>
                             <th className="whitespace-nowrap px-4 py-3 text-left">Video</th>
+                            <th className="whitespace-nowrap px-4 py-3 text-left">Title</th>
                             <th className="whitespace-nowrap px-4 py-3 text-left">Order</th>
                             <th className="whitespace-nowrap px-4 py-3 text-left">Status</th>
                             <th className="whitespace-nowrap px-4 py-3 text-left">Action</th>
@@ -289,7 +291,7 @@ export default function Listing() {
                     <tbody>
                         {loading ? (
                             <tr>
-                                <td colSpan="4">
+                                <td colSpan="5">
                                     <div className="flex items-center justify-center py-16">
                                         <Spinner size="md" />
                                     </div>
@@ -300,6 +302,13 @@ export default function Listing() {
                                 <tr key={item.id} className="border-t">
                                     <td className="px-4 py-2">
                                         <VideoPreview item={item} onPlay={setPlaying} />
+                                    </td>
+                                    <td className="min-w-[180px] max-w-[320px] px-4 py-3">
+                                        {item.title ? (
+                                            <span className="line-clamp-2 font-medium text-[#1A1F36]" title={item.title}>{item.title}</span>
+                                        ) : (
+                                            <span className="text-gray-400">-</span>
+                                        )}
                                     </td>
                                     <td className="whitespace-nowrap px-4 py-3">{item.sort_order}</td>
                                     <td className="whitespace-nowrap px-4 py-3">
@@ -349,7 +358,7 @@ export default function Listing() {
                             ))
                         ) : (
                             <tr>
-                                <td colSpan="4" className="py-6 text-center text-gray-500">
+                                <td colSpan="5" className="py-6 text-center text-gray-500">
                                     No videos yet. The home page section stays hidden until one is added.
                                 </td>
                             </tr>
@@ -408,6 +417,21 @@ export default function Listing() {
                             {formError}
                         </p>
                     )}
+
+                    <div>
+                        <label htmlFor="video_title" className={labelClass}>Video Title</label>
+                        <input
+                            id="video_title"
+                            name="title"
+                            type="text"
+                            value={form.title}
+                            onChange={handleChange}
+                            maxLength={255}
+                            placeholder="e.g. 3 BHK Apartment Tour in Noida"
+                            className={inputClass}
+                        />
+                        <p className="mb-0 mt-1 text-xs text-[#62748E]">Optional. Max 255 characters.</p>
+                    </div>
 
                     <PropertyVideoField
                         value={video}

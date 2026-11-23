@@ -20,8 +20,9 @@ import { useRouter } from "next/navigation";
 import { loginUser } from "@/utils/fetchApi";
 import { useUser } from "../../context/UserContext";
 import { adminHomePath, hasAdminAccess } from "../../utils/adminPermissions";
+import { onOpenLoginPopup } from "../../utils/loginPopup";
 
-// Post Property button kahan le jaye (guest ko seller login par bhej rahe hain)
+// Post Property button: opens the login popup (this href is only the no-JS fallback)
 const POST_PROPERTY_HREF = "/login";
 
 // Popup band karne ke baad 24 ghante tak auto-open nahi hoga
@@ -74,6 +75,16 @@ export default function StickyLoginForm() {
     }, 600);
 
     return () => clearTimeout(timer);
+  }, [user, accessToken]);
+
+  // Header Buyer / Broker / Seller click -> open this popup (utils/loginPopup.js)
+  useEffect(() => {
+    if (user || accessToken) return;
+
+    return onOpenLoginPopup(() => {
+      setError("");
+      setOpen(true);
+    });
   }, [user, accessToken]);
 
   // User ne popup khud band kiya — time save karo
@@ -437,23 +448,29 @@ export default function StickyLoginForm() {
 
       {/* Floating buttons: Post Property + Login */}
       {!open && (
-        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+        <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2 sm:bottom-6 sm:right-6 sm:gap-3">
           <button
             type="button"
             onClick={() => setOpen(true)}
             aria-label="Open login popup"
-            className="flex items-center gap-2 rounded-full bg-[var(--primary-color)] px-5 py-3 text-sm font-semibold text-white shadow-xl transition hover:-translate-y-1 hover:bg-[var(--secondary-color)]"
+            className="flex items-center gap-1.5 rounded-full bg-[var(--primary-color)] px-4 py-2.5 text-[13px] font-semibold text-white shadow-xl transition hover:-translate-y-1 hover:bg-[var(--secondary-color)] sm:gap-2 sm:px-5 sm:py-3 sm:text-sm"
           >
-            <FiLogIn className="text-lg" />
+            <FiLogIn className="text-[17px] sm:text-lg" />
             Login
           </button>
 
           <NextLink
             href={POST_PROPERTY_HREF}
+            onClick={(event) => {
+              // Guest: login popup first (link stays as a no-JS fallback)
+              event.preventDefault();
+              setError("");
+              setOpen(true);
+            }}
             aria-label="Post your property for free"
-            className="flex items-center gap-2 no-underline hover:no-underline rounded-full bg-[var(--primary-color)] px-5 py-3 text-sm font-semibold text-white shadow-xl transition hover:-translate-y-1 hover:bg-[var(--secondary-color)]"
+            className="flex items-center gap-1.5 no-underline hover:no-underline rounded-full bg-[var(--primary-color)] px-4 py-2.5 text-[13px] font-semibold text-white shadow-xl transition hover:-translate-y-1 hover:bg-[var(--secondary-color)] sm:gap-2 sm:px-5 sm:py-3 sm:text-sm"
           >
-            <FiPlusCircle className="text-lg" />
+            <FiPlusCircle className="text-[17px] sm:text-lg" />
             Post Property Free
           </NextLink>
         </div>

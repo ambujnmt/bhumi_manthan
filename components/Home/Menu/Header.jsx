@@ -2,7 +2,7 @@
 
 import { Link } from "@heroui/react";
 import NextLink from "next/link";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { FaArrowRight, FaChevronDown, FaBars, FaTimes } from "react-icons/fa";
 import { FiGrid, FiHeart, FiLogOut } from "react-icons/fi";
 import { useUser } from "../../../context/UserContext";
@@ -16,6 +16,11 @@ import { adminHomePath, hasAdminAccess } from "../../../utils/adminPermissions";
 import { SEARCH_PATH, findTab, useSearchOptions } from "../../../utils/useSearchFilters";
 import useLiveEvents from "../../../utils/useLiveEvents";
 import UserAvatar from "../../Common/UserAvatar";
+import { openLoginPopup } from "../../../utils/loginPopup";
+import dynamic from "next/dynamic";
+
+// Loaded only when "Register" is clicked (sign-up form uses MUI)
+const RegisterModal = dynamic(() => import("../../Common/RegisterModal"), { ssr: false });
 import LiveBadge from "../../Common/LiveBadge";
 import { formatEventTime } from "../../Innerpages/Events/eventUtils";
 import { PROJECT_CITIES, PROJECT_DEVELOPERS, PROJECT_STAGES, PROJECTS_PATH, projectsHref } from "../../../utils/projectFilters";
@@ -135,6 +140,29 @@ export default function Header() {
     authLoading,
   } = useUser();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Buyer / Broker / Seller: open the login popup (same as the floating "Login" button).
+  // No popup on this page -> the link opens the login page as before.
+  const openLogin = (event) => {
+    setMobileOpen(false);
+    if (openLoginPopup()) event.preventDefault();
+  };
+
+  // Register: sign-up popup (same design as /signUp page)
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const closeRegister = useCallback(() => setRegisterOpen(false), []);
+
+  const openRegister = (event) => {
+    event.preventDefault();
+    setMobileOpen(false);
+    setRegisterOpen(true);
+  };
+
+  // "Already have an account? Login" -> login popup (or /login page when this page has none)
+  const registerToLogin = () => {
+    setRegisterOpen(false);
+    if (!openLoginPopup()) router.push("/login");
+  };
 /* ---------- desktop dropdown states ---------- */
   const [admissionsOpen, setAdmissionsOpen] = useState(false);
   const [admissiontabOpen, setAdmissiontabOpen] = useState(false);
@@ -795,39 +823,43 @@ const handleLogout = () => {
                           {compareLink}
                         </div>
 
-                        <Link
+                        <NextLink
                           href="/login"
-                          className="capitalize text-[14px] font-semibold text-[var(--text-color3)] hover:text-[var(--secondary-color)] transition-colors py-2"
+                          onClick={openLogin}
+                          className="no-underline capitalize text-[14px] font-semibold text-[var(--text-color3)] hover:text-[var(--secondary-color)] transition-colors py-2"
                         >
                           Buyer
-                        </Link>
+                        </NextLink>
 
                         <span>/</span>
 
-                        <Link
+                        <NextLink
                           href="/login"
-                          className="capitalize text-[14px] font-semibold text-[var(--text-color3)] hover:text-[var(--secondary-color)] transition-colors py-2"
+                          onClick={openLogin}
+                          className="no-underline capitalize text-[14px] font-semibold text-[var(--text-color3)] hover:text-[var(--secondary-color)] transition-colors py-2"
                         >
                           Broker
-                        </Link>
+                        </NextLink>
 
                         <span>/</span>
 
-                        <Link
+                        <NextLink
                           href="/login"
-                          className="capitalize text-[14px] font-semibold text-[var(--text-color3)] hover:text-[var(--secondary-color)] transition-colors py-2"
+                          onClick={openLogin}
+                          className="no-underline capitalize text-[14px] font-semibold text-[var(--text-color3)] hover:text-[var(--secondary-color)] transition-colors py-2"
                         >
                           Seller
-                        </Link>
+                        </NextLink>
 
                         <span>/</span>
 
-                        <Link
+                        <NextLink
                           href="/signUp"
-                          className="capitalize text-[14px] font-semibold text-[var(--text-color3)] hover:text-[var(--secondary-color)] transition-colors py-2"
+                          onClick={openRegister}
+                          className="no-underline capitalize text-[14px] font-semibold text-[var(--text-color3)] hover:text-[var(--secondary-color)] transition-colors py-2"
                         >
                           Register
-                        </Link>
+                        </NextLink>
 
                         {/* <Link
                           href="#"
@@ -1146,38 +1178,38 @@ const handleLogout = () => {
 
       {/* Buyer / Broker / Seller login */}
       <div className="grid grid-cols-3 gap-2">
-        <Link
+        <NextLink
           href="/buyer-login"
-          onClick={() => setMobileOpen(false)}
-          className="flex items-center justify-center text-white text-sm font-medium rounded-md px-2 py-2.5 bg-[var(--primary-color)] hover:bg-[var(--secondary-color)] hover:text-white transition-all duration-500 ease-in-out whitespace-nowrap"
+          onClick={openLogin}
+          className="no-underline flex items-center justify-center text-white text-sm font-medium rounded-md px-2 py-2.5 bg-[var(--primary-color)] hover:bg-[var(--secondary-color)] hover:text-white transition-all duration-500 ease-in-out whitespace-nowrap"
         >
           Buyer
-        </Link>
+        </NextLink>
 
-        <Link
+        <NextLink
           href="/login"
-          onClick={() => setMobileOpen(false)}
-          className="flex items-center justify-center text-white text-sm font-medium rounded-md px-2 py-2.5 bg-[var(--primary-color)] hover:bg-[var(--secondary-color)] hover:text-white transition-all duration-500 ease-in-out whitespace-nowrap"
+          onClick={openLogin}
+          className="no-underline flex items-center justify-center text-white text-sm font-medium rounded-md px-2 py-2.5 bg-[var(--primary-color)] hover:bg-[var(--secondary-color)] hover:text-white transition-all duration-500 ease-in-out whitespace-nowrap"
         >
           Broker
-        </Link>
+        </NextLink>
 
-        <Link
+        <NextLink
           href="/login"
-          onClick={() => setMobileOpen(false)}
-          className="flex items-center justify-center text-white text-sm font-medium rounded-md px-2 py-2.5 bg-[var(--primary-color)] hover:bg-[var(--secondary-color)] hover:text-white transition-all duration-500 ease-in-out whitespace-nowrap"
+          onClick={openLogin}
+          className="no-underline flex items-center justify-center text-white text-sm font-medium rounded-md px-2 py-2.5 bg-[var(--primary-color)] hover:bg-[var(--secondary-color)] hover:text-white transition-all duration-500 ease-in-out whitespace-nowrap"
         >
           Seller
-        </Link>
+        </NextLink>
       </div>
 
-      <Link
+      <NextLink
         href="/signUp"
-        onClick={() => setMobileOpen(false)}
-        className="flex items-center justify-center text-sm font-medium rounded-md px-5 py-2.5 border border-[var(--primary-color)] text-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-white transition-all duration-500 ease-in-out w-full"
+        onClick={openRegister}
+        className="no-underline flex items-center justify-center text-sm font-medium rounded-md px-5 py-2.5 border border-[var(--primary-color)] text-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-white transition-all duration-500 ease-in-out w-full"
       >
         Register
-      </Link>
+      </NextLink>
 
     </div>
   )}
@@ -1214,6 +1246,9 @@ const handleLogout = () => {
       </header>
 
       <LogoutConfirm isOpen={logoutOpen} onClose={() => setLogoutOpen(false)} onConfirm={handleLogout} />
+
+      {/* Register: same sign-up form as /signUp, in a popup */}
+      {registerOpen && <RegisterModal open onClose={closeRegister} onLogin={registerToLogin} />}
     </>
   );
 }

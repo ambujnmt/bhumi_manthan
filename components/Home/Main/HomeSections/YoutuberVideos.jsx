@@ -97,6 +97,18 @@ export const VideoCard = ({ item, playing, onPlay, onClose }) => {
           </button>
         )}
       </div>
+
+      {/* Title (Admin -> YouTuber Videos), only when set */}
+      {item.title && (
+        <div className="py-3 pl-4 pr-2">
+          <h3
+            className="mb-0 line-clamp-2 text-[15px] font-semibold leading-snug text-[var(--text-color1)]"
+            title={item.title}
+          >
+            {item.title}
+          </h3>
+        </div>
+      )}
     </article>
   );
 };

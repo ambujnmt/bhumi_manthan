@@ -280,8 +280,11 @@ function ProfileDetails({ profile, onProfileUpdated }) {
               <InfoRow icon={FiMapPin} label="City">{profile.city || "-"}</InfoRow>
               <InfoRow icon={FiMap} label="State">{profile.state || "-"}</InfoRow>
               <InfoRow icon={FiGlobe} label="Country">{profile.country || "-"}</InfoRow>
-              <InfoRow icon={FiHash} label="PIN Code">{profile.pin_code || "-"}</InfoRow>
-              <InfoRow icon={FiCalendar} label="Member Since">{memberSince}</InfoRow>
+              {/* PIN Code + Member Since side by side (stacked on very small phones) */}
+              <div className="grid grid-cols-1 gap-[4px] min-[400px]:grid-cols-2">
+                <InfoRow icon={FiHash} label="PIN Code">{profile.pin_code || "-"}</InfoRow>
+                <InfoRow icon={FiCalendar} label="Member Since">{memberSince}</InfoRow>
+              </div>
             </div>
           )}
         </section>

@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useEffect, useId, useRef, useState } from "react";
-import { FiBriefcase, FiCrosshair, FiHash, FiHome, FiMapPin, FiPlus, FiSearch, FiX } from "react-icons/fi";
+import { FiBriefcase, FiClock, FiCrosshair, FiHash, FiHome, FiMap, FiMapPin, FiPlus, FiSearch, FiX } from "react-icons/fi";
 import SearchableSelect from "../../Admin/PropertyManagement/SearchableSelect";
-import { detectLocation, getNearMe, getSearchSuggest, getSimilarLocalities, lookupPropertyById } from "../../../utils/fetchApi";
+import { detectLocation, getNearMe, getSearchAutocomplete, getSearchSuggest, getSimilarLocalities, lookupPropertyById } from "../../../utils/fetchApi";
 import { showToast } from "../../../store/toast";
 import { useRouter } from "next/router";
 import useSearchFilters, {
@@ -62,15 +62,40 @@ export default function SearchBar({ mode = "page", footer = null }) {
         if (match) setCity(match.name);
     }, [isHome, city, userLocation?.city, options?.cities]);
 
-    const search = () => {
+    // Search (or a "Recent Searches" item) -> search page / filters; saved as a recent search
+    const runSearch = (next) => {
+        saveRecentSearch(next);
+
         if (isHome) {
             router.push({
                 pathname: SEARCH_PATH,
-                query: filtersToQuery({ ...EMPTY_FILTERS, type, city, localities, q }),
+                query: filtersToQuery({ ...EMPTY_FILTERS, ...next }),
             });
         } else {
-            setFilters({ city, localities, q });
+            setFilters({ city: next.city, localities: next.localities, q: next.q });
         }
+    };
+
+    const search = () => runSearch({ type, city, localities, q });
+
+    // City picked (dropdown or a suggestion): localities belong to the old city -> cleared
+    const changeCity = (value) => {
+        cityTouched.current = true;
+
+        if (value !== city) {
+            setCity(value);
+            setLocalities([]);
+            setQ("");
+        }
+    };
+
+    // "Recent Searches" item -> same search again
+    const applyRecent = (entry) => {
+        cityTouched.current = true;
+        setCity(entry.city || "");
+        setLocalities(entry.localities || []);
+        setQ(entry.q || "");
+        runSearch({ type, city: entry.city || "", localities: entry.localities || [], q: entry.q || "" });
     };
 
     // "Current Location": GPS (asks permission on click) -> else IP location
@@ -188,15 +213,7 @@ export default function SearchBar({ mode = "page", footer = null }) {
                         name="city"
                         value={city}
                         options={cityOptions}
-                        onChange={(value) => {
-                            cityTouched.current = true;
-
-                            if (value !== city) {
-                                setCity(value);
-                                setLocalities([]); // localities belong to old city
-                                setQ("");
-                            }
-                        }}
+                        onChange={changeCity}
                         placeholder="Select City"
                         searchPlaceholder="Search city..."
                         emptyText="No city found"
@@ -210,9 +227,12 @@ export default function SearchBar({ mode = "page", footer = null }) {
                     type={type}
                     localities={localities}
                     q={q}
+                    cities={options?.cities || []}
+                    onCity={changeCity}
                     onLocalities={setLocalities}
                     onQ={setQ}
                     onEnter={search}
+                    onRecent={applyRecent}
                     onUseLocation={applyCurrentLocation}
                     locating={locating}
                 />
@@ -241,33 +261,110 @@ export default function SearchBar({ mode = "page", footer = null }) {
         </div>
     );
 }
-
 /*
 |--------------------------------------------------------------------------
-| Locality chips + suggestions (localities, projects, builders)
+| Search box with suggestions as you type (like 99acres)
+| Text typed -> GET /api/search/autocomplete: cities, localities (+ city), projects, builders
+| Empty box  -> city selected: popular localities (GET /api/search/suggest)
+|              no city: recent searches + popular cities
 |--------------------------------------------------------------------------
 */
 
-function LocalityPicker({ city, type, localities, q, onLocalities, onQ, onEnter, onUseLocation, locating }) {
+const RECENT_KEY = "bm_recent_searches";
+const RECENT_MAX = 5;
+
+const readRecent = () => {
+    try {
+        const list = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+        return Array.isArray(list) ? list : [];
+    } catch {
+        return [];
+    }
+};
+
+const recentLabel = (entry) =>
+    [entry.q, ...(entry.localities || []), entry.city].filter(Boolean).join(", ");
+
+// Saved on every Search (newest first, no duplicates)
+const saveRecentSearch = (entry) => {
+    const label = recentLabel(entry);
+    if (!label) return;
+
+    try {
+        const list = [{ ...entry, label }, ...readRecent().filter((item) => item.label !== label)].slice(0, RECENT_MAX);
+        localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+    } catch {
+        // storage blocked -> no recent searches
+    }
+};
+
+// Typed text in bold inside a suggestion (case-insensitive)
+function Highlight({ text, query }) {
+    const needle = query.trim().toLowerCase();
+    const index = needle ? text.toLowerCase().indexOf(needle) : -1;
+
+    if (index < 0) return text;
+
+    return (
+        <>
+            {text.slice(0, index)}
+            <b className="font-semibold text-[#1A1F36]">{text.slice(index, index + needle.length)}</b>
+            {text.slice(index + needle.length)}
+        </>
+    );
+}
+
+const propertiesText = (count) => (count ? `${count} ${count === 1 ? "property" : "properties"}` : "");
+const projectsText = (count) => `${count} project${count === 1 ? "" : "s"}`;
+
+const EMPTY_RESULT = { cities: [], localities: [], projects: [], builders: [] };
+
+const ICONS = { recent: FiClock, city: FiMap, locality: FiMapPin, project: FiHome, builder: FiBriefcase };
+
+// Right side of a typed suggestion (like 99acres)
+const KIND_LABELS = { city: "City", locality: "Locality", project: "Project", builder: "Builder" };
+
+function LocalityPicker({ city, type, localities, q, cities = [], onCity, onLocalities, onQ, onEnter, onRecent, onUseLocation, locating }) {
+    const router = useRouter();
     const [text, setText] = useState("");
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [result, setResult] = useState({ localities: [], projects: [], builders: [] });
+    const [result, setResult] = useState(EMPTY_RESULT);
+    const [recent, setRecent] = useState([]);
     const [activeIndex, setActiveIndex] = useState(-1);
     const boxRef = useRef(null);
     const inputRef = useRef(null);
     const listId = useId();
+    const typed = text.trim();
+
+    // Recent searches (this browser) each time the box opens
+    useEffect(() => {
+        if (open) setRecent(readRecent());
+    }, [open]);
 
     // Suggestions (debounced, old request cancelled)
     useEffect(() => {
-        if (!city || !open) return;
+        if (!open) return;
+
+        // Empty box, no city: recent + popular cities (no request)
+        if (!typed && !city) {
+            setResult(EMPTY_RESULT);
+            setLoading(false);
+            return;
+        }
 
         const controller = new AbortController();
         setLoading(true);
 
         const timer = setTimeout(() => {
-            getSearchSuggest({ city, q: text.trim(), type, limit: 8 }, controller.signal)
-                .then((data) => setResult(data))
+            const request = typed
+                ? getSearchAutocomplete({ q: typed, city, type, limit: 6 }, controller.signal)
+                : getSearchSuggest({ city, q: "", type, limit: 8 }, controller.signal).then((data) => ({
+                      localities: (data.localities || []).map((l) => ({ ...l, city })),
+                  }));
+
+            request
+                .then((data) => setResult({ ...EMPTY_RESULT, ...data }))
                 .catch(() => {})
                 .finally(() => !controller.signal.aborted && setLoading(false));
         }, SUGGEST_DEBOUNCE);
@@ -276,7 +373,7 @@ function LocalityPicker({ city, type, localities, q, onLocalities, onQ, onEnter,
             clearTimeout(timer);
             controller.abort();
         };
-    }, [city, type, text, open]);
+    }, [city, type, typed, open]);
 
     useEffect(() => {
         if (!open) return;
@@ -289,27 +386,78 @@ function LocalityPicker({ city, type, localities, q, onLocalities, onQ, onEnter,
         return () => document.removeEventListener("mousedown", close);
     }, [open]);
 
-    useEffect(() => setActiveIndex(-1), [text, result]);
+    useEffect(() => setActiveIndex(-1), [typed, result]);
 
     const selectedLower = localities.map((l) => l.toLowerCase());
+    const showStart = !typed && !city; // empty box, no city yet
 
-    // One list for keyboard: localities, projects, builders
-    const items = [
-        ...result.localities
-            .filter((l) => !selectedLower.includes(l.name.toLowerCase()))
-            .map((l) => ({ kind: "locality", name: l.name, meta: l.properties_count ? `${l.properties_count} ${l.properties_count === 1 ? "property" : "properties"}` : "" })),
-        ...result.projects.map((p) => ({ kind: "project", name: p.name, meta: p.builder_name || p.location || "" })),
-        ...result.builders.map((b) => ({ kind: "builder", name: b.name, meta: `${b.projects_count} project${b.projects_count === 1 ? "" : "s"}` })),
-    ];
+    // One list for keyboard, in the order shown
+    const items = showStart
+        ? [
+              ...recent.map((entry) => ({ kind: "recent", name: entry.label, entry })),
+              ...cities
+                  .filter((c) => c.properties_count > 0)
+                  .slice(0, 6)
+                  .map((c) => ({ kind: "city", name: c.name, meta: propertiesText(c.properties_count) })),
+          ]
+        : [
+              ...result.cities.map((c) => ({ kind: "city", name: c.name, sub: c.state, meta: propertiesText(c.properties_count), label: [c.name, c.state].filter(Boolean).join(", ") })),
+              ...result.localities
+                  .filter((l) => !((l.city || "").toLowerCase() === city.toLowerCase() && selectedLower.includes(l.name.toLowerCase())))
+                  .map((l) => ({ kind: "locality", name: l.name, city: l.city, sub: l.city, meta: propertiesText(l.properties_count), label: [l.name, l.city].filter(Boolean).join(", ") })),
+              ...result.projects.map((p) => ({
+                  kind: "project",
+                  name: p.name,
+                  slug: p.slug,
+                  sub: [p.builder_name, p.location, p.city].filter(Boolean).join(" · "),
+                  label: [p.name, p.location, p.city].filter(Boolean).join(", "),
+              })),
+              ...result.builders.map((b) => ({ kind: "builder", name: b.name, meta: projectsText(b.projects_count), label: b.name })),
+          ];
+
+    // Typed: one mixed list like 99acres - names starting with the text first, then the rest
+    // (sort is stable: same rank keeps city -> locality -> project -> builder order)
+    if (typed) {
+        const needle = typed.toLowerCase();
+        items.sort(
+            (a, b) =>
+                (a.name.toLowerCase().startsWith(needle) ? 0 : 1) - (b.name.toLowerCase().startsWith(needle) ? 0 : 1)
+        );
+    }
 
     const pick = (item) => {
-        if (item.kind === "locality") {
-            onLocalities([...localities, item.name]);
-        } else {
-            onQ(item.name); // project / builder -> text search
+        setText("");
+
+        switch (item.kind) {
+            case "recent":
+                setOpen(false);
+                onRecent(item.entry);
+                return;
+
+            case "city":
+                onCity(item.name);
+                break;
+
+            case "locality":
+                // Locality of another city -> switch city first (localities belong to one city)
+                if (item.city && item.city.toLowerCase() !== city.toLowerCase()) {
+                    onCity(item.city);
+                    onLocalities([item.name]);
+                } else {
+                    onLocalities([...localities, item.name]);
+                }
+                break;
+
+            case "project":
+                // Straight to the project page (like 99acres)
+                setOpen(false);
+                router.push(`/web/project/projectDetail/${item.slug}`);
+                return;
+
+            default:
+                onQ(item.name); // builder -> text search
         }
 
-        setText("");
         inputRef.current?.focus();
     };
 
@@ -326,9 +474,10 @@ function LocalityPicker({ city, type, localities, q, onLocalities, onQ, onEnter,
 
             if (open && activeIndex >= 0 && items[activeIndex]) {
                 pick(items[activeIndex]);
-            } else if (text.trim()) {
-                // typed name not in list -> still search it
-                onLocalities([...localities, text.trim()]);
+            } else if (typed) {
+                // typed name not in list -> locality of the city, or a text search without city
+                if (city) onLocalities([...localities, typed]);
+                else onQ(typed);
                 setText("");
             } else {
                 setOpen(false);
@@ -342,14 +491,17 @@ function LocalityPicker({ city, type, localities, q, onLocalities, onQ, onEnter,
     };
 
     let index = -1;
-    const group = (kind, title, Icon) => {
+    const group = (kind, title, action = null) => {
         const rows = items.filter((item) => item.kind === kind);
         if (!rows.length) return null;
 
+        const Icon = ICONS[kind];
+
         return (
             <>
-                <li role="presentation" className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                <li role="presentation" className="flex items-center justify-between px-3 pb-1 pt-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                     {title}
+                    {action}
                 </li>
                 {rows.map((item) => {
                     index += 1;
@@ -357,19 +509,30 @@ function LocalityPicker({ city, type, localities, q, onLocalities, onQ, onEnter,
 
                     return (
                         <li
-                            key={`${kind}-${item.name}`}
+                            key={`${kind}-${item.name}-${item.city || ""}`}
                             id={`${listId}-${i}`}
                             role="option"
                             aria-selected={i === activeIndex}
                             onMouseEnter={() => setActiveIndex(i)}
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={() => pick(item)}
-                            className={`flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm ${
-                                i === activeIndex ? "bg-orange-50 text-[#E87722]" : "text-[#1A1F36]"
-                            }`}
+                            className={`flex cursor-pointer items-center gap-3 px-3 py-2 text-sm ${i === activeIndex ? "bg-orange-50" : ""}`}
                         >
-                            <Icon className="h-4 w-4 shrink-0 text-gray-400" />
-                            <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                            <span
+                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                                    i === activeIndex ? "bg-[#E87722] text-white" : "bg-gray-100 text-gray-500"
+                                }`}
+                            >
+                                <Icon className="h-4 w-4" />
+                            </span>
+
+                            <span className="min-w-0 flex-1">
+                                <span className="block truncate text-gray-600">
+                                    <Highlight text={item.name} query={typed} />
+                                </span>
+                                {item.sub && <span className="block truncate text-xs text-gray-400">{item.sub}</span>}
+                            </span>
+
                             {item.meta && <span className="shrink-0 text-xs text-gray-400">{item.meta}</span>}
                         </li>
                     );
@@ -378,11 +541,31 @@ function LocalityPicker({ city, type, localities, q, onLocalities, onQ, onEnter,
         );
     };
 
+    const clearRecent = (
+        <button
+            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+                try {
+                    localStorage.removeItem(RECENT_KEY);
+                } catch {
+                    // ignore
+                }
+                setRecent([]);
+            }}
+            className="normal-case tracking-normal text-[#E87722] hover:underline"
+        >
+            Clear
+        </button>
+    );
+
+    const showList = open && Boolean(typed || city || items.length > 0);
+
     return (
         <div ref={boxRef} className="relative min-w-0 flex-1">
             <div
-                onClick={() => city && inputRef.current?.focus()}
-                className={`flex min-h-[50px] flex-wrap items-center gap-1.5 rounded-lg bg-white pl-3 pr-1.5 py-1.5 ${city ? "cursor-text" : "cursor-not-allowed"}`}
+                onClick={() => inputRef.current?.focus()}
+                className="flex min-h-[50px] cursor-text flex-wrap items-center gap-1.5 rounded-lg bg-white py-1.5 pl-3 pr-1.5"
             >
                 <FiSearch className="mr-1 h-4 w-4 shrink-0 text-gray-400" />
 
@@ -424,7 +607,6 @@ function LocalityPicker({ city, type, localities, q, onLocalities, onQ, onEnter,
                     ref={inputRef}
                     type="text"
                     value={text}
-                    disabled={!city}
                     onChange={(event) => {
                         setText(event.target.value);
                         setOpen(true);
@@ -432,17 +614,18 @@ function LocalityPicker({ city, type, localities, q, onLocalities, onQ, onEnter,
                     onFocus={() => setOpen(true)}
                     onKeyDown={handleKeyDown}
                     placeholder={
-                        !city
-                            ? "Select a city first"
-                            : localities.length || q
-                                ? "Add more..."
-                                : "Search locality, projects or builders"
+                        localities.length || q
+                            ? "Add more..."
+                            : city
+                                ? `Search locality, project or builder in ${city}`
+                                : "Search city, locality, project or builder"
                     }
                     role="combobox"
-                    aria-expanded={open}
+                    aria-expanded={showList}
                     aria-controls={listId}
+                    aria-autocomplete="list"
                     aria-activedescendant={activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
-                    className="min-w-[140px] flex-1 bg-transparent py-1.5 text-sm text-gray-700 placeholder-gray-400 outline-none disabled:cursor-not-allowed"
+                    className="min-w-[140px] flex-1 bg-transparent py-1.5 text-sm text-gray-700 placeholder-gray-400 outline-none"
                 />
 
                 {loading && open && (
@@ -473,17 +656,42 @@ function LocalityPicker({ city, type, localities, q, onLocalities, onQ, onEnter,
                 </button>
             </div>
 
-            {open && city && (
+            {showList && (
                 <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl">
-                    <ul id={listId} role="listbox" className="mb-0 max-h-80 overflow-y-auto pb-1 pl-0">
-                        {group("locality", text.trim() ? `Localities in ${city}` : `Popular localities in ${city}`, FiMapPin)}
-                        {group("project", "Projects", FiHome)}
-                        {group("builder", "Builders", FiBriefcase)}
+                    <ul id={listId} role="listbox" className="mb-0 max-h-[420px] overflow-y-auto pl-0">
+                        {typed ? (
+                            // Typed: one flat list like 99acres -> "Name, Locality, City" ... type on the right
+                            items.map((item, i) => (
+                                <li
+                                    key={`${item.kind}-${item.name}-${item.city || ""}`}
+                                    id={`${listId}-${i}`}
+                                    role="option"
+                                    aria-selected={i === activeIndex}
+                                    onMouseEnter={() => setActiveIndex(i)}
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onClick={() => pick(item)}
+                                    className={`flex cursor-pointer items-center gap-4 border-b border-gray-100 px-4 py-3 text-[15px] last:border-b-0 sm:px-5 ${
+                                        i === activeIndex ? "bg-orange-50" : "bg-white"
+                                    }`}
+                                >
+                                    <span className="min-w-0 flex-1 truncate text-[#1A1F36]">
+                                        {item.label}
+                                    </span>
+                                    <span className="shrink-0 text-sm text-gray-400">{KIND_LABELS[item.kind]}</span>
+                                </li>
+                            ))
+                        ) : (
+                            <>
+                                {group("recent", "Recent Searches", clearRecent)}
+                                {group("city", showStart ? "Popular Cities" : "Cities")}
+                                {group("locality", `Popular localities in ${city}`)}
+                            </>
+                        )}
 
                         {!loading && items.length === 0 && (
                             <li role="presentation" className="px-3 py-4 text-center text-sm text-gray-400">
-                                {text.trim()
-                                    ? <>No match. Press <b>Enter</b> to search "{text.trim()}".</>
+                                {typed
+                                    ? <>No match. Press <b>Enter</b> to search &quot;{typed}&quot;.</>
                                     : `No localities found in ${city}`}
                             </li>
                         )}
@@ -493,6 +701,7 @@ function LocalityPicker({ city, type, localities, q, onLocalities, onQ, onEnter,
         </div>
     );
 }
+
 
 /*
 |--------------------------------------------------------------------------
