@@ -8,13 +8,73 @@ import { FiImage, FiLink, FiPlus, FiVideo, FiX } from "react-icons/fi";
 import { actionButtonClass } from "../actionButtonClass";
 import PageTitle from "../../Breadcrumb/PageTitle";
 import Tmodal from "../../Tmodal/Tmodal";
-import AdMedia from "../../Common/Ads/AdMedia";
+import AdMedia, { hasMobileMedia } from "../../Common/Ads/AdMedia";
 import { showToast } from "../../../store/toast";
 import { deleteAd, getAdminAds, saveAd } from "../../../utils/adminFetchApi";
 import { useAdminPermission } from "../../../utils/adminPermissions";
 
 const MAX_IMAGE_MB = 5;
 const MAX_VIDEO_MB = 30;
+
+// Recommended upload size of ad images = size of the ads live on the website now
+// (desktop ads: 464 × 2220 px, mobile images: 825 × 1024 px).
+// desktop = left / right column next to the page, mobile = phones / tablets.
+const IMAGE_SIZES = {
+    desktop: { width: 464, height: 2220, ratio: "about 1:4.8", note: "Long tall strip, shows in the left / right column next to the page." },
+    mobile: { width: 825, height: 1024, ratio: "about 4:5", note: "Shows on phones / tablets instead of the desktop image." },
+};
+
+// Picture shape this far off the recommended one -> warning (it will look cropped / squeezed)
+const RATIO_TOLERANCE = 0.15;
+
+/**
+ * Recommended width × height of an ad image + the size of the chosen picture
+ * (warning when its shape is too different).
+ * size: IMAGE_SIZES.desktop | IMAGE_SIZES.mobile, src: chosen / saved image (optional)
+ */
+function ImageSizeHint({ size, src }) {
+    const [actual, setActual] = useState(null); // { width, height }
+
+    useEffect(() => {
+        setActual(null);
+        if (!src) return undefined;
+
+        let active = true;
+        const img = new Image();
+        img.onload = () => active && setActual({ width: img.naturalWidth, height: img.naturalHeight });
+        img.src = src;
+
+        return () => {
+            active = false;
+        };
+    }, [src]);
+
+    const expected = size.width / size.height;
+    const offShape = actual && Math.abs(actual.width / actual.height - expected) / expected > RATIO_TOLERANCE;
+    const tooSmall = actual && !offShape && actual.width < size.width;
+
+    return (
+        <div className="mt-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-[#62748E]">
+            <p className="mb-0">
+                <span className="font-semibold text-[#E87722]">
+                    Recommended size: {size.width} × {size.height} px
+                </span>{" "}
+                (width × height, ratio {size.ratio}). {size.note}
+            </p>
+
+            {actual && (
+                <p className={`mb-0 mt-1 font-medium ${offShape || tooSmall ? "text-red-600" : "text-green-700"}`}>
+                    Selected image: {actual.width} × {actual.height} px
+                    {offShape
+                        ? ` - shape does not match, it may look cropped or squeezed. Use about ${size.width} × ${size.height} px.`
+                        : tooSmall
+                          ? ` - smaller than recommended, it may look blurry.`
+                          : " - looks good."}
+                </p>
+            )}
+        </div>
+    );
+}
 
 const MEDIA_TYPES = [
     { value: "image", label: "Image", icon: FiImage },
@@ -23,6 +83,17 @@ const MEDIA_TYPES = [
 ];
 
 const MEDIA_LABELS = { image: "Image", video: "Video", video_url: "Video Link" };
+
+// Phones / tablets media, same kind as the tab: image -> Mobile Image, video -> Mobile Video, link -> Mobile Video Link
+const MOBILE_LABELS = { image: "Mobile Image", video: "Mobile Video", video_url: "Mobile Video Link" };
+
+// Saved mobile media of one kind ("" = none)
+const savedMobileOf = (ad, mediaType) =>
+    (mediaType === "image" ? ad?.mobile_image : mediaType === "video" ? ad?.mobile_video_file : ad?.mobile_video_url) || "";
+
+// Kind of the saved mobile media (null = none)
+const mobileKindOf = (ad) =>
+    ad?.mobile_image ? "image" : ad?.mobile_video_file ? "video" : ad?.mobile_video_url ? "video_url" : null;
 
 const emptyForm = (placements = []) => ({
     placements,
@@ -70,6 +141,7 @@ export default function Listing() {
     // Optional image for phones / tablets (shown there instead of the main media)
     const [mobileFile, setMobileFile] = useState(null);
     const [mobilePreview, setMobilePreview] = useState("");
+    const [mobileUrl, setMobileUrl] = useState(""); // Video Link tab: mobile video link
     const [removeMobile, setRemoveMobile] = useState(false);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState("");
@@ -132,33 +204,44 @@ export default function Listing() {
         );
         setFile(null);
         setFilePreview("");
-        setMobileFile(null);
-        setMobilePreview(ad?.mobile_image || "");
-        setRemoveMobile(false);
+        resetMobile(ad, ad?.media_type || "image");
         setFormError("");
         setFormOpen(true);
     };
 
+    // Mobile field of a tab back to the saved one (of that kind)
+    const resetMobile = (ad, mediaType) => {
+        setMobileFile(null);
+        setMobilePreview(mediaType === "video_url" ? "" : savedMobileOf(ad, mediaType));
+        setMobileUrl(mediaType === "video_url" ? savedMobileOf(ad, "video_url") : "");
+        setRemoveMobile(false);
+
+        const input = document.getElementById("ad_mobile_file");
+        if (input) input.value = "";
+    };
+
     const handleMobileChange = (event) => {
         const selected = event.target.files?.[0] || null;
+        const isImage = form.media_type === "image";
+        const maxMb = isImage ? MAX_IMAGE_MB : MAX_VIDEO_MB;
 
-        if (selected && selected.size > MAX_IMAGE_MB * 1024 * 1024) {
+        if (selected && selected.size > maxMb * 1024 * 1024) {
             event.target.value = "";
-            setFormError(`Mobile image must be ${MAX_IMAGE_MB} MB or smaller.`);
+            setFormError(`Mobile ${isImage ? "image" : "video"} must be ${maxMb} MB or smaller.`);
             return;
         }
 
         setFormError("");
         setMobileFile(selected);
-        setMobilePreview(selected ? URL.createObjectURL(selected) : removeMobile ? "" : editing?.mobile_image || "");
+        setMobilePreview(selected ? URL.createObjectURL(selected) : removeMobile ? "" : savedMobileOf(editing, form.media_type));
     };
 
     const clearMobile = () => {
         setMobileFile(null);
         setMobilePreview("");
-        setRemoveMobile(Boolean(editing?.mobile_image));
+        setRemoveMobile(Boolean(savedMobileOf(editing, form.media_type)));
 
-        const input = document.getElementById("ad_mobile_image");
+        const input = document.getElementById("ad_mobile_file");
         if (input) input.value = "";
     };
 
@@ -172,6 +255,7 @@ export default function Listing() {
         setForm((previous) => ({ ...previous, media_type: mediaType }));
         setFile(null);
         setFilePreview("");
+        resetMobile(editing, mediaType); // mobile field follows the tab
         setFormError("");
     };
 
@@ -211,6 +295,13 @@ export default function Listing() {
             return;
         }
 
+        const mobileLink = mobileUrl.trim();
+
+        if (form.media_type === "video_url" && mobileLink && !/^https?:\/\/\S+$/i.test(mobileLink)) {
+            setFormError("Mobile video link must start with http:// or https://.");
+            return;
+        }
+
         if (!keepsSavedMedia()) {
             if (form.media_type === "video_url" && !link) {
                 setFormError("Enter a video link.");
@@ -238,8 +329,18 @@ export default function Listing() {
                 else formData.append(form.media_type, file);
             }
 
-            if (mobileFile) formData.append("mobile_image", mobileFile);
-            else if (removeMobile) formData.append("remove_mobile_image", "1");
+            // Mobile media = same kind as the tab. A saved one of another kind is removed.
+            const savedSameKind = savedMobileOf(editing, form.media_type);
+            const savedOtherKind = hasMobileMedia(editing) && !savedSameKind;
+
+            if (form.media_type === "video_url") {
+                if (mobileLink && mobileLink !== savedSameKind) formData.append("mobile_video_url", mobileLink);
+                else if (!mobileLink && hasMobileMedia(editing)) formData.append("remove_mobile", "1");
+            } else if (mobileFile) {
+                formData.append(form.media_type === "image" ? "mobile_image" : "mobile_video", mobileFile);
+            } else if (removeMobile || savedOtherKind) {
+                formData.append("remove_mobile", "1");
+            }
 
             const res = await saveAd(formData, editing?.id);
             const saved = res.data.ad;
@@ -286,9 +387,13 @@ export default function Listing() {
     };
 
     // Preview inside the form: new file / typed link, else saved media
+    // Main media only (image / video of the selected tab). Never the mobile image:
+    // AdMedia would show that instead on small screens, it has its own preview below.
     const formPreview = (() => {
-        if (form.media_type === "image") return file ? { image: filePreview } : editing?.media_type === "image" ? editing : null;
-        if (form.media_type === "video") return file ? { video_file: filePreview } : editing?.media_type === "video" ? editing : null;
+        const saved = editing?.media_type === form.media_type ? { ...editing, mobile_image: null, mobile_video_file: null, mobile_video_url: null } : null;
+
+        if (form.media_type === "image") return file ? { image: filePreview } : saved;
+        if (form.media_type === "video") return file ? { video_file: filePreview } : saved;
         return form.video_url.trim() ? { video_url: form.video_url.trim() } : null;
     })();
 
@@ -426,8 +531,11 @@ export default function Listing() {
                                     </td>
                                     <td className="whitespace-nowrap px-4 py-3">
                                         {MEDIA_LABELS[ad.media_type]}
-                                        {ad.mobile_image && (
-                                            <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700" title="Has a separate image for phones">
+                                        {mobileKindOf(ad) && (
+                                            <span
+                                                className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700"
+                                                title={`Has a separate ${MOBILE_LABELS[mobileKindOf(ad)].toLowerCase()} for phones`}
+                                            >
                                                 + Mobile
                                             </span>
                                         )}
@@ -652,6 +760,12 @@ export default function Listing() {
                                     : `MP4, WEBM or MOV, max ${MAX_VIDEO_MB} MB. Plays silently on loop. Bigger video: use a video link.`}
                                 {editing && editing.media_type === form.media_type && " Leave empty to keep the current one."}
                             </p>
+                            {form.media_type === "image" && (
+                                <ImageSizeHint
+                                    size={IMAGE_SIZES.desktop}
+                                    src={file ? filePreview : editing?.media_type === "image" ? editing?.image : ""}
+                                />
+                            )}
                         </div>
                     )}
 
@@ -676,34 +790,76 @@ export default function Listing() {
                         </div>
                     )}
 
-                    {/* Mobile image (optional) */}
+                    {/* Mobile media (optional), same kind as the tab: Mobile Image / Mobile Video / Mobile Video Link */}
                     <div>
-                        <label htmlFor="ad_mobile_image" className={labelClass}>Mobile Image</label>
-                        <input
-                            id="ad_mobile_image"
-                            type="file"
-                            accept="image/png,image/jpeg,image/webp,image/gif"
-                            onChange={handleMobileChange}
-                            className={fileInputClass}
-                        />
-                        <p className="mb-0 mt-1 text-xs text-[#62748E]">
-                            Optional. Phones / tablets show this image instead of the ad above (a video is heavy on mobile data).
-                            JPG, PNG, WEBP or GIF, max {MAX_IMAGE_MB} MB. Wide picture works best (about 800 × 300 px).
-                            Empty: side ads stay hidden on phones.
-                        </p>
+                        <label htmlFor={form.media_type === "video_url" ? "ad_mobile_url" : "ad_mobile_file"} className={labelClass}>
+                            {MOBILE_LABELS[form.media_type]}
+                        </label>
 
-                        {mobilePreview && (
-                            <div className="relative mt-3 w-[220px]">
-                                <img src={mobilePreview} alt="Mobile image preview" className="w-full rounded-lg border object-cover" />
-                                <button
-                                    type="button"
-                                    aria-label="Remove mobile image"
-                                    onClick={clearMobile}
-                                    className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white text-red-600 shadow"
-                                >
-                                    <FiX size={15} aria-hidden="true" />
-                                </button>
-                            </div>
+                        {form.media_type === "video_url" ? (
+                            <>
+                                <input
+                                    id="ad_mobile_url"
+                                    type="url"
+                                    maxLength={1000}
+                                    value={mobileUrl}
+                                    onChange={(event) => setMobileUrl(event.target.value)}
+                                    placeholder="https://www.youtube.com/shorts/..."
+                                    className={inputClass}
+                                />
+                                <p className="mb-0 mt-1 text-xs text-[#62748E]">
+                                    Optional. Phones / tablets play this link instead of the one above (e.g. a vertical / Shorts
+                                    version). YouTube or Vimeo, plays silently on loop. Empty: side ads stay hidden on phones.
+                                </p>
+                                {mobileUrl.trim() && (
+                                    <div className="mt-3 w-[220px]">
+                                        <AdMedia ad={{ video_url: mobileUrl.trim() }} shape="wide" />
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <input
+                                    key={form.media_type}
+                                    id="ad_mobile_file"
+                                    type="file"
+                                    accept={form.media_type === "image" ? "image/png,image/jpeg,image/webp,image/gif" : "video/mp4,video/webm,video/quicktime"}
+                                    onChange={handleMobileChange}
+                                    className={fileInputClass}
+                                />
+                                <p className="mb-0 mt-1 text-xs text-[#62748E]">
+                                    {form.media_type === "image"
+                                        ? `Optional. Phones / tablets show this image instead of the one above. JPG, PNG, WEBP or GIF, max ${MAX_IMAGE_MB} MB.`
+                                        : `Optional. Phones / tablets play this video instead of the one above (keep it small, mobile data). MP4, WEBM or MOV, max ${MAX_VIDEO_MB} MB.`}{" "}
+                                    Empty: side ads stay hidden on phones.
+                                </p>
+                                {form.media_type === "image" && <ImageSizeHint size={IMAGE_SIZES.mobile} src={mobilePreview} />}
+
+                                {mobilePreview && (
+                                    <div className="relative mt-3 w-[220px]">
+                                        {form.media_type === "image" ? (
+                                            <img src={mobilePreview} alt="Mobile image preview" className="w-full rounded-lg border object-cover" />
+                                        ) : (
+                                            <video src={mobilePreview} autoPlay muted loop playsInline className="w-full rounded-lg border bg-black" />
+                                        )}
+                                        <button
+                                            type="button"
+                                            aria-label={`Remove ${MOBILE_LABELS[form.media_type].toLowerCase()}`}
+                                            onClick={clearMobile}
+                                            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white text-red-600 shadow"
+                                        >
+                                            <FiX size={15} aria-hidden="true" />
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {/* Saved mobile media of another kind is removed on save (mobile follows the tab) */}
+                        {editing && mobileKindOf(editing) && mobileKindOf(editing) !== form.media_type && (
+                            <p className="mb-0 mt-2 text-xs font-medium text-red-600">
+                                Saved {MOBILE_LABELS[mobileKindOf(editing)].toLowerCase()} will be removed when you save this tab.
+                            </p>
                         )}
                     </div>
 
@@ -753,8 +909,26 @@ export default function Listing() {
             <Tmodal isOpen={Boolean(previewAd)} onClose={() => setPreviewAd(null)} title="Ad Preview">
                 {previewAd && (
                     <div className="mx-auto mb-3 w-[240px]">
-                        {/* No click-through in admin preview, link shown below */}
-                        <AdMedia ad={{ ...previewAd, link_url: null }} />
+                        {/* No click-through in admin preview, link shown below.
+                            Main media always (mobile image shown separately, not swapped in on small screens) */}
+                        <p className="mb-1 text-center text-xs font-semibold text-[#62748E]">
+                            Desktop ({MEDIA_LABELS[previewAd.media_type] || "Ad"})
+                        </p>
+                        <AdMedia ad={{ ...previewAd, link_url: null, mobile_image: null, mobile_video_file: null, mobile_video_url: null }} />
+
+                        {mobileKindOf(previewAd) && (
+                            <>
+                                <p className="mb-1 mt-4 text-center text-xs font-semibold text-[#62748E]">{MOBILE_LABELS[mobileKindOf(previewAd)]}</p>
+                                <AdMedia
+                                    ad={{
+                                        image: previewAd.mobile_image || null,
+                                        video_file: previewAd.mobile_video_file || null,
+                                        video_url: previewAd.mobile_video_url || null,
+                                    }}
+                                    shape="wide"
+                                />
+                            </>
+                        )}
                         <p className="mb-0 mt-2 break-all text-center text-xs text-[#62748E]">
                             {previewAd.link_url ? (
                                 <>

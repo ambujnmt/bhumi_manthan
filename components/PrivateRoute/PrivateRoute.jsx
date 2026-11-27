@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { adminHomePath, hasAdminAccess, hasPermission, isSeoOnly, PANEL_ROLES } from "../../utils/adminPermissions";
 import AdminRolePending from "../Common/AdminRolePending";
+import { loginUrl } from "../../utils/loginPopup";
 
 // true after the first client render: on client side navigation (sidebar click)
 // the page renders right away instead of a blank screen (looked like a full refresh)
@@ -17,7 +18,11 @@ const getAccess = (user, allowedRoles, permission, superAdminOnly, blockSeoOnly)
   // USER NOT LOGGED IN
   // ------------------------------------------------
   if (!user) {
-    return { status: "redirect", to: "/login" };
+    // Home with the login popup, back to this page after login
+    return {
+      status: "redirect",
+      to: loginUrl(typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : ""),
+    };
   }
 
   // ------------------------------------------------

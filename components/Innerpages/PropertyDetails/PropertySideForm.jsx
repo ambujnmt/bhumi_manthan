@@ -1,7 +1,8 @@
 
 import { useState } from "react";
-import { FaUser, FaMobileAlt, FaEnvelope } from "react-icons/fa";
+import { FaUser, FaEnvelope } from "react-icons/fa";
 import { submitEnquiryForm } from "@/utils/fetchApi";
+import PhoneOtpField, { isValidEmail, isValidMobile } from "../../Common/PhoneOtpField";
 
 const initialForm = {
     name: "",
@@ -10,9 +11,15 @@ const initialForm = {
     agree: true,
 };
 
+// Bootstrap ".border" forces a grey border with !important -> border-[1px] keeps our colours
+const boxClass = "flex items-center gap-3 rounded border-[1px] bg-white px-3 focus-within:border-[var(--primary-color)]";
+
 // propertyId: property detail page; projectSlug: project detail page (same form, same admin inbox)
 export default function PropertySideForm({ propertyId = null, projectSlug = null }) {
     const [formData, setFormData] = useState(initialForm);
+    // From the phone OTP (sent as phone_verification_token)
+    const [phoneToken, setPhoneToken] = useState("");
+    const [touched, setTouched] = useState({});
     const [loading, setLoading] = useState(false);
     const [successMsg, setSuccessMsg] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
@@ -22,8 +29,20 @@ export default function PropertySideForm({ propertyId = null, projectSlug = null
         setFormData((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
     };
 
+    const nameError = touched.name && formData.name.trim().length < 2 ? "Please enter your full name." : "";
+    const emailError = touched.email && !isValidEmail(formData.email) ? "Enter a valid email address." : "";
+    const canSubmit = formData.name.trim().length >= 2 && isValidEmail(formData.email) && isValidMobile(formData.phone) && phoneToken && formData.agree;
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setTouched({ name: true, email: true });
+
+        if (!phoneToken) {
+            setErrorMsg(isValidMobile(formData.phone) ? "Please verify your mobile number with OTP." : "Enter a valid 10-digit mobile number.");
+            return;
+        }
+
+        if (!canSubmit) return;
 
         setLoading(true);
         setSuccessMsg("");
@@ -32,6 +51,8 @@ export default function PropertySideForm({ propertyId = null, projectSlug = null
         const { agree, ...payload } = formData;
         const res = await submitEnquiryForm({
             ...payload,
+            email: payload.email.trim(),
+            phone_verification_token: phoneToken,
             ...(propertyId && { property: String(propertyId) }),
             ...(projectSlug && { project: String(projectSlug) }),
         });
@@ -39,10 +60,14 @@ export default function PropertySideForm({ propertyId = null, projectSlug = null
         if (res?.status) {
             setSuccessMsg(res.message);
             setFormData(initialForm);
+            setPhoneToken("");
+            setTouched({});
             setTimeout(() => setSuccessMsg(""), 4000);
         } else {
+            // Verification expired on the server -> verify again
+            if (res?.requires_otp) setPhoneToken("");
             setErrorMsg(res?.message || "Something went wrong. Please try again.");
-            setTimeout(() => setErrorMsg(""), 4000);
+            setTimeout(() => setErrorMsg(""), 6000);
         }
         setLoading(false);
     };
@@ -55,50 +80,55 @@ export default function PropertySideForm({ propertyId = null, projectSlug = null
         </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-3 p-4 sm:p-5">
+            <form onSubmit={handleSubmit} noValidate className="space-y-3 p-4 sm:p-5">
                 {/* Name */}
-                <div className="flex items-center gap-3 rounded border border-gray-300 bg-white px-3 focus-within:border-[var(--primary-color)]">
-                <FaUser className="shrink-0 text-[var(--secondary-color)]" size={14} />
-                <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    placeholder="Your Name *"
-                    required
-                    className="w-full bg-transparent py-2.5 text-sm text-gray-700 placeholder-gray-500 outline-none"
-                />
+                <div>
+                    <div className={`${boxClass} ${nameError ? "border-red-500" : "border-gray-300"}`}>
+                        <FaUser className="shrink-0 text-[var(--secondary-color)]" size={14} />
+                        <input
+                            type="text"
+                            name="name"
+                            value={formData.name}
+                            onChange={handleChange}
+                            onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
+                            placeholder="Your Name *"
+                            autoComplete="name"
+                            maxLength={100}
+                            required
+                            className="w-full bg-transparent py-2.5 text-sm text-gray-700 placeholder-gray-500 outline-none"
+                        />
+                    </div>
+                    {nameError && <p className="mb-0 mt-1 text-xs text-red-600">{nameError}</p>}
                 </div>
 
                 {/* Email */}
-                <div className="flex items-center gap-3 rounded border border-gray-300 bg-white px-3 focus-within:border-[var(--primary-color)]">
-                <FaEnvelope className="shrink-0 text-[var(--secondary-color)]" size={14} />
-                <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="Email Address *"
-                    required
-                    className="w-full bg-transparent py-2.5 text-sm text-gray-700 placeholder-gray-500 outline-none"
-                />
+                <div>
+                    <div className={`${boxClass} ${emailError ? "border-red-500" : "border-gray-300"}`}>
+                        <FaEnvelope className="shrink-0 text-[var(--secondary-color)]" size={14} />
+                        <input
+                            type="email"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
+                            placeholder="Email Address *"
+                            autoComplete="email"
+                            maxLength={255}
+                            required
+                            className="w-full bg-transparent py-2.5 text-sm text-gray-700 placeholder-gray-500 outline-none"
+                        />
+                    </div>
+                    {emailError && <p className="mb-0 mt-1 text-xs text-red-600">{emailError}</p>}
                 </div>
 
-                {/* Mobile */}
-                <div className="flex items-center gap-3 rounded border border-gray-300 bg-white px-3 focus-within:border-[var(--primary-color)]">
-                <FaMobileAlt className="shrink-0 text-[var(--secondary-color)]" size={14} />
-                <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    placeholder="Mobile Number *"
-                    required
-                    minLength={8}
-                    maxLength={20}
-                    className="w-full bg-transparent py-2.5 text-sm text-gray-700 placeholder-gray-500 outline-none"
+                {/* Mobile + OTP */}
+                <PhoneOtpField
+                    phone={formData.phone}
+                    onPhoneChange={(phone) => setFormData((prev) => ({ ...prev, phone }))}
+                    token={phoneToken}
+                    onTokenChange={setPhoneToken}
+                    disabled={loading}
                 />
-                </div>
 
                 {/* Checkbox */}
                 <label className="flex cursor-pointer items-start gap-2 text-xs text-gray-600">
@@ -120,13 +150,13 @@ export default function PropertySideForm({ propertyId = null, projectSlug = null
                     <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-600">{errorMsg}</p>
                 )}
 
-                {/* Submit */}
+                {/* Submit: only after the mobile number is OTP verified */}
                 <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !canSubmit}
                 className="w-full rounded bg-[var(--primary-color)] py-3 text-base font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                {loading ? "Submitting..." : "Submit Enquiry"}
+                {loading ? "Submitting..." : phoneToken ? "Submit Enquiry" : "Verify Mobile to Submit"}
                 </button>
             </form>
         </div>

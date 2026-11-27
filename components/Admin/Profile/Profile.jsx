@@ -515,17 +515,15 @@ export default function Profile() {
               </div>
             </div>
 
-            {/* Seller / broker: address + agency + RERA (edit here) */}
-            {["seller", "broker"].includes(profile.role) && (
-              <BusinessDetailsCard
-                profile={profile}
-                onSaved={(user) => {
-                  if (!user) return;
-                  setProfile(user);
-                  updateUser({ ...(loggedInUser || {}), ...user });
-                }}
-              />
-            )}
+            {/* Address + agency + RERA (edit here) - every admin panel user */}
+            <BusinessDetailsCard
+              profile={profile}
+              onSaved={(user) => {
+                if (!user) return;
+                setProfile(user);
+                updateUser({ ...(loggedInUser || {}), ...user });
+              }}
+            />
 
             {/* ========================================================= */}
             {/* MY PLAN (seller / broker / staff) */}

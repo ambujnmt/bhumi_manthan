@@ -342,58 +342,71 @@ export default function Signup({ modal = false, onLogin = null, onDone = null })
         {/* ==========================================
             LEFT SIDE
         ========================================== */}
+        {/* ==========================================
+            LEFT SIDE - PREMIUM DESIGN
+        ========================================== */}
         <div className="hidden lg:flex lg:w-[46%] relative overflow-hidden bg-[#001737]">
-
-          <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full border border-white/10" />
-
-          <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full border border-white/10" />
-
-          <div className="absolute top-20 right-10 w-20 h-20 rounded-full bg-[#E87722]/10" />
-
+ 
+          {/* BACKGROUND GRADIENT */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#001737] via-[#08264B] to-[#00112B]" />
+ 
+          {/* SUBTLE ORANGE GLOW */}
+          <div className="absolute top-[18%] right-[-100px] w-[300px] h-[300px] rounded-full bg-[#E87722]/10 blur-[100px]" />
+ 
+          <div className="absolute bottom-[-100px] left-[-80px] w-[280px] h-[280px] rounded-full bg-blue-400/10 blur-[100px]" />
+ 
+          {/* DECORATIVE ACCENT */}
+          <div className="absolute top-0 right-0 w-1.5 h-full bg-gradient-to-b from-transparent via-[#E87722]/60 to-transparent" />
+ 
+          {/* MAIN CONTENT */}
           <div className="relative z-10 flex flex-col justify-between w-full p-10 xl:p-12">
-
+ 
             {/* LOGO */}
-            <Link href="/">
+            <Link href="/" className="inline-block">
               <img
                 src="/assets/img/logo.png"
                 alt="Logo"
                 className="h-auto w-64 object-contain brightness-0 invert"
               />
             </Link>
-
+ 
             {/* CONTENT */}
-            <div className="my-auto py-16">
-
-              <div className="inline-flex items-center gap-2 bg-white/10 border border-white/10 rounded-full px-4 py-2 mb-6">
-
+            <div className="my-auto py-4">
+ 
+              {/* LABEL */}
+              <div className="inline-flex items-center gap-3 bg-white/[0.06] border border-white/10 rounded-md px-4 py-2 mb-7">
+ 
                 <span className="w-2 h-2 rounded-full bg-[#E87722]" />
-
-                <span className="text-white/80 text-xs font-medium tracking-wide">
+ 
+                <span className="text-white/75 text-xs font-semibold tracking-[2px]">
                   YOUR PROPERTY JOURNEY STARTS HERE
                 </span>
-
+ 
               </div>
-
-              <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight font-['Montserrat']">
-
+ 
+              {/* HEADING */}
+              <h1 className="text-4xl xl:text-[50px] font-bold text-white leading-[1.15] font-['Montserrat']">
+ 
                 Find a place
+ 
                 <br />
-
+ 
                 <span className="text-[#E87722]">
                   you'll love.
                 </span>
-
+ 
               </h1>
-
-              <p className="text-white/65 text-sm xl:text-base leading-7 mt-6 max-w-[420px]">
+ 
+              {/* DESCRIPTION */}
+              <p className="text-white/65 text-sm xl:text-base leading-8 mt-6 max-w-[420px]">
                 Create your account and discover properties,
                 connect with trusted brokers, and make your
                 next real estate move with confidence.
               </p>
-
+ 
               {/* FEATURES */}
-              <div className="mt-8 space-y-4">
-
+              <div className="mt-10 space-y-5">
+ 
                 {[
                   "Discover properties that match your needs",
                   "Connect with trusted real estate professionals",
@@ -401,32 +414,44 @@ export default function Signup({ modal = false, onLogin = null, onDone = null })
                 ].map((text) => (
                   <div
                     key={text}
-                    className="flex items-center gap-3"
+                    className="flex items-center gap-4 group"
                   >
-
-                    <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center">
-
-                      <span className="text-[#E87722] text-sm">
+ 
+                    <div className="w-10 h-10 shrink-0 rounded-lg bg-[#E87722]/10 border border-[#E87722]/20 flex items-center justify-center">
+ 
+                      <span className="text-[#E87722] text-base font-bold">
                         ✓
                       </span>
-
+ 
                     </div>
-
-                    <span className="text-white/80 text-sm">
+ 
+                    <span className="text-white/80 text-sm xl:text-[15px]">
                       {text}
                     </span>
-
+ 
                   </div>
                 ))}
-
+ 
               </div>
-
+ 
+              {/* BOTTOM ACCENT */}
+              <div className="mt-4 flex items-center gap-3">
+ 
+                <div className="w-12 h-[3px] bg-[#E87722]" />
+ 
+                <div className="w-5 h-[3px] bg-white/20" />
+ 
+                <div className="w-2 h-[3px] bg-white/10" />
+ 
+              </div>
+ 
             </div>
-
-            <div className="text-white/40 text-xs">
+ 
+            {/* FOOTER */}
+            <div className="text-white/40 text-xs tracking-wide">
               © {new Date().getFullYear()} All rights reserved.
             </div>
-
+ 
           </div>
         </div>
 
@@ -769,7 +794,7 @@ export default function Signup({ modal = false, onLogin = null, onDone = null })
                 </button>
               ) : (
                 <Link
-                  href="/login"
+                  href="/?login=1"
                   className="text-[#E87722] font-semibold hover:underline"
                 >
                   Login

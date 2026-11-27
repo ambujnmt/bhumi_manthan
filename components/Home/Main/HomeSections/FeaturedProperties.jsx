@@ -5,23 +5,19 @@ import { FiMapPin, FiNavigation } from "react-icons/fi";
 import { cardSpecs, priceInfo, propertyTypeLabel } from "../../../Innerpages/PropertyDetails/PropertySpecs";
 import { formatDistance, formatPropertyPrice, imageFallback } from "../../../../utils/formatPrice";
 import WishlistButton from "../../../Common/WishlistButton";
-import AdMedia from "../../../Common/Ads/AdMedia";
-import { AD_PLACEMENTS, fetchAd, peekAd } from "../../../../utils/ads";
-
-const knownHomeAds = () => ({
-    left: peekAd(AD_PLACEMENTS.HOME_FEATURED_LEFT) || null,
-    right: peekAd(AD_PLACEMENTS.HOME_FEATURED_RIGHT) || null,
-});
+import AdMedia, { hasMobileMedia } from "../../../Common/Ads/AdMedia";
+import { AD_PLACEMENTS, fetchAd, useInitialAd } from "../../../../utils/ads";
 
 const badgeColors = {
     FEATURED: "bg-[#22C55E]",
     PREMIUM: "bg-[var(--primary-color)]",
     NEW: "bg-[#3B82F6]",
+    "NEW LAUNCH": "bg-[#7C3AED]",
     "ULTRA LUXURY": "bg-[#D4AF37]",
 };
 
 // Home shows 12 cards (3 rows), no pagination; "View All Properties" opens the full list
-const HOME_LIMIT = 12;
+const HOME_LIMIT = 20;
 
 // Card photo: same simple <img> as before (fixed h-48, so the card never changes size).
 // First row loads first (eager), the rest when needed (lazy).
@@ -58,8 +54,14 @@ function CardSkeleton() {
 // properties + nearby come from Body (useHomeListings)
 export default function FeaturedProperties({ loading = false, properties = [], nearby = false }) {
     // Side ads (Admin -> Ads, "Home (Featured Properties)"). Only set ads show, no default card.
-    // First render: ads from the server (pages/index.jsx) / cache -> layout right away, no jump
-    const [ads, setAds] = useState(knownHomeAds);
+    // First render: this request's server ads (pages/index.jsx, ServerAdsContext) -> same HTML
+    // on server and browser (no hydration error), layout right away, no jump.
+    // Browser cache is used only when there are no server ads (e.g. client navigation).
+    const initialAd = useInitialAd();
+    const [ads, setAds] = useState(() => ({
+        left: initialAd(AD_PLACEMENTS.HOME_FEATURED_LEFT) || null,
+        right: initialAd(AD_PLACEMENTS.HOME_FEATURED_RIGHT) || null,
+    }));
 
     useEffect(() => {
         let active = true;
@@ -115,7 +117,7 @@ export default function FeaturedProperties({ loading = false, properties = [], n
                 <div className="grid grid-cols-12 gap-4 mt-4 lg:mt-[30px]">
                     {/* Left ad column (only when a side has an ad). Phones: shown only with a mobile image (full width); desktop: kept so cards stay centred */}
                     {withAds && (
-                        <div className={`${ads.left?.mobile_image ? "col-span-12" : "hidden"} lg:col-span-1 lg:block xl:col-span-1`}>
+                        <div className={`${hasMobileMedia(ads.left) ? "col-span-12" : "hidden"} lg:col-span-1 lg:block xl:col-span-1`}>
                             {ads.left && <AdMedia ad={ads.left} />}
                         </div>
                     )}
@@ -144,9 +146,12 @@ export default function FeaturedProperties({ loading = false, properties = [], n
                                                     alt={property.title}
                                                     eager={index < 4}
                                                 />
-                                                <div className={`absolute top-[10px] left-[10px] text-white px-2 py-1 rounded-md ${badgeColors[badge] || "bg-[var(--primary-color)]"}`}>
-                                                    <p className="text-[11px] font-bold mb-0">{badge}</p>
-                                                </div>
+                                                {/* Admin "Card Badge": NONE = no badge */}
+                                                {badge !== "NONE" && (
+                                                    <div className={`absolute top-[10px] left-[10px] text-white px-2 py-1 rounded-md ${badgeColors[badge] || "bg-[var(--primary-color)]"}`}>
+                                                        <p className="text-[11px] font-bold mb-0">{badge}</p>
+                                                    </div>
+                                                )}
                                                 <WishlistButton propertyId={property.id} className="absolute top-[10px] right-[10px]" />
                                                 {distance && (
                                                     <div className="absolute bottom-[10px] left-[10px] inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white">
@@ -205,7 +210,7 @@ export default function FeaturedProperties({ loading = false, properties = [], n
                     </div>
                     {/* Right ad column. Phones: -mb-12 pulls the next section (mt-[60px] py-10) closer, so no big gap under the ad */}
                     {withAds && (
-                        <div className={`${ads.right?.mobile_image ? "col-span-12 -mb-12" : "hidden"} lg:col-span-1 lg:mb-0 lg:block xl:col-span-1`}>
+                        <div className={`${hasMobileMedia(ads.right) ? "col-span-12 -mb-12" : "hidden"} lg:col-span-1 lg:mb-0 lg:block xl:col-span-1`}>
                             {ads.right && <AdMedia ad={ads.right} />}
                         </div>
                     )}

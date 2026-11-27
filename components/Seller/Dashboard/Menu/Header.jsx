@@ -61,7 +61,7 @@ export default function Header({ menuOpen, toggleMenu }) {
     onClose();
 
     // Go to login immediately
-    router.replace("/login");
+    router.replace("/?login=1");
   } catch (error) {
     console.error("Logout error:", error);
   } finally {

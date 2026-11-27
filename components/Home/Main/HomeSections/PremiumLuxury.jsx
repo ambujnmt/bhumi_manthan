@@ -87,9 +87,12 @@ export default function PremiumLuxury({ loading = false, properties = [], nearby
 
                                     {/* Content */}
                                     <div className="p-4">
-                                        <span className="inline-block bg-[#D4AF37] text-white text-[11px] font-bold px-3 py-1 rounded-md mb-3 uppercase">
-                                            {property.badge || "Ultra Luxury"}
-                                        </span>
+                                        {/* Admin "Card Badge": NONE = no badge */}
+                                        {String(property.badge || "").toUpperCase() !== "NONE" && (
+                                            <span className="inline-block bg-[#D4AF37] text-white text-[11px] font-bold px-3 py-1 rounded-md mb-3 uppercase">
+                                                {property.badge || "Ultra Luxury"}
+                                            </span>
+                                        )}
 
                                         <h2 className="text-[20px] font-bold text-[var(--text-color1)] line-clamp-1">
                                             {property.title}

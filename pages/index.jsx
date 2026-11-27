@@ -1,14 +1,18 @@
 import React from "react";
 import Main from "../components/Home/Main/Main";
 import { loadDefaultListings } from "../utils/useHomeListings";
-import { AD_PLACEMENTS, loadAdsOnServer, primeAds } from "../utils/ads";
+import { AD_PLACEMENTS, loadAdsOnServer, primeAds, ServerAdsContext } from "../utils/ads";
 
 export default function HomePage({ banners, listings, youtuberVideos, ads = null }) {
-  // Featured Properties side ads come with the HTML -> right layout on the first paint (no jump)
+  // Featured Properties side ads come with the HTML -> right layout on the first paint (no jump).
+  // Given through context (per request) so server HTML and browser hydration match;
+  // primeAds only fills the browser cache for later pages.
   primeAds(ads);
 
   return (
+    <ServerAdsContext.Provider value={ads}>
       <Main banners={banners} listings={listings} youtuberVideos={youtuberVideos} />
+    </ServerAdsContext.Provider>
   );
 }
 

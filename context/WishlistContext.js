@@ -4,6 +4,7 @@ import { showToast } from "@/store/toast";
 import { addToWishlist, getWishlistIds, removeFromWishlist } from "../utils/fetchApi";
 import { clearPostLoginRedirect, rememberPostLoginRedirect } from "../utils/postLoginRedirect";
 import { useUser } from "./UserContext";
+import { openLogin } from "../utils/loginPopup";
 
 // Heart a guest clicked: saved right after they log in
 const PENDING_KEY = "wishlist_pending_property";
@@ -95,7 +96,7 @@ export const WishlistProvider = ({ children }) => {
     if (!userId) {
       writePending(propertyId);
       rememberPostLoginRedirect(router.asPath);
-      router.push("/login");
+      openLogin(router);
       return;
     }
 

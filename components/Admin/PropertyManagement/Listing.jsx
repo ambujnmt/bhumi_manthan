@@ -1,16 +1,17 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { actionButtonClass } from "../actionButtonClass";
+import { actionButtonClass, dangerActionButtonClass } from "../actionButtonClass";
 import { useAdminPermission } from "../../../utils/adminPermissions";
 import AddedBy from "../AddedBy";
+import ApprovalBadge from "./ApprovalBadge";
 import PageTitle from "../../Breadcrumb/PageTitle";
 import { Link, Spinner, Tooltip } from "@heroui/react";
-import { deleteProperty, getAdminProperties } from "../../../utils/adminFetchApi";
+import { deleteProperty, getAdminProperties, permanentDeleteProperty, restoreProperty } from "../../../utils/adminFetchApi";
 import { showToast } from "../../../store/toast";
 import { saveCachedProperties } from "../../../utils/adminPropertyCache";
 import Pagination from "../../Pagination/Pagination";
-import { FaPen, FaRegImage } from "react-icons/fa";
+import { FaPen, FaRegImage, FaTrashRestore } from "react-icons/fa";
 import { LuCopy, LuEye, LuHouse, LuMapPin } from "react-icons/lu";
 
 // Property ID chip click -> copy plain ID
@@ -44,7 +45,7 @@ export default function Listing() {
 
     // Pagination
     const [pageIndex, setPageIndex] = useState(0);
-    const [pageSize, setPageSize] = useState(12);
+    const [pageSize, setPageSize] = useState(48);
 
     // Fetch Properties
     useEffect(() => {
@@ -129,6 +130,32 @@ export default function Listing() {
     ];
 
     // Delete Click
+    // Trash actions: { type: "restore" | "permanent", property }
+    const [trashAction, setTrashAction] = useState(null);
+    const [trashLoading, setTrashLoading] = useState(false);
+
+    const handleTrashConfirm = async () => {
+        if (!trashAction?.property?.id) return;
+
+        const { type, property } = trashAction;
+        setTrashLoading(true);
+
+        try {
+            const res = type === "restore"
+                ? await restoreProperty(property.id)
+                : await permanentDeleteProperty(property.id);
+
+            // Either way it leaves the trash list
+            setProperties((prev) => prev.filter((item) => item.id !== property.id));
+            setTrashAction(null);
+            showToast(res?.message || (type === "restore" ? "Property restored." : "Property permanently deleted."));
+        } catch (error) {
+            showToast(error?.message || "Something went wrong.", "error");
+        } finally {
+            setTrashLoading(false);
+        }
+    };
+
     const handleDeleteClick = (property) => {
         setSelectedProperty(property);
         setDeleteModalOpen(true);
@@ -375,6 +402,24 @@ export default function Listing() {
                                         )}
                                     </div>
 
+                                    {/* Admin approval (seller / broker properties) */}
+                                    {property.approval_status && property.approval_status !== "approved" && (
+                                        <div className="mt-2.5">
+                                            <ApprovalBadge status={property.approval_status} />
+                                            {property.approval_note && (
+                                                <p className="mb-0 mt-1.5 line-clamp-3 rounded-lg bg-gray-50 px-2.5 py-1.5 text-[12px] text-[#1A1F36]" title={property.approval_note}>
+                                                    <span className="font-semibold">Admin note: </span>
+                                                    {property.approval_note}
+                                                </p>
+                                            )}
+                                            {["rejected", "changes_requested"].includes(property.approval_status) && (
+                                                <p className="mb-0 mt-1 text-[11px] text-[#62748E]">
+                                                    Update the property to resubmit it for approval.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {/* Added by */}
                                     <div className="mt-3 border-t border-gray-100 pt-2">
                                         <p className="mb-0 text-[11px] text-[#62748E]">Added by</p>
@@ -397,7 +442,7 @@ export default function Listing() {
                                             )}
 
                                             {!showDeleted && can('properties.delete') && (
-                                                <Tooltip content="Delete Property">
+                                                <Tooltip content="Move to Trash">
                                                     <button
                                                         type="button"
                                                         onClick={() => handleDeleteClick(property)}
@@ -407,6 +452,32 @@ export default function Listing() {
                                                         <FaRegTrashCan size={14} />
                                                     </button>
                                                 </Tooltip>
+                                            )}
+
+                                            {/* Trash: restore / delete for good */}
+                                            {showDeleted && can('properties.delete') && (
+                                                <>
+                                                    <Tooltip content="Restore Property">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setTrashAction({ type: "restore", property })}
+                                                            className={actionButtonClass}
+                                                            aria-label={`Restore ${property.title}`}
+                                                        >
+                                                            <FaTrashRestore size={13} />
+                                                        </button>
+                                                    </Tooltip>
+                                                    <Tooltip content="Delete Permanently">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setTrashAction({ type: "permanent", property })}
+                                                            className={dangerActionButtonClass}
+                                                            aria-label={`Permanently delete ${property.title}`}
+                                                        >
+                                                            <FaRegTrashCan size={14} />
+                                                        </button>
+                                                    </Tooltip>
+                                                </>
                                             )}
                                         </div>
 
@@ -504,6 +575,61 @@ export default function Listing() {
 
                 </p>
 
+                <p className="mb-0 text-sm text-[#62748E]">
+                    It moves to Trash (Show Deleted Properties) and is hidden from the website.
+                    You can restore it from there.
+                </p>
+
+            </Tmodal>
+
+            {/* Trash: Restore / Permanent delete */}
+            <Tmodal
+                isOpen={Boolean(trashAction)}
+                onClose={() => !trashLoading && setTrashAction(null)}
+                title={trashAction?.type === "restore" ? "Restore Property" : "Delete Permanently"}
+                footer={
+                    <div className="flex gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setTrashAction(null)}
+                            disabled={trashLoading}
+                            className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleTrashConfirm}
+                            disabled={trashLoading}
+                            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-white ${
+                                trashAction?.type === "restore" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                            }`}
+                        >
+                            {trashLoading && <Spinner size="sm" color="white" />}
+                            {trashAction?.type === "restore"
+                                ? (trashLoading ? "Restoring..." : "Restore")
+                                : (trashLoading ? "Deleting..." : "Delete Permanently")}
+                        </button>
+                    </div>
+                }
+            >
+                <p className="text-gray-600">
+                    {trashAction?.type === "restore" ? "Restore " : "Permanently delete "}
+                    <span className="font-semibold text-gray-900">{trashAction?.property?.title}</span>?
+                </p>
+
+                {trashAction?.type === "restore" ? (
+                    <p className="mb-0 text-sm text-[#62748E]">
+                        It goes back to the property list with the same status it had
+                        (shown on the website again if it was active and approved).
+                    </p>
+                ) : (
+                    <p className="mb-0 text-sm text-red-600">
+                        This cannot be undone. The property, its photos and video are removed for good,
+                        and it is taken out of buyers&apos; wishlists and compare lists.
+                        Enquiries and leads for it are kept.
+                    </p>
+                )}
             </Tmodal>
 
         </div>

@@ -161,7 +161,7 @@ export default function Header() {
   // "Already have an account? Login" -> login popup (or /login page when this page has none)
   const registerToLogin = () => {
     setRegisterOpen(false);
-    if (!openLoginPopup()) router.push("/login");
+    if (!openLoginPopup()) router.push("/?login=1");
   };
 /* ---------- desktop dropdown states ---------- */
   const [admissionsOpen, setAdmissionsOpen] = useState(false);
@@ -207,7 +207,9 @@ export default function Header() {
   // Only customers have a wishlist. A guest goes to login first.
   const wishlistLink = !authLoading && (!user || user.role === "customer") && (
     <Link
-      href={user ? `/user/myWishlist/myWishlist/${user.id}` : "/login"}
+      href={user ? `/user/myWishlist/myWishlist/${user.id}` : "/?login=1"}
+      // Guest: login popup on this page
+      onClick={user ? undefined : openLogin}
       aria-label={wishlistIds.length ? `Wishlist, ${wishlistIds.length} saved` : "Wishlist"}
       title="Wishlist"
       className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--primary-color)] transition-colors hover:bg-[#FFECD3]"
@@ -223,8 +225,8 @@ export default function Header() {
 
   const { ids: compareIds } = useCompare();
 
-  // The compare page itself asks a guest to log in
-  const compareLink = !authLoading && (
+  // Compare button: logged-in users only (hidden for guests)
+  const compareLink = !authLoading && user && (
     <Link
       href="/web/compare"
       aria-label={compareIds.length ? `Compare, ${compareIds.length} added` : "Compare"}
@@ -242,7 +244,7 @@ export default function Header() {
 
   const getDashboardPath = () => {
     if (!user) {
-      return "/login";
+      return "/?login=1";
     }
 
     if (hasAdminAccess(user)) {
@@ -265,17 +267,23 @@ export default function Header() {
   };
 
 
+  // Label by the account's own role: a seller / broker with admin panel access
+  // still sees "Seller / Broker Dashboard" (the link opens their panel either way)
   const getDashboardLabel = () => {
-    if (hasAdminAccess(user)) {
-      return "Admin Dashboard";
-    }
-
     if (user?.role === "seller") {
       return "Seller Dashboard";
     }
 
     if (user?.role === "broker") {
       return "Broker Dashboard";
+    }
+
+    if (user?.role === "staff") {
+      return "Staff Dashboard";
+    }
+
+    if (hasAdminAccess(user)) {
+      return "Admin Dashboard";
     }
 
     if (user?.role === "customer") {
@@ -343,7 +351,7 @@ const handleLogout = () => {
   setMobileOpen(false);
 
   // Home page with login popup open (StickyLoginForm reads ?login=1)
-  router.push("/?login=1");
+  router.push("/");
 };
   return (
     <>
@@ -825,7 +833,7 @@ const handleLogout = () => {
                         </div>
 
                         <NextLink
-                          href="/login"
+                          href="/?login=1"
                           onClick={openLogin}
                           className="no-underline capitalize text-[14px] font-semibold text-[var(--text-color3)] hover:text-[var(--secondary-color)] transition-colors py-2"
                         >
@@ -835,7 +843,7 @@ const handleLogout = () => {
                         <span>/</span>
 
                         <NextLink
-                          href="/login"
+                          href="/?login=1"
                           onClick={openLogin}
                           className="no-underline capitalize text-[14px] font-semibold text-[var(--text-color3)] hover:text-[var(--secondary-color)] transition-colors py-2"
                         >
@@ -845,7 +853,7 @@ const handleLogout = () => {
                         <span>/</span>
 
                         <NextLink
-                          href="/login"
+                          href="/?login=1"
                           onClick={openLogin}
                           className="no-underline capitalize text-[14px] font-semibold text-[var(--text-color3)] hover:text-[var(--secondary-color)] transition-colors py-2"
                         >
@@ -1188,7 +1196,7 @@ const handleLogout = () => {
         </NextLink>
 
         <NextLink
-          href="/login"
+          href="/?login=1"
           onClick={openLogin}
           className="no-underline flex items-center justify-center text-white text-sm font-medium rounded-md px-2 py-2.5 bg-[var(--primary-color)] hover:bg-[var(--secondary-color)] hover:text-white transition-all duration-500 ease-in-out whitespace-nowrap"
         >
@@ -1196,7 +1204,7 @@ const handleLogout = () => {
         </NextLink>
 
         <NextLink
-          href="/login"
+          href="/?login=1"
           onClick={openLogin}
           className="no-underline flex items-center justify-center text-white text-sm font-medium rounded-md px-2 py-2.5 bg-[var(--primary-color)] hover:bg-[var(--secondary-color)] hover:text-white transition-all duration-500 ease-in-out whitespace-nowrap"
         >

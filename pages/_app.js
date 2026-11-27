@@ -18,6 +18,9 @@ import Toast from "../components/Toast";
 
 const Snackbar = dynamic(() => import('@/components/utils/Snackbar'), { ssr: false });
 
+// Login popup (client only: reads cookies / URL)
+const StickyLoginForm = dynamic(() => import('@/components/Innerpages/StickyLoginForm'), { ssr: false });
+
 /**
  * Admin panel URL by logged in role:
  * /admin/... (super admin), /seller/..., /broker/..., /staff/...
@@ -71,6 +74,8 @@ function App({ Component, pageProps, websiteData }) {
               <DefaultLayout websiteData={websiteData}>
                  <Toast />
               {getLayout(<Component {...pageProps} />)}
+              {/* The only login screen: popup on every page (opens itself on home only) */}
+              <StickyLoginForm autoOpen={router.pathname === "/"} />
               </DefaultLayout>
               <Snackbar />
             </RoleAwareProviders>

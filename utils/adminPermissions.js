@@ -36,8 +36,11 @@ export const isSeoOnly = (user) => {
 const ADMIN_PAGES = [
   ["dashboard.view", "/admin/dashboard"],
   ["properties.view", "/admin/propertyManagement/propertyList"],
+  ["property_requests.view", "/admin/propertyRequest/requestList"],
+  ["reviews.view", "/admin/review/reviewList"],
+  ["leads.view", "/admin/lead/leadList"],
   ["property_categories.view", "/admin/propertyCategory/listing"],
-  ["enquiries.view", "/admin/enquiry/enquiryList"],
+  ["property_badges.view", "/admin/propertyBadge/listing"],
   ["contact_messages.view", "/admin/contact/contactList"],
   ["subscribers.view", "/admin/subscriber/subscriberList"],
   ["users.view", "/admin/user/userManagement"],

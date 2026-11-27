@@ -15,7 +15,7 @@ import CompareButton from '../../Common/CompareButton';
 import { FaCog, FaRulerCombined, FaCity, FaBuilding, } from "react-icons/fa";
 import { FaVectorSquare, FaCompass, FaFileSignature, FaCouch } from "react-icons/fa";
 import { FaHome, FaChevronRight, FaArrowLeft } from "react-icons/fa";
-import { MdRealEstateAgent, MdApartment } from "react-icons/md";
+import { MdRealEstateAgent, MdApartment, MdVerified } from "react-icons/md";
 import { BsChatDotsFill } from "react-icons/bs";
 import PropertyDescription from './PropertyDescription';
 import { useEffect, useState } from "react";
@@ -32,87 +32,16 @@ import { useUser } from "@/context/UserContext";
 import { BookAppointmentButton } from "@/modules/appointments";
 import MetaTags from "../../Head/MetaTags";
 import { buildPropertySeo } from "@/utils/seo";
-import { FiCheck, FiCopy } from "react-icons/fi";
 import SideAds from "../../Common/Ads/SideAds";
+import { openLogin } from "../../../utils/loginPopup";
 
-// "ID: PROP-XXXX [copy]" pill. Clipboard API, with a fallback for http / older browsers.
-// variant "crumb": small breadcrumb pill, whole pill copies on click.
-function PropertyIdCopy({ id, variant = "default" }) {
-    const [copied, setCopied] = useState(false);
-
-    useEffect(() => {
-        if (!copied) return;
-        const timer = setTimeout(() => setCopied(false), 2000);
-
-        return () => clearTimeout(timer);
-    }, [copied]);
-
-    const copy = async () => {
-        try {
-            if (navigator.clipboard && window.isSecureContext) {
-                await navigator.clipboard.writeText(id);
-            } else {
-                const field = document.createElement("textarea");
-                field.value = id;
-                field.setAttribute("readonly", "");
-                field.style.position = "fixed";
-                field.style.opacity = "0";
-                document.body.appendChild(field);
-                field.select();
-                document.execCommand("copy");
-                field.remove();
-            }
-
-            setCopied(true);
-            showToast("Property ID copied.");
-        } catch {
-            showToast("Could not copy. Please copy the ID manually.", "error");
-        }
-    };
-
-    if (variant === "crumb") {
-        return (
-            <button
-                type="button"
-                onClick={copy}
-                title={copied ? "Copied" : "Click to copy Property ID"}
-                aria-label={copied ? "Property ID copied" : `Property ID ${id}, click to copy`}
-                className={`group flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 font-semibold shadow-sm transition ${
-                    copied
-                        ? "border-green-200 bg-green-50 text-green-700"
-                        : "border-[#f3d9bf] bg-[#fdf3e7] text-[var(--secondary-color)] hover:border-[var(--primary-color)] hover:text-[var(--primary-color)]"
-                }`}
-            >
-                <span className="text-[11px] font-medium uppercase tracking-wide text-[#62748E]">ID</span>
-                <span className="tracking-wide">{id}</span>
-                {copied ? (
-                    <FiCheck size={13} aria-hidden="true" />
-                ) : (
-                    <FiCopy size={13} className="text-[var(--primary-color)] opacity-70 group-hover:opacity-100" aria-hidden="true" />
-                )}
-            </button>
-        );
-    }
-
+// "Property ID: PROP-XXXX" pill in the breadcrumb (no copy button; the ID text can still be selected).
+function PropertyIdBadge({ id }) {
     return (
-        <div className="flex items-center overflow-hidden rounded-lg border border-[#f3d9bf] bg-white text-sm shadow-sm">
-            <span className="whitespace-nowrap px-3 py-1.5 text-gray-500">
-                Property ID:{" "}
-                <span className="select-all font-bold tracking-wide text-[var(--secondary-color)]">{id}</span>
-            </span>
-            <button
-                type="button"
-                onClick={copy}
-                aria-label={copied ? "Property ID copied" : `Copy Property ID ${id}`}
-                title={copied ? "Copied" : "Copy Property ID"}
-                className={`flex items-center gap-1.5 self-stretch border-l border-[#f3d9bf] px-3 text-xs font-semibold transition-colors ${
-                    copied ? "bg-green-50 text-green-700" : "bg-[#fdf3e7] text-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-white"
-                }`}
-            >
-                {copied ? <FiCheck size={14} aria-hidden="true" /> : <FiCopy size={14} aria-hidden="true" />}
-                {copied ? "Copied" : "Copy"}
-            </button>
-        </div>
+        <span className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#f3d9bf] bg-[#fdf3e7] px-3 py-1.5 font-semibold text-[var(--secondary-color)] shadow-sm">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-[#62748E]">Property ID</span>
+            <span className="select-all tracking-wide">{id}</span>
+        </span>
     );
 }
 
@@ -179,7 +108,7 @@ export default function PropertyDetails({ clientSeo = false }) {
 
         if (!user) {
             rememberPostLoginRedirect(chatPath);
-            router.push("/login");
+            openLogin(router);
             return;
         }
 
@@ -199,7 +128,7 @@ export default function PropertyDetails({ clientSeo = false }) {
     const askLoginToBook = () => {
         rememberBookingAfterLogin(listingKey);
         rememberPostLoginRedirect(`/web/propertyDetail/${encodeURIComponent(listingKey)}`);
-        router.push("/login");
+        openLogin(router);
     };
 
     useEffect(() => {
@@ -314,7 +243,7 @@ export default function PropertyDetails({ clientSeo = false }) {
                                 {property.property_id && (
                                     <>
                                         <li>
-                                            <PropertyIdCopy id={property.property_id} variant="crumb" />
+                                            <PropertyIdBadge id={property.property_id} />
                                         </li>
 
                                         <li aria-hidden="true">
@@ -370,8 +299,19 @@ export default function PropertyDetails({ clientSeo = false }) {
                                         </h2>
                                     </div>
 
-                                    {/* Property ID + copy (same ID works in the home search "Property ID" tab) */}
-                                    {property.property_id && <PropertyIdCopy id={property.property_id} />}
+                                    {/* RERA registration number (Property ID stays in the breadcrumb above) */}
+                                    {property.rera_number && (
+                                        <div
+                                            className="flex items-center gap-2 rounded-lg border-[1px] border-green-200 bg-green-50 px-3 py-1.5 text-sm shadow-sm"
+                                            title="RERA registration number"
+                                        >
+                                            <MdVerified className="shrink-0 text-green-600" size={16} aria-hidden="true" />
+                                            <span className="whitespace-nowrap text-gray-500">RERA No:</span>
+                                            <span className="select-all break-all font-mono font-bold tracking-wide text-[var(--secondary-color)]">
+                                                {property.rera_number}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Highlights Box */}

@@ -9,6 +9,7 @@ import { showToast } from "../../../store/toast";
 import { getCompareTable } from "../../../utils/fetchApi";
 import { formatPropertyPrice, imageFallback } from "../../../utils/formatPrice";
 import { rememberPostLoginRedirect } from "../../../utils/postLoginRedirect";
+import { openLogin } from "../../../utils/loginPopup";
 
 const FALLBACK_IMAGE = "/assets/img/prop-1.png";
 const SEARCH_PATH = "/web/property/searchProperties";
@@ -225,7 +226,7 @@ export default function CompareProperties() {
 
   const goToLogin = () => {
     rememberPostLoginRedirect("/web/compare");
-    router.push("/login");
+    openLogin(router);
   };
 
   const renderBody = () => {

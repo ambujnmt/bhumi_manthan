@@ -13,6 +13,9 @@ import LocationFields from "./LocationFields";
 import CategoryFields from "./CategoryFields";
 import PropertyVideoField, { appendVideo, emptyVideo, videoFromProperty } from "./PropertyVideoField";
 import PropertySeoFields from "./PropertySeoFields";
+import ReraField, { formatRera, validateRera } from "./ReraField";
+import CardBadgeField from "./CardBadgeField";
+import ImageSizeNote, { PROPERTY_IMAGE_SIZES } from "./ImageSizeNote";
 import {
     TYPE_FIELD_DEFAULTS,
     applyFieldRules,
@@ -41,6 +44,7 @@ const initialForm = {
     price_per_sqft: "",
     location: "",
     city: "",
+    rera_number: "",
     state: "",
     description: "",
     super_area: "",
@@ -208,7 +212,7 @@ const breadCrumbItems = [
    IMAGE FIELD (current image + file input, Create page style)
 ========================================================= */
 
-const ImageField = ({ label, name, preview, selectedFile, onChange, onRemove }) => (
+const ImageField = ({ label, name, preview, selectedFile, onChange, onRemove, size }) => (
     <div>
         <label htmlFor={name} className={labelClass}>
             {label}
@@ -250,6 +254,9 @@ const ImageField = ({ label, name, preview, selectedFile, onChange, onRemove }) 
                 Selected: {selectedFile.name}
             </p>
         )}
+
+        {/* Recommended width x height + chosen image size */}
+        <ImageSizeNote size={size} file={selectedFile} />
     </div>
 );
 
@@ -299,6 +306,7 @@ export default function Update() {
     const [message, setMessage] = useState("");
     const [messageType, setMessageType] = useState("");
     const [geoStatus, setGeoStatus] = useState(""); // "", loading, found, error
+    const [reraSubmitted, setReraSubmitted] = useState(false); // show RERA error after a submit try
 
     // Saved address -> lat/long is recalculated only when address changes
     const savedAddressRef = useRef("");
@@ -315,6 +323,9 @@ export default function Update() {
             Object.keys(initialForm).reduce((values, key) => {
                 if (["agent_verified", "is_featured", "is_luxury"].includes(key)) {
                     values[key] = !!data[key];
+                } else if (key === "rera_number") {
+                    // Old entries (lowercase / extra symbols) -> new format, so saving is not blocked
+                    values[key] = formatRera(data[key] ?? "").trim();
                 } else {
                     values[key] = data[key] ?? "";
                 }
@@ -508,6 +519,17 @@ export default function Update() {
             return;
         }
 
+        // RERA format (optional field): stop here and show the error under the box
+        const reraError = validateRera(form.rera_number);
+
+        if (reraError) {
+            setReraSubmitted(true);
+            showToast(reraError, "error");
+            document.getElementById("rera_number")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            document.getElementById("rera_number")?.focus({ preventScroll: true });
+            return;
+        }
+
         setUpdateLoading(true);
         setMessage("");
         setMessageType("");
@@ -691,6 +713,19 @@ export default function Update() {
                                         />
                                     )}
 
+                                    {section.title === "Location Details" && (
+                                        <ReraField
+                                            value={form.rera_number}
+                                            onChange={(rera_number) =>
+                                                setForm((previous) => ({ ...previous, rera_number }))
+                                            }
+                                            state={form.state}
+                                            inputClass={inputClass}
+                                            labelClass={labelClass}
+                                            showError={reraSubmitted}
+                                        />
+                                    )}
+
                                     {section.fields.map((field) => (
                                         <div
                                             key={field.name}
@@ -869,24 +904,8 @@ export default function Update() {
                                     Premium Luxury Listings
                                 </label>
 
-                                <div>
-                                    <label htmlFor="badge" className={labelClass}>Card Badge</label>
-                                    <select
-                                        id="badge"
-                                        name="badge"
-                                        value={form.badge}
-                                        onChange={handleChange}
-                                        className={inputClass}
-                                    >
-                                        <option value="">Auto</option>
-                                        {withCurrentOption(
-                                            ["FEATURED", "PREMIUM", "NEW", "ULTRA LUXURY"],
-                                            form.badge
-                                        ).map((option) => (
-                                            <option key={option} value={option}>{option}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                {/* Options from Admin -> Card Badges */}
+                                <CardBadgeField value={form.badge} onChange={handleChange} labelClass={labelClass} inputClass={inputClass} />
                             </div>
                         </section>
 
@@ -907,6 +926,7 @@ export default function Update() {
                                 <ImageField
                                     label="Main Property Image"
                                     name="main_image"
+                                    size={PROPERTY_IMAGE_SIZES.main}
                                     preview={imagePreviews.main_image}
                                     selectedFile={images.main_image}
                                     onChange={handleImageChange}
@@ -916,6 +936,7 @@ export default function Update() {
                                     <ImageField
                                         label="Image 2"
                                         name="image_2"
+                                        size={PROPERTY_IMAGE_SIZES.gallery}
                                         preview={imagePreviews.image_2}
                                         selectedFile={images.image_2}
                                         onChange={handleImageChange}
@@ -927,6 +948,7 @@ export default function Update() {
                                     <ImageField
                                         label="Image 3"
                                         name="image_3"
+                                        size={PROPERTY_IMAGE_SIZES.gallery}
                                         preview={imagePreviews.image_3}
                                         selectedFile={images.image_3}
                                         onChange={handleImageChange}
@@ -938,6 +960,9 @@ export default function Update() {
                             {/* Add More Images */}
                             <div className="mt-6">
                                 <label className={labelClass}>More Images</label>
+                                <p className="mb-0 mt-1 text-xs text-[#62748E]">
+                                    Recommended: {PROPERTY_IMAGE_SIZES.gallery.width} × {PROPERTY_IMAGE_SIZES.gallery.height} px ({PROPERTY_IMAGE_SIZES.gallery.ratio}) for every image.
+                                </p>
 
                                 {existingGallery.length > 0 && (
                                     <div className="mt-1.5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -1000,6 +1025,8 @@ export default function Update() {
                                                         Selected: {slot.file.name}
                                                     </p>
                                                 )}
+
+                                                <ImageSizeNote size={PROPERTY_IMAGE_SIZES.gallery} file={slot.file} />
                                             </div>
                                         ))}
                                     </div>
@@ -1020,6 +1047,7 @@ export default function Update() {
                                 <ImageField
                                     label="Floor Plan Image"
                                     name="floor_plan_image"
+                                    size={PROPERTY_IMAGE_SIZES.floor}
                                     preview={imagePreviews.floor_plan_image}
                                     selectedFile={images.floor_plan_image}
                                     onChange={handleImageChange}
@@ -1029,6 +1057,7 @@ export default function Update() {
                                 <ImageField
                                     label="Agent Image"
                                     name="agent_image"
+                                    size={PROPERTY_IMAGE_SIZES.agent}
                                     preview={imagePreviews.agent_image}
                                     selectedFile={images.agent_image}
                                     onChange={handleImageChange}

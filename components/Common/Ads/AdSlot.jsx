@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import AdMedia from "./AdMedia";
-import { fetchAd, peekAd } from "../../../utils/ads";
+import { fetchAd, peekAd, useInitialAd } from "../../../utils/ads";
 
 /**
  * Ad spot for any page. Shows the active ad of this placement (Admin -> Ads).
@@ -17,7 +17,9 @@ import { fetchAd, peekAd } from "../../../utils/ads";
  * No blink: an ad already loaded (other page / server) shows on the first render.
  */
 export default function AdSlot({ placement, fallback = null, shape = "tall", wrapper = null, className = "", alt = "Advertisement" }) {
-  const [ad, setAd] = useState(() => peekAd(placement) || null);
+  // Server ads of this page (same on server + hydration), else browser cache
+  const initialAd = useInitialAd();
+  const [ad, setAd] = useState(() => initialAd(placement) || null);
 
   useEffect(() => {
     let active = true;

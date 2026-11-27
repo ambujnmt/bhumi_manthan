@@ -71,7 +71,7 @@ function DashboardShell({ children }) {
   const handleLogout = () => {
     setLogoutOpen(false);
     logout();
-    router.replace("/login");
+    router.replace("/?login=1");
   };
 
   return (

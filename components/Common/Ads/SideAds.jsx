@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import AdMedia from "./AdMedia";
+import AdMedia, { hasMobileMedia } from "./AdMedia";
 import { fetchAd, peekAd, sideAdPage, sideAdPlacements } from "../../../utils/ads";
 
 // Ads of a page right now, from the cache (no waiting): { left, right } (undefined = not loaded yet)
@@ -108,7 +108,7 @@ export default function SideAds({ page = null, children, top = "top-28", sticky 
       )}
 
       {/* Phones / tablets: mobile image of the left ad, above the content */}
-      {left?.mobile_image && (
+      {hasMobileMedia(left) && (
         <aside aria-label="Advertisement" className={`${mobileBanner} mb-4 ${mobileGap || (wrapClass ? "mt-4" : "")}`}>
           <AdMedia ad={left} />
         </aside>
@@ -117,7 +117,7 @@ export default function SideAds({ page = null, children, top = "top-28", sticky 
       <div className={withAds ? "min-w-0 flex-1" : undefined}>{children}</div>
 
       {/* Phones / tablets: mobile image of the right ad, below the content */}
-      {right?.mobile_image && (
+      {hasMobileMedia(right) && (
         <aside aria-label="Advertisement" className={`${mobileBanner} ${mobileGap || "mt-4"} ${wrapClass ? "mb-6" : ""}`}>
           <AdMedia ad={right} />
         </aside>

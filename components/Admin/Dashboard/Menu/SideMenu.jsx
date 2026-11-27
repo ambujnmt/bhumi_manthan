@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/router';
 import { MdOutlineLogout, MdOutlineMonitor } from "react-icons/md";
 import { HiMenu } from "react-icons/hi";
-import { FaBuilding, FaBullhorn, FaCity, FaClipboardList, FaCog, FaEnvelope, FaImages, FaLayerGroup, FaMapMarkedAlt, FaMoneyBillWave, FaNewspaper, FaRegCalendarCheck, FaSearch, FaUser, FaUserShield, FaUserTie, FaYoutube } from 'react-icons/fa';
+import { FaAddressBook, FaBuilding, FaChartLine, FaBullhorn, FaCity, FaClipboardCheck, FaClipboardList, FaCog, FaEnvelope, FaImages, FaLayerGroup, FaMapMarkedAlt, FaMoneyBillWave, FaNewspaper, FaRegCalendarCheck, FaSearch, FaStar, FaTag, FaUser, FaUserShield, FaUserTie, FaYoutube } from 'react-icons/fa';
 import { RxDotFilled } from "react-icons/rx";
 import { BsChatDotsFill } from "react-icons/bs";
 import { FiMail } from "react-icons/fi";
@@ -19,6 +19,31 @@ import UserAvatar from "../../../Common/UserAvatar";
 // Menu scroll position: every admin page mounts its own SideMenu,
 // so keep it between pages (menu does not jump back to top on click)
 let savedMenuScroll = 0;
+
+/**
+ * One sidebar section (Main, Properties & Projects, Users ...).
+ * Menu items the user may not open render false -> React.Children.toArray drops them;
+ * nothing left -> no heading either (staff never sees an empty section).
+ * Collapsed sidebar: a thin divider instead of the heading (name on hover).
+ */
+function SidebarGroup({ label, isCollapsed, children }) {
+  const items = React.Children.toArray(children);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div role="group" aria-label={label}>
+      {isCollapsed ? (
+        <div className="mx-auto my-1.5 h-px w-8 bg-gray-200" title={label} aria-hidden="true" />
+      ) : (
+        <p className="mb-1 mt-3 px-2.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#9AA4B5] first:mt-0">
+          {label}
+        </p>
+      )}
+      {items}
+    </div>
+  );
+}
 
 export default function SideMenu({
   isCollapsed,
@@ -59,7 +84,7 @@ export default function SideMenu({
   const handleLogout = () => {
     logout();
     setLogoutOpen(false);
-    router.replace('/login');
+    router.replace('/?login=1');
   };
 
   // Fresh role / permissions: UserContext refreshes the user from /profile
@@ -159,6 +184,12 @@ export default function SideMenu({
   const isUserActive = isActive('/admin/user') && !isTeamActive;
   const isPropertyActive = isActive('/admin/propertyManagement');
   const isPropertyCategoryActive = isActive('/admin/propertyCategory');
+  const isPropertyBadgeActive = isActive('/admin/propertyBadge');
+  const isPropertyRequestActive = isActive('/admin/propertyRequest');
+  const isReviewActive = isActive('/admin/review');
+  // '/admin/lead' must not also match '/admin/leadRevenue'
+  const isLeadActive = pathname === '/admin/lead' || pathname?.startsWith('/admin/lead/');
+  // const isLeadRevenueActive = isActive('/admin/leadRevenue');
   const isProjectActive = isActive('/admin/project');
   const isBlogActive = isActive('/admin/blog');  const isLocationActive = isActive('/admin/location');
   const isSettingsActive = isActive('/admin/settings');
@@ -166,7 +197,6 @@ export default function SideMenu({
   const isYoutuberVideoActive = isActive('/admin/youtuberVideo');
   const isAdsActive = isActive('/admin/ads');
   const isContactActive = isActive('/admin/contact');
-  const isEnquiryActive = isActive('/admin/enquiry');
   const isAppointmentActive = isActive('/admin/appointment');
   const isSubscriberActive = isActive('/admin/subscriber');
   const isChatActive = isActive('/admin/chat');
@@ -377,6 +407,10 @@ export default function SideMenu({
         <div className="relative p-3">
 
           {/* ============================================================
+        MAIN
+    ============================================================ */}
+          <SidebarGroup label="Main" isCollapsed={isCollapsed}>
+          {/* ============================================================
         DASHBOARD
     ============================================================ */}
           {can('dashboard.view') && (
@@ -386,14 +420,14 @@ export default function SideMenu({
               className={`
         group
         relative
-        mb-2
+        mb-0.5
         flex
         w-full
         cursor-pointer
         items-center
         rounded-lg
         px-2.5
-        py-2.5
+        py-2
         transition-all
         duration-200
         ${isDashboardActive
@@ -437,1055 +471,6 @@ export default function SideMenu({
             </Link>
           )}
 
-
-          {/* ============================================================
-        USER MANAGEMENT
-    ============================================================ */}
-          {can('users.view') && [
-            {
-              key: 'customers',
-              href: '/admin/user/userManagement',
-              label: 'Customers',
-              Icon: FaUser,
-              active: isUserActive,
-            },
-            {
-              key: 'team',
-              href: '/admin/user/userManagement?tab=team',
-              label: 'Seller / Broker / Staff',
-              Icon: FaUserTie,
-              active: isTeamActive,
-            },
-          ].map(({ key, href, label, Icon, active: isUserActive }) => (
-            <Link
-              key={key}
-              href={href}
-              onClick={toggleMenu}
-              title={isCollapsed ? label : undefined}
-              className={`
-        group
-        relative
-        mb-2
-        flex
-        w-full
-        cursor-pointer
-        items-center
-        rounded-lg
-        px-2.5
-        py-2.5
-        transition-all
-        duration-200
-        ${isUserActive
-                  ? 'bg-orange-50 text-[#E87722]'
-                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                }
-        ${isCollapsed ? 'justify-center' : 'justify-between'}
-      `}
-            >
-              <div
-                className={`
-          flex
-          items-center
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
-        `}
-              >
-                <Icon
-                  className={`
-            h-[18px]
-            w-[18px]
-            flex-shrink-0
-            transition-colors
-            duration-200
-            ${isUserActive
-                      ? 'text-[#E87722]'
-                      : 'text-[#62748E] group-hover:text-[#E87722]'
-                    }
-          `}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    {label}
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isUserActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          ))}
-
-          {/* property */}
-          {can('properties.view') && (
-            <Link
-              href="/admin/propertyManagement/propertyList"
-              onClick={toggleMenu}
-              className={`
-        group
-        relative
-        mb-2
-        flex
-        w-full
-        cursor-pointer
-        items-center
-        rounded-lg
-        px-2.5
-        py-2.5
-        transition-all
-        duration-200
-        ${isPropertyActive
-                  ? 'bg-orange-50 text-[#E87722]'
-                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                }
-        ${isCollapsed ? 'justify-center' : 'justify-between'}
-      `}
-            >
-              <div
-                className={`
-          flex
-          items-center
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
-        `}
-              >
-                <FaBuilding
-                  className={`
-            h-[18px]
-            w-[18px]
-            flex-shrink-0
-            transition-colors
-            duration-200
-            ${isPropertyActive
-                      ? 'text-[#E87722]'
-                      : 'text-[#62748E] group-hover:text-[#E87722]'
-                    }
-          `}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    Property Management
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isPropertyActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          )}
-
-          {/* property categories */}
-          {can('property_categories.view') && (
-            <Link
-              href="/admin/propertyCategory/listing"
-              onClick={toggleMenu}
-              className={`
-        group
-        relative
-        mb-2
-        flex
-        w-full
-        cursor-pointer
-        items-center
-        rounded-lg
-        px-2.5
-        py-2.5
-        transition-all
-        duration-200
-        ${isPropertyCategoryActive
-                  ? 'bg-orange-50 text-[#E87722]'
-                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                }
-        ${isCollapsed ? 'justify-center' : 'justify-between'}
-      `}
-            >
-              <div
-                className={`
-          flex
-          items-center
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
-        `}
-              >
-                <FaLayerGroup
-                  className={`
-            h-[18px]
-            w-[18px]
-            flex-shrink-0
-            transition-colors
-            duration-200
-            ${isPropertyCategoryActive
-                      ? 'text-[#E87722]'
-                      : 'text-[#62748E] group-hover:text-[#E87722]'
-                    }
-          `}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    Property Categories
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isPropertyCategoryActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          )}
-
-          {/* project */}
-          {can('projects.view') && (
-            <Link
-              href="/admin/project/projectList"
-              onClick={toggleMenu}
-              className={`
-        group
-        relative
-        mb-2
-        flex
-        w-full
-        cursor-pointer
-        items-center
-        rounded-lg
-        px-2.5
-        py-2.5
-        transition-all
-        duration-200
-        ${isProjectActive
-                  ? 'bg-orange-50 text-[#E87722]'
-                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                }
-        ${isCollapsed ? 'justify-center' : 'justify-between'}
-      `}
-            >
-              <div
-                className={`
-          flex
-          items-center
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
-        `}
-              >
-                <FaCity
-                  className={`
-            h-[18px]
-            w-[18px]
-            flex-shrink-0
-            transition-colors
-            duration-200
-            ${isProjectActive
-                      ? 'text-[#E87722]'
-                      : 'text-[#62748E] group-hover:text-[#E87722]'
-                    }
-          `}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    Project Management
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isProjectActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          )}
-
-          {/* blog */}
-          {can('blogs.view') && (
-            <Link
-              href="/admin/blog/blogList"
-              onClick={toggleMenu}
-              className={`
-        group
-        relative
-        mb-2
-        flex
-        w-full
-        cursor-pointer
-        items-center
-        rounded-lg
-        px-2.5
-        py-2.5
-        transition-all
-        duration-200
-        ${isBlogActive
-                  ? 'bg-orange-50 text-[#E87722]'
-                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                }
-        ${isCollapsed ? 'justify-center' : 'justify-between'}
-      `}
-            >
-              <div
-                className={`
-          flex
-          items-center
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
-        `}
-              >
-                <FaNewspaper
-                  className={`
-            h-[18px]
-            w-[18px]
-            flex-shrink-0
-            transition-colors
-            duration-200
-            ${isBlogActive
-                      ? 'text-[#E87722]'
-                      : 'text-[#62748E] group-hover:text-[#E87722]'
-                    }
-          `}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    Blog Management
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isBlogActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          )}
-
-          {/* seo */}
-          {can('seo.view|seo.edit') && [
-            ['/admin/seo/properties', 'Property SEO'],
-            ['/admin/seo/blogs', 'Blog SEO'],
-          ].map(([href, label]) => {
-            const isSeoActive = isActive(href);
-
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={toggleMenu}
-                aria-label={isCollapsed ? label : undefined}
-                title={isCollapsed ? label : undefined}
-                className={`
-        group
-        relative
-        mb-2
-        flex
-        w-full
-        cursor-pointer
-        items-center
-        rounded-lg
-        px-2.5
-        py-2.5
-        transition-all
-        duration-200
-        ${isSeoActive
-                    ? 'bg-orange-50 text-[#E87722]'
-                    : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                  }
-        ${isCollapsed ? 'justify-center' : 'justify-between'}
-      `}
-              >
-                <div
-                  className={`
-          flex
-          items-center
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
-        `}
-                >
-                  <FaSearch
-                    className={`
-            h-[18px]
-            w-[18px]
-            flex-shrink-0
-            transition-colors
-            duration-200
-            ${isSeoActive
-                        ? 'text-[#E87722]'
-                        : 'text-[#62748E] group-hover:text-[#E87722]'
-                      }
-          `}
-                  />
-
-                  {!isCollapsed && (
-                    <span className="text-[13px] font-semibold">
-                      {label}
-                    </span>
-                  )}
-                </div>
-
-                {!isCollapsed && isSeoActive && (
-                  <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-                )}
-              </Link>
-            );
-          })}
-
-          {/* states & cities */}
-          {can('locations.view') && (
-            <Link
-              href="/admin/location/locationList"
-              onClick={toggleMenu}
-              className={`
-        group
-        relative
-        mb-2
-        flex
-        w-full
-        cursor-pointer
-        items-center
-        rounded-lg
-        px-2.5
-        py-2.5
-        transition-all
-        duration-200
-        ${isLocationActive
-                  ? 'bg-orange-50 text-[#E87722]'
-                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                }
-        ${isCollapsed ? 'justify-center' : 'justify-between'}
-      `}
-            >
-              <div
-                className={`
-          flex
-          items-center
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
-        `}
-              >
-                <FaMapMarkedAlt
-                  className={`
-            h-[18px]
-            w-[18px]
-            flex-shrink-0
-            transition-colors
-            duration-200
-            ${isLocationActive
-                      ? 'text-[#E87722]'
-                      : 'text-[#62748E] group-hover:text-[#E87722]'
-                    }
-          `}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    States & Cities
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isLocationActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          )}
-          {/* site settings (footer, privacy, terms, faqs) */}
-
-          {can('settings.view') && (
-            <Link
-              href="/admin/settings/siteSettings"
-              onClick={toggleMenu}
-              className={`
-        group
-        relative
-        mb-2
-        flex
-        w-full
-        cursor-pointer
-        items-center
-        rounded-lg
-        px-2.5
-        py-2.5
-        transition-all
-        duration-200
-        ${isSettingsActive
-                  ? 'bg-orange-50 text-[#E87722]'
-                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                }
-        ${isCollapsed ? 'justify-center' : 'justify-between'}
-      `}
-            >
-              <div
-                className={`
-          flex
-          items-center
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
-        `}
-              >
-                <FaCog
-                  className={`
-            h-[18px]
-            w-[18px]
-            flex-shrink-0
-            transition-colors
-            duration-200
-            ${isSettingsActive
-                      ? 'text-[#E87722]'
-                      : 'text-[#62748E] group-hover:text-[#E87722]'
-                    }
-          `}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    Site Settings
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isSettingsActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          )}
-
-          {/* youtuber videos */}
-          {can('youtuber_videos.view') && (
-            <Link
-              href="/admin/youtuberVideo/videoList"
-              onClick={toggleMenu}
-              aria-label={isCollapsed ? 'YouTuber Videos' : undefined}
-              title={isCollapsed ? 'YouTuber Videos' : undefined}
-              className={`
-        group
-        relative
-        mb-2
-        flex
-        w-full
-        cursor-pointer
-        items-center
-        rounded-lg
-        px-2.5
-        py-2.5
-        transition-all
-        duration-200
-        ${isYoutuberVideoActive
-                  ? 'bg-orange-50 text-[#E87722]'
-                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                }
-        ${isCollapsed ? 'justify-center' : 'justify-between'}
-      `}
-            >
-              <div
-                className={`
-          flex
-          items-center
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
-        `}
-              >
-                <FaYoutube
-                  className={`
-            h-[18px]
-            w-[18px]
-            flex-shrink-0
-            transition-colors
-            duration-200
-            ${isYoutuberVideoActive
-                      ? 'text-[#E87722]'
-                      : 'text-[#62748E] group-hover:text-[#E87722]'
-                    }
-          `}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    YouTuber Videos
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isYoutuberVideoActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          )}
-
-          {/* ads (website ads on any page) */}
-          {can('ads.view') && (
-            <Link
-              href="/admin/ads/adList"
-              onClick={toggleMenu}
-              aria-label={isCollapsed ? 'Ads' : undefined}
-              title={isCollapsed ? 'Ads' : undefined}
-              className={`group relative mb-2 flex w-full cursor-pointer items-center rounded-lg px-2.5 py-2.5 transition-all duration-200 ${
-                isAdsActive ? 'bg-orange-50 text-[#E87722]' : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-              } ${isCollapsed ? 'justify-center' : 'justify-between'}`}
-            >
-              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-                <FaBullhorn
-                  className={`h-[18px] w-[18px] flex-shrink-0 transition-colors duration-200 ${
-                    isAdsActive ? 'text-[#E87722]' : 'text-[#62748E] group-hover:text-[#E87722]'
-                  }`}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    Ads
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isAdsActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          )}
-
-          {/* banner */}
-          {can('banners.view') && (
-            <Link
-              href="/admin/banner/bannerList"
-              onClick={toggleMenu}
-              className={`
-        group
-        relative
-        mb-2
-        flex
-        w-full
-        cursor-pointer
-        items-center
-        rounded-lg
-        px-2.5
-        py-2.5
-        transition-all
-        duration-200
-        ${isBannerActive
-                  ? 'bg-orange-50 text-[#E87722]'
-                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                }
-        ${isCollapsed ? 'justify-center' : 'justify-between'}
-      `}
-            >
-              <div
-                className={`
-          flex
-          items-center
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
-        `}
-              >
-                <FaImages
-                  className={`
-            h-[18px]
-            w-[18px]
-            flex-shrink-0
-            transition-colors
-            duration-200
-            ${isBannerActive
-                      ? 'text-[#E87722]'
-                      : 'text-[#62748E] group-hover:text-[#E87722]'
-                    }
-          `}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    Banner Management
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isBannerActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          )}
-
-          {/* contact us messages */}
-          {can('contact_messages.view') && (
-            <Link
-              href="/admin/contact/contactList"
-              onClick={toggleMenu}
-              className={`
-        group
-        relative
-        mb-2
-        flex
-        w-full
-        cursor-pointer
-        items-center
-        rounded-lg
-        px-2.5
-        py-2.5
-        transition-all
-        duration-200
-        ${isContactActive
-                  ? 'bg-orange-50 text-[#E87722]'
-                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                }
-        ${isCollapsed ? 'justify-center' : 'justify-between'}
-      `}
-            >
-              <div
-                className={`
-          flex
-          items-center
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
-        `}
-              >
-                <FaEnvelope
-                  className={`
-            h-[18px]
-            w-[18px]
-            flex-shrink-0
-            transition-colors
-            duration-200
-            ${isContactActive
-                      ? 'text-[#E87722]'
-                      : 'text-[#62748E] group-hover:text-[#E87722]'
-                    }
-          `}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    Contact Messages
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isContactActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          )}
-
-          {/* Events */}
-          {can('events.view') && (
-            <Link
-              href="/admin/event/listing"
-              onClick={toggleMenu}
-              className={`
-      group
-      relative
-      mb-2
-      flex
-      w-full
-      cursor-pointer
-      items-center
-      rounded-lg
-      px-2.5
-      py-2.5
-      transition-all
-      duration-200
-      ${isEventActive
-                  ? 'bg-orange-50 text-[#E87722]'
-                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                }
-      ${isCollapsed ? 'justify-center' : 'justify-between'}
-    `}
-            >
-              <div
-                className={`
-        flex
-        items-center
-        ${isCollapsed ? 'justify-center' : 'gap-3'}
-      `}
-              >
-                <FaCity
-                  className={`
-          h-[18px]
-          w-[18px]
-          flex-shrink-0
-          transition-colors
-          duration-200
-          ${isEventActive
-                      ? 'text-[#E87722]'
-                      : 'text-[#62748E] group-hover:text-[#E87722]'
-                    }
-        `}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    Events
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isEventActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          )}
-
-
-{/* Plan */}
-
-{can('plans.view') && (
-  <Link
-    href="/admin/plan/listing"
-    onClick={toggleMenu}
-    className={`
-      group
-      relative
-      mb-2
-      flex
-      w-full
-      cursor-pointer
-      items-center
-      rounded-lg
-      px-2.5
-      py-2.5
-      transition-all
-      duration-200
-      ${isPlanActive
-        ? 'bg-orange-50 text-[#E87722]'
-        : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-      }
-      ${isCollapsed ? 'justify-center' : 'justify-between'}
-    `}
-  >
-    <div
-      className={`
-        flex
-        items-center
-        ${isCollapsed ? 'justify-center' : 'gap-3'}
-      `}
-    >
-      <FaClipboardList
-        className={`
-          h-[18px]
-          w-[18px]
-          flex-shrink-0
-          transition-colors
-          duration-200
-          ${isPlanActive
-            ? 'text-[#E87722]'
-            : 'text-[#62748E] group-hover:text-[#E87722]'
-          }
-        `}
-      />
-
-      {!isCollapsed && (
-        <span className="text-[13px] font-semibold">
-          Plan
-        </span>
-      )}
-    </div>
-
-    {!isCollapsed && isPlanActive && (
-      <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-    )}
-  </Link>
-)}
-
-{/* Plan orders (cash / offline payments) + cash flow */}
-{can('plans.view') && (
-  <Link
-    href="/admin/planOrder/orderList"
-    onClick={toggleMenu}
-    title={isCollapsed ? 'Plan Orders' : undefined}
-    className={`
-      group relative mb-2 flex w-full cursor-pointer items-center rounded-lg px-2.5 py-2.5 transition-all duration-200
-      ${isPlanOrderActive
-        ? 'bg-orange-50 text-[#E87722]'
-        : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-      }
-      ${isCollapsed ? 'justify-center' : 'justify-between'}
-    `}
-  >
-    <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-      <FaMoneyBillWave
-        className={`
-          h-[18px] w-[18px] flex-shrink-0 transition-colors duration-200
-          ${isPlanOrderActive ? 'text-[#E87722]' : 'text-[#62748E] group-hover:text-[#E87722]'}
-        `}
-      />
-
-      {!isCollapsed && (
-        <span className="text-[13px] font-semibold">
-          Plan Orders
-        </span>
-      )}
-    </div>
-
-    {!isCollapsed && isPlanOrderActive && (
-      <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-    )}
-  </Link>
-)}
-
-
-          {/* property enquiries (Enquire Now) */}
-          {can('enquiries.view') && (
-            <Link
-              href="/admin/enquiry/enquiryList"
-              onClick={toggleMenu}
-              className={`
-        group
-        relative
-        mb-2
-        flex
-        w-full
-        cursor-pointer
-        items-center
-        rounded-lg
-        px-2.5
-        py-2.5
-        transition-all
-        duration-200
-        ${isEnquiryActive
-                  ? 'bg-orange-50 text-[#E87722]'
-                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                }
-        ${isCollapsed ? 'justify-center' : 'justify-between'}
-      `}
-            >
-              <div
-                className={`
-          flex
-          items-center
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
-        `}
-              >
-                <FaClipboardList
-                  className={`
-            h-[18px]
-            w-[18px]
-            flex-shrink-0
-            transition-colors
-            duration-200
-            ${isEnquiryActive
-                      ? 'text-[#E87722]'
-                      : 'text-[#62748E] group-hover:text-[#E87722]'
-                    }
-          `}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    Property Enquiries
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isEnquiryActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          )}
-
-
-          {/* appointments (every panel user sees at least their own, except SEO-only staff) */}
-          {hasAdminAccess(user) && !isSeoOnly(user) && (
-            <Link
-              href="/admin/appointment/appointmentList"
-              onClick={toggleMenu}
-              className={`
-        group
-        relative
-        mb-2
-        flex
-        w-full
-        cursor-pointer
-        items-center
-        rounded-lg
-        px-2.5
-        py-2.5
-        transition-all
-        duration-200
-        ${isAppointmentActive
-                  ? 'bg-orange-50 text-[#E87722]'
-                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                }
-        ${isCollapsed ? 'justify-center' : 'justify-between'}
-      `}
-            >
-              <div
-                className={`
-          flex
-          items-center
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
-        `}
-              >
-                <FaRegCalendarCheck
-                  className={`
-            h-[18px]
-            w-[18px]
-            flex-shrink-0
-            transition-colors
-            duration-200
-            ${isAppointmentActive
-                      ? 'text-[#E87722]'
-                      : 'text-[#62748E] group-hover:text-[#E87722]'
-                    }
-          `}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    Appointments
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isAppointmentActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          )}
-
-
-          {/* newsletter subscribers (footer Subscribe) */}
-          {can('subscribers.view') && (
-            <Link
-              href="/admin/subscriber/subscriberList"
-              onClick={toggleMenu}
-              className={`
-        group
-        relative
-        mb-2
-        flex
-        w-full
-        cursor-pointer
-        items-center
-        rounded-lg
-        px-2.5
-        py-2.5
-        transition-all
-        duration-200
-        ${isSubscriberActive
-                  ? 'bg-orange-50 text-[#E87722]'
-                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
-                }
-        ${isCollapsed ? 'justify-center' : 'justify-between'}
-      `}
-            >
-              <div
-                className={`
-          flex
-          items-center
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
-        `}
-              >
-                <FiMail
-                  className={`
-            h-[18px]
-            w-[18px]
-            flex-shrink-0
-            transition-colors
-            duration-200
-            ${isSubscriberActive
-                      ? 'text-[#E87722]'
-                      : 'text-[#62748E] group-hover:text-[#E87722]'
-                    }
-          `}
-                />
-
-                {!isCollapsed && (
-                  <span className="text-[13px] font-semibold">
-                    Subscribers
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && isSubscriberActive && (
-                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
-              )}
-            </Link>
-          )}
-
-
           {/* Chat with customers (every admin panel user) */}
           {canChat && (
             <Link
@@ -1494,14 +479,14 @@ export default function SideMenu({
               className={`
         group
         relative
-        mb-2
+        mb-0.5
         flex
         w-full
         cursor-pointer
         items-center
         rounded-lg
         px-2.5
-        py-2.5
+        py-2
         transition-all
         duration-200
         ${isChatActive
@@ -1556,6 +541,607 @@ export default function SideMenu({
             </Link>
           )}
 
+          {/* appointments (every panel user sees at least their own, except SEO-only staff) */}
+          {hasAdminAccess(user) && !isSeoOnly(user) && (
+            <Link
+              href="/admin/appointment/appointmentList"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isAppointmentActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaRegCalendarCheck
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isAppointmentActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Appointments
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isAppointmentActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+          </SidebarGroup>
+
+          {/* ============================================================
+        PROPERTIES & PROJECTS
+    ============================================================ */}
+          <SidebarGroup label="Properties & Projects" isCollapsed={isCollapsed}>
+          {/* property */}
+          {can('properties.view') && (
+            <Link
+              href="/admin/propertyManagement/propertyList"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isPropertyActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaBuilding
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isPropertyActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Properties
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isPropertyActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+
+          {/* properties request (seller / broker properties waiting for approval) */}
+          {can('property_requests.view') && (
+            <Link
+              href="/admin/propertyRequest/requestList"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isPropertyRequestActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaClipboardCheck
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isPropertyRequestActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Property Requests
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isPropertyRequestActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+
+          {/* project */}
+          {can('projects.view') && (
+            <Link
+              href="/admin/project/projectList"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isProjectActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaCity
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isProjectActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Projects
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isProjectActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+          </SidebarGroup>
+
+          {/* ============================================================
+        LEADS & SALES
+    ============================================================ */}
+          <SidebarGroup label="Leads & Sales" isCollapsed={isCollapsed}>
+          {/* leads (Get Number + property / project enquiries) */}
+          {can('leads.view') && (
+            <Link
+              href="/admin/lead/leadList"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isLeadActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaAddressBook
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isLeadActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Leads
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isLeadActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+
+          {/* lead revenue (lead sales: daily / monthly / yearly) - admin & staff only */}
+          {/* {can('lead_sales.view') && !['seller', 'broker'].includes(user?.role) && (
+            <Link
+              href="/admin/leadRevenue/revenue"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isLeadRevenueActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaChartLine
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isLeadRevenueActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Lead Revenue
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isLeadRevenueActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )} */}
+
+{/* Plan */}
+
+{can('plans.view') && (
+  <Link
+    href="/admin/plan/listing"
+    onClick={toggleMenu}
+    className={`
+      group
+      relative
+      mb-0.5
+      flex
+      w-full
+      cursor-pointer
+      items-center
+      rounded-lg
+      px-2.5
+      py-2
+      transition-all
+      duration-200
+      ${isPlanActive
+        ? 'bg-orange-50 text-[#E87722]'
+        : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+      }
+      ${isCollapsed ? 'justify-center' : 'justify-between'}
+    `}
+  >
+    <div
+      className={`
+        flex
+        items-center
+        ${isCollapsed ? 'justify-center' : 'gap-3'}
+      `}
+    >
+      <FaClipboardList
+        className={`
+          h-[18px]
+          w-[18px]
+          flex-shrink-0
+          transition-colors
+          duration-200
+          ${isPlanActive
+            ? 'text-[#E87722]'
+            : 'text-[#62748E] group-hover:text-[#E87722]'
+          }
+        `}
+      />
+
+      {!isCollapsed && (
+        <span className="text-[13px] font-semibold">
+          Plan
+        </span>
+      )}
+    </div>
+
+    {!isCollapsed && isPlanActive && (
+      <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+    )}
+  </Link>
+)}
+
+{/* Plan orders (cash / offline payments) + cash flow */}
+{can('plans.view') && (
+  <Link
+    href="/admin/planOrder/orderList"
+    onClick={toggleMenu}
+    title={isCollapsed ? 'Plan Orders' : undefined}
+    className={`
+      group relative mb-0.5 flex w-full cursor-pointer items-center rounded-lg px-2.5 py-2 transition-all duration-200
+      ${isPlanOrderActive
+        ? 'bg-orange-50 text-[#E87722]'
+        : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+      }
+      ${isCollapsed ? 'justify-center' : 'justify-between'}
+    `}
+  >
+    <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+      <FaMoneyBillWave
+        className={`
+          h-[18px] w-[18px] flex-shrink-0 transition-colors duration-200
+          ${isPlanOrderActive ? 'text-[#E87722]' : 'text-[#62748E] group-hover:text-[#E87722]'}
+        `}
+      />
+
+      {!isCollapsed && (
+        <span className="text-[13px] font-semibold">
+          Plan Orders
+        </span>
+      )}
+    </div>
+
+    {!isCollapsed && isPlanOrderActive && (
+      <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+    )}
+  </Link>
+)}
+          </SidebarGroup>
+
+          {/* ============================================================
+        USERS
+    ============================================================ */}
+          <SidebarGroup label="Users" isCollapsed={isCollapsed}>
+          {/* ============================================================
+        USER MANAGEMENT
+    ============================================================ */}
+          {can('users.view') && [
+            {
+              key: 'customers',
+              href: '/admin/user/userManagement',
+              label: 'Customers',
+              Icon: FaUser,
+              active: isUserActive,
+            },
+            {
+              key: 'team',
+              href: '/admin/user/userManagement?tab=team',
+              label: 'Seller / Broker / Staff',
+              Icon: FaUserTie,
+              active: isTeamActive,
+            },
+          ].map(({ key, href, label, Icon, active: isUserActive }) => (
+            <Link
+              key={key}
+              href={href}
+              onClick={toggleMenu}
+              title={isCollapsed ? label : undefined}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isUserActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <Icon
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isUserActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    {label}
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isUserActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          ))}
+
+          {/* reviews (buyer ratings waiting for approval) */}
+          {can('reviews.view') && (
+            <Link
+              href="/admin/review/reviewList"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isReviewActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaStar
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isReviewActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Reviews
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isReviewActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
 
           {/* Roles & Permissions (super admin only) */}
           {isSuperAdmin && (
@@ -1565,14 +1151,14 @@ export default function SideMenu({
               className={`
         group
         relative
-        mb-2
+        mb-0.5
         flex
         w-full
         cursor-pointer
         items-center
         rounded-lg
         px-2.5
-        py-2.5
+        py-2
         transition-all
         duration-200
         ${isRoleActive
@@ -1615,6 +1201,715 @@ export default function SideMenu({
               )}
             </Link>
           )}
+          </SidebarGroup>
+
+          {/* ============================================================
+        WEBSITE CONTENT
+    ============================================================ */}
+          <SidebarGroup label="Website Content" isCollapsed={isCollapsed}>
+          {/* banner */}
+          {can('banners.view') && (
+            <Link
+              href="/admin/banner/bannerList"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isBannerActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaImages
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isBannerActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Banner Management
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isBannerActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+
+          {/* ads (website ads on any page) */}
+          {can('ads.view') && (
+            <Link
+              href="/admin/ads/adList"
+              onClick={toggleMenu}
+              aria-label={isCollapsed ? 'Ads' : undefined}
+              title={isCollapsed ? 'Ads' : undefined}
+              className={`group relative mb-0.5 flex w-full cursor-pointer items-center rounded-lg px-2.5 py-2 transition-all duration-200 ${
+                isAdsActive ? 'bg-orange-50 text-[#E87722]' : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+              } ${isCollapsed ? 'justify-center' : 'justify-between'}`}
+            >
+              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+                <FaBullhorn
+                  className={`h-[18px] w-[18px] flex-shrink-0 transition-colors duration-200 ${
+                    isAdsActive ? 'text-[#E87722]' : 'text-[#62748E] group-hover:text-[#E87722]'
+                  }`}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Ads
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isAdsActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+
+          {/* Events */}
+          {can('events.view') && (
+            <Link
+              href="/admin/event/listing"
+              onClick={toggleMenu}
+              className={`
+      group
+      relative
+      mb-0.5
+      flex
+      w-full
+      cursor-pointer
+      items-center
+      rounded-lg
+      px-2.5
+      py-2
+      transition-all
+      duration-200
+      ${isEventActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+      ${isCollapsed ? 'justify-center' : 'justify-between'}
+    `}
+            >
+              <div
+                className={`
+        flex
+        items-center
+        ${isCollapsed ? 'justify-center' : 'gap-3'}
+      `}
+              >
+                <FaCity
+                  className={`
+          h-[18px]
+          w-[18px]
+          flex-shrink-0
+          transition-colors
+          duration-200
+          ${isEventActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+        `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Events
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isEventActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+
+          {/* blog */}
+          {can('blogs.view') && (
+            <Link
+              href="/admin/blog/blogList"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isBlogActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaNewspaper
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isBlogActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Blog Management
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isBlogActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+
+          {/* youtuber videos */}
+          {can('youtuber_videos.view') && (
+            <Link
+              href="/admin/youtuberVideo/videoList"
+              onClick={toggleMenu}
+              aria-label={isCollapsed ? 'YouTuber Videos' : undefined}
+              title={isCollapsed ? 'YouTuber Videos' : undefined}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isYoutuberVideoActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaYoutube
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isYoutuberVideoActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    YouTuber Videos
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isYoutuberVideoActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+          </SidebarGroup>
+
+          {/* ============================================================
+        MARKETING & INBOX
+    ============================================================ */}
+          <SidebarGroup label="Marketing & Inbox" isCollapsed={isCollapsed}>
+          {/* seo */}
+          {can('seo.view|seo.edit') && [
+            ['/admin/seo/properties', 'Property SEO'],
+            ['/admin/seo/blogs', 'Blog SEO'],
+          ].map(([href, label]) => {
+            const isSeoActive = isActive(href);
+
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={toggleMenu}
+                aria-label={isCollapsed ? label : undefined}
+                title={isCollapsed ? label : undefined}
+                className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isSeoActive
+                    ? 'bg-orange-50 text-[#E87722]'
+                    : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                  }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+              >
+                <div
+                  className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+                >
+                  <FaSearch
+                    className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isSeoActive
+                        ? 'text-[#E87722]'
+                        : 'text-[#62748E] group-hover:text-[#E87722]'
+                      }
+          `}
+                  />
+
+                  {!isCollapsed && (
+                    <span className="text-[13px] font-semibold">
+                      {label}
+                    </span>
+                  )}
+                </div>
+
+                {!isCollapsed && isSeoActive && (
+                  <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+                )}
+              </Link>
+            );
+          })}
+
+          {/* contact us messages */}
+          {can('contact_messages.view') && (
+            <Link
+              href="/admin/contact/contactList"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isContactActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaEnvelope
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isContactActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Contact Messages
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isContactActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+
+          {/* newsletter subscribers (footer Subscribe) */}
+          {can('subscribers.view') && (
+            <Link
+              href="/admin/subscriber/subscriberList"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isSubscriberActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FiMail
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isSubscriberActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Subscribers
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isSubscriberActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+          </SidebarGroup>
+
+          {/* ============================================================
+        MASTERS & SETTINGS
+    ============================================================ */}
+          <SidebarGroup label="Masters & Settings" isCollapsed={isCollapsed}>
+          {/* property categories */}
+          {can('property_categories.view') && (
+            <Link
+              href="/admin/propertyCategory/listing"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isPropertyCategoryActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaLayerGroup
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isPropertyCategoryActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Property Categories
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isPropertyCategoryActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+
+          {/* card badges (property card badge master) */}
+          {can('property_badges.view') && (
+            <Link
+              href="/admin/propertyBadge/listing"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isPropertyBadgeActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaTag
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isPropertyBadgeActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Card Badges
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isPropertyBadgeActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+
+          {/* states & cities */}
+          {can('locations.view') && (
+            <Link
+              href="/admin/location/locationList"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isLocationActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaMapMarkedAlt
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isLocationActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    States & Cities
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isLocationActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+
+          {/* site settings (footer, privacy, terms, faqs) */}
+
+          {can('settings.view') && (
+            <Link
+              href="/admin/settings/siteSettings"
+              onClick={toggleMenu}
+              className={`
+        group
+        relative
+        mb-0.5
+        flex
+        w-full
+        cursor-pointer
+        items-center
+        rounded-lg
+        px-2.5
+        py-2
+        transition-all
+        duration-200
+        ${isSettingsActive
+                  ? 'bg-orange-50 text-[#E87722]'
+                  : 'text-[#1A1F36] hover:bg-orange-50 hover:text-[#E87722]'
+                }
+        ${isCollapsed ? 'justify-center' : 'justify-between'}
+      `}
+            >
+              <div
+                className={`
+          flex
+          items-center
+          ${isCollapsed ? 'justify-center' : 'gap-3'}
+        `}
+              >
+                <FaCog
+                  className={`
+            h-[18px]
+            w-[18px]
+            flex-shrink-0
+            transition-colors
+            duration-200
+            ${isSettingsActive
+                      ? 'text-[#E87722]'
+                      : 'text-[#62748E] group-hover:text-[#E87722]'
+                    }
+          `}
+                />
+
+                {!isCollapsed && (
+                  <span className="text-[13px] font-semibold">
+                    Site Settings
+                  </span>
+                )}
+              </div>
+
+              {!isCollapsed && isSettingsActive && (
+                <span className="h-5 w-1 rounded-full bg-[#E87722]" />
+              )}
+            </Link>
+          )}
+          </SidebarGroup>
 
         </div>
       </div>

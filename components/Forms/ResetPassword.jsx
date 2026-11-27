@@ -33,7 +33,7 @@ export default function ResetPassword() {
     if (!successMessage) return;
 
     const timer = setTimeout(() => {
-      router.push("/login");
+      router.push("/?login=1");
     }, 3000);
 
     return () => clearTimeout(timer);
@@ -314,7 +314,7 @@ export default function ResetPassword() {
 
             <div className="mt-8 border-t border-slate-100 pt-6 text-center">
               <Link
-                href="/login"
+                href="/?login=1"
                 className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 transition hover:text-[#E87722]"
               >
                 <FiArrowLeft size={18} />

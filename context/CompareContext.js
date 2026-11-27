@@ -4,6 +4,7 @@ import { showToast } from "@/store/toast";
 import { addToCompare, getCompareList, removeFromCompare } from "../utils/fetchApi";
 import { clearPostLoginRedirect, rememberPostLoginRedirect } from "../utils/postLoginRedirect";
 import { useUser } from "./UserContext";
+import { openLogin } from "../utils/loginPopup";
 
 // Property a guest clicked "Add to Compare" on: added right after they log in
 const PENDING_KEY = "compare_pending_property";
@@ -97,7 +98,7 @@ export const CompareProvider = ({ children }) => {
     if (!userId) {
       writePending(propertyId);
       rememberPostLoginRedirect(router.asPath);
-      router.push("/login");
+      openLogin(router);
       return;
     }
 
