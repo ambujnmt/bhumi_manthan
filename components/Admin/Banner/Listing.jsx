@@ -11,6 +11,7 @@ import { FaPen } from "react-icons/fa";
 import { FaRegTrashCan } from "react-icons/fa6";
 import { FiPlus } from "react-icons/fi";
 import Tmodal from "../../Tmodal/Tmodal";
+import ImageSizeNote, { PROPERTY_IMAGE_SIZES } from "../PropertyManagement/ImageSizeNote";
 
 // Banner type = website page where it shows
 const BANNER_TYPES = [
@@ -446,8 +447,14 @@ export default function Listing() {
                         />
 
                         <p className="mt-1 text-xs text-[#62748E]">
-                            JPG or WEBP recommended, max 5 MB. Best size 1920 × 818 px, under 400 KB for fast loading.
+                            JPG or WEBP recommended, max 5 MB, under 400 KB for fast loading.
                         </p>
+
+                        {/* Recommended width x height for the chosen page + chosen image size */}
+                        <ImageSizeNote
+                            size={form.type === "events" || form.type === "plans" ? PROPERTY_IMAGE_SIZES.banner_page : PROPERTY_IMAGE_SIZES.banner_home}
+                            file={imageFile}
+                        />
 
                         {imagePreview && (
                             <img

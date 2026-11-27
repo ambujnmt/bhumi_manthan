@@ -81,6 +81,8 @@ export default function Update({ userId = null, inModal = false, onSaved = null,
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
     const [messageType, setMessageType] = useState("");
+    // Backend validation errors per field: { email: "..." }
+    const [fieldErrors, setFieldErrors] = useState({});
 
     // Admin roles for "Staff" (super admin only)
     const { user: loggedInUser } = useUser();
@@ -167,6 +169,9 @@ export default function Update({ userId = null, inModal = false, onSaved = null,
             ...previous,
             [name]: value,
         }));
+
+        // Typing again clears that field's error
+        setFieldErrors((previous) => (previous[name] ? { ...previous, [name]: undefined } : previous));
     };
 
     /* =======================================================
@@ -185,6 +190,7 @@ export default function Update({ userId = null, inModal = false, onSaved = null,
         setSaving(true);
         setMessage("");
         setMessageType("");
+        setFieldErrors({});
 
         try {
             const payload = new FormData();
@@ -212,6 +218,12 @@ export default function Update({ userId = null, inModal = false, onSaved = null,
                     }, 2000);
                 }
             } else {
+                // { email: ["This email is already used ..."] } -> { email: "This email is already used ..." }
+                setFieldErrors(
+                    Object.fromEntries(
+                        Object.entries(res?.errors || {}).map(([key, messages]) => [key, [].concat(messages)[0]])
+                    )
+                );
                 setMessage(res?.message || "Failed to update user.");
                 setMessageType("error");
                 showToast(res?.message || "Failed to update user.", "error");
@@ -295,8 +307,17 @@ export default function Update({ userId = null, inModal = false, onSaved = null,
                                                     onChange={handleChange}
                                                     required={field.required}
                                                     placeholder={field.placeholder}
-                                                    className={inputClass}
+                                                    aria-invalid={Boolean(fieldErrors[field.name])}
+                                                    aria-describedby={fieldErrors[field.name] ? `${field.name}_error` : undefined}
+                                                    className={`${inputClass} ${fieldErrors[field.name] ? "border-red-400" : ""}`}
                                                 />
+                                            )}
+
+                                            {/* Backend reason for this field (e.g. email already used) */}
+                                            {fieldErrors[field.name] && (
+                                                <p id={`${field.name}_error`} className="mb-0 mt-1 text-xs text-red-600">
+                                                    {fieldErrors[field.name]}
+                                                </p>
                                             )}
                                         </div>
                                     ))}

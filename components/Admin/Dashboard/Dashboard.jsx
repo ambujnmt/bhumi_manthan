@@ -56,7 +56,7 @@ const STAT_CARDS = [
     icon: FiMessageSquare,
     iconBg: "bg-violet-50",
     iconColor: "text-violet-600",
-    href: "/admin/enquiry/enquiryList",
+    href: "/admin/lead/leadList",
   },
   {
     key: "registered_users",
@@ -104,9 +104,46 @@ const formatDate = (value) => {
   return `${date.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}, ${time}`;
 };
 
+/*
+|--------------------------------------------------------------------------
+| Loading placeholders: page shows at once, each card fills in when data comes
+|--------------------------------------------------------------------------
+*/
+
+const Bone = ({ className = "" }) => <span aria-hidden="true" className={`block animate-pulse rounded bg-gray-100 ${className}`} />;
+
+const StatCardSkeleton = () => (
+  <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
+    <div className="flex items-start justify-between">
+      <div className="flex-1">
+        <Bone className="h-4 w-28" />
+        <Bone className="mt-3 h-7 w-16" />
+      </div>
+      <Bone className="h-11 w-11 rounded-xl" />
+    </div>
+    <Bone className="mt-4 h-3 w-40" />
+  </div>
+);
+
+// Fixed heights (no Math.random: same on server and client)
+const CHART_SKELETON_HEIGHTS = [35, 55, 40, 70, 50, 85, 60, 45, 75, 55, 65, 40];
+
+const ListRowSkeleton = ({ image = false }) => (
+  <div className="flex items-center gap-3 rounded-xl border border-gray-100 p-2.5">
+    <Bone className={image ? "h-16 w-20 shrink-0 rounded-lg sm:w-24" : "h-9 w-9 shrink-0 rounded-full"} />
+    <div className="flex-1">
+      <Bone className="h-4 w-3/4" />
+      <Bone className="mt-2 h-3 w-1/2" />
+    </div>
+    <Bone className="h-4 w-14" />
+  </div>
+);
+
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [year, setYear] = useState(new Date().getFullYear());
 
   // Chat button (header) with live unread count
@@ -121,42 +158,43 @@ export default function Dashboard() {
   }, [canChat]);
 
   useEffect(() => {
+    let active = true;
+
     const fetchDashboard = async () => {
       setLoading(true);
+      setFailed(false);
 
       try {
         const res = await getDashboard(year);
 
+        if (!active) return;
+
         if (res?.status) {
           setData(res.data);
+        } else {
+          setFailed(true);
         }
       } catch (error) {
+        if (!active) return;
         console.error("Failed to fetch dashboard:", error);
+        setFailed(true);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     fetchDashboard();
-  }, [year]);
 
-  if (loading && !data) {
-    return (
-      <div className="flex justify-center items-center py-32">
-        <Spinner size="md" />
-      </div>
-    );
-  }
+    // Year changed again before the answer -> ignore the old answer
+    return () => {
+      active = false;
+    };
+  }, [year, reloadKey]);
 
-  if (!data) {
-    return (
-      <div className="py-32 text-center text-sm text-gray-500">
-        Failed to load dashboard.
-      </div>
-    );
-  }
+  // No full page loader: the page shows at once, cards show placeholders until data comes
+  const ready = Boolean(data);
 
-  const monthly = data.monthly || [];
+  const monthly = data?.monthly || [];
   const chartMax = Math.max(1, ...monthly.map((item) => Math.max(item.properties, item.enquiries)));
   const yearProperties = monthly.reduce((sum, item) => sum + item.properties, 0);
   const yearEnquiries = monthly.reduce((sum, item) => sum + item.enquiries, 0);
@@ -165,7 +203,21 @@ export default function Dashboard() {
   const offer = user?.listing_quota?.offer;
 
   return (
-    <div className="min-h-screen [&_p]:mb-0">
+    <div className="min-h-screen [&_p]:mb-0" aria-busy={loading}>
+
+      {/* Load failed: page stays, message + retry on top */}
+      {failed && !loading && (
+        <div role="alert" className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{ready ? "Could not refresh the dashboard." : "Failed to load dashboard."}</span>
+          <button
+            type="button"
+            onClick={() => setReloadKey((key) => key + 1)}
+            className="shrink-0 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {offer?.ends_at && (
         <div
@@ -227,8 +279,11 @@ export default function Dashboard() {
       ================================================================ */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 
+        {/* Loading: 4 placeholder cards */}
+        {!ready && Array.from({ length: 4 }, (_, index) => <StatCardSkeleton key={index} />)}
+
         {/* Cards not sent by API are hidden (e.g. Registered Users for seller / broker) */}
-        {STAT_CARDS.filter((card) => data.stats?.[card.key]).map((card) => {
+        {ready && STAT_CARDS.filter((card) => data.stats?.[card.key]).map((card) => {
           const Icon = card.icon;
           const stat = data.stats?.[card.key] || { total: 0, this_month: 0, change: 0 };
           const isDown = stat.change < 0;
@@ -316,14 +371,17 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-center gap-2">
-              {loading && <Spinner size="sm" />}
+              {/* Year change: small spinner, old chart stays until the new one comes */}
+              {loading && ready && <Spinner size="sm" />}
 
               <select
                 value={year}
                 onChange={(e) => setYear(Number(e.target.value))}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 outline-none"
+                disabled={!ready}
+                aria-label="Year"
+                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 outline-none disabled:opacity-60"
               >
-                {(data.years?.length ? data.years : [year]).map((item) => (
+                {(data?.years?.length ? data.years : [year]).map((item) => (
                   <option key={item} value={item}>
                     {item}
                   </option>
@@ -341,9 +399,13 @@ export default function Dashboard() {
                 Properties Added
               </p>
 
-              <p className="mt-1 text-2xl font-bold text-[#1A1F36]">
-                {yearProperties.toLocaleString("en-IN")}
-              </p>
+              {ready ? (
+                <p className="mt-1 text-2xl font-bold text-[#1A1F36]">
+                  {yearProperties.toLocaleString("en-IN")}
+                </p>
+              ) : (
+                <Bone className="mt-2 h-7 w-14" />
+              )}
             </div>
 
             <div>
@@ -352,14 +414,29 @@ export default function Dashboard() {
                 Enquiries Received
               </p>
 
-              <p className="mt-1 text-2xl font-bold text-[#1A1F36]">
-                {yearEnquiries.toLocaleString("en-IN")}
-              </p>
+              {ready ? (
+                <p className="mt-1 text-2xl font-bold text-[#1A1F36]">
+                  {yearEnquiries.toLocaleString("en-IN")}
+                </p>
+              ) : (
+                <Bone className="mt-2 h-7 w-14" />
+              )}
             </div>
           </div>
 
           {/* Chart */}
           <div className="mt-7 flex h-[280px] items-end gap-2 sm:gap-3">
+
+            {/* Loading: 12 placeholder bars */}
+            {!ready &&
+              CHART_SKELETON_HEIGHTS.map((height, index) => (
+                <div key={index} className="flex h-full flex-1 flex-col items-center justify-end">
+                  <div className="flex h-full w-full items-end justify-center">
+                    <span aria-hidden="true" className="block w-full max-w-[36px] animate-pulse rounded-t-md bg-gray-100" style={{ height: `${height}%` }} />
+                  </div>
+                  <Bone className="mt-2 h-3 w-6" />
+                </div>
+              ))}
 
             {monthly.map((item) => (
               <div
@@ -411,7 +488,21 @@ export default function Dashboard() {
 
           <div className="mt-6 space-y-5">
 
-            {data.property_types?.length ? (
+            {!ready ? (
+              Array.from({ length: 4 }, (_, index) => (
+                <div key={index}>
+                  <div className="flex items-center gap-3">
+                    <Bone className="h-9 w-9 rounded-lg" />
+                    <div className="flex-1">
+                      <Bone className="h-4 w-24" />
+                      <Bone className="mt-1.5 h-3 w-16" />
+                    </div>
+                    <Bone className="h-4 w-8" />
+                  </div>
+                  <Bone className="mt-2 h-1.5 w-full rounded-full" />
+                </div>
+              ))
+            ) : data.property_types?.length ? (
               data.property_types.map((type, index) => {
                 const style = type.name === "Other" ? OTHER_TYPE_STYLE : TYPE_STYLES[index] || OTHER_TYPE_STYLE;
                 const Icon = style.icon;
@@ -504,7 +595,9 @@ export default function Dashboard() {
           </div>
 
           <div className="mt-4 space-y-2.5">
-            {data.recent_properties?.length ? (
+            {!ready ? (
+              Array.from({ length: 4 }, (_, index) => <ListRowSkeleton key={index} image />)
+            ) : data.recent_properties?.length ? (
               data.recent_properties.map((property) => (
                 <NextLink
                   key={property.id}
@@ -595,7 +688,7 @@ export default function Dashboard() {
             <div>
               <h2 className="text-base font-bold text-[#1A1F36]">
                 Recent Enquiries
-                {data.enquiry_unread > 0 && (
+                {data?.enquiry_unread > 0 && (
                   <span className="ml-2 rounded-full bg-[#E87722] px-2 py-0.5 align-middle text-[10px] font-bold text-white">
                     {data.enquiry_unread} unread
                   </span>
@@ -608,7 +701,7 @@ export default function Dashboard() {
             </div>
 
             <NextLink
-              href="/admin/enquiry/enquiryList"
+              href="/admin/lead/leadList"
               className="text-xs font-semibold text-orange-600 no-underline hover:text-orange-700 hover:no-underline"
             >
               View All
@@ -617,7 +710,11 @@ export default function Dashboard() {
 
           <div className="mt-3">
 
-            {data.recent_enquiries?.length ? (
+            {!ready ? (
+              <div className="space-y-2.5">
+                {Array.from({ length: 5 }, (_, index) => <ListRowSkeleton key={index} />)}
+              </div>
+            ) : data.recent_enquiries?.length ? (
               data.recent_enquiries.map((enquiry) => (
                 <div
                   key={enquiry.id}
@@ -658,7 +755,7 @@ export default function Dashboard() {
                   </div>
 
                   <NextLink
-                    href="/admin/enquiry/enquiryList"
+                    href="/admin/lead/leadList"
                     className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition hover:bg-orange-50 hover:text-orange-600"
                   >
                     <FiMessageSquare size={15} />

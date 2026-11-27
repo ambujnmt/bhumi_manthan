@@ -18,7 +18,7 @@ export default function AdminRolePending() {
 
   const handleLogout = () => {
     logout();
-    router.replace("/login");
+    router.replace("/?login=1");
   };
 
   return (

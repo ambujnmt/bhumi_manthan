@@ -11,6 +11,7 @@ import { SlCalender } from "react-icons/sl";
 import { FiClock } from "react-icons/fi";
 import { useUser } from "../../../../context/UserContext";
 import { useRouter } from "next/router";
+import NotificationBell from "./NotificationBell";
 
 export default function Header({ menuOpen, toggleMenu }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -77,7 +78,7 @@ export default function Header({ menuOpen, toggleMenu }) {
     onClose();
 
     // Go to login immediately
-    router.replace("/login");
+    router.replace("/?login=1");
   } catch (error) {
     console.error("Logout error:", error);
   } finally {
@@ -189,6 +190,9 @@ export default function Header({ menuOpen, toggleMenu }) {
               {formattedTime}
             </span>
           </div>
+
+          {/* Notifications: seller / broker get property approval updates */}
+          {["seller", "broker"].includes(user?.role) && <NotificationBell />}
 
           <div className="hidden h-8 w-px bg-gray-100 sm:block" />
 

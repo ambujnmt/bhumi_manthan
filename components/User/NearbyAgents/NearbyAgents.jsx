@@ -82,7 +82,7 @@ export default function NearbyAgents() {
         {loading
           ? "Finding property experts around you..."
           : nearby
-            ? `${counts.broker} ${counts.broker === 1 ? "broker" : "brokers"} & ${counts.seller} ${counts.seller === 1 ? "seller" : "sellers"} active within 50 km${city ? ` of ${city}` : ""}, nearest first.`
+            ? `${counts.broker} ${counts.broker === 1 ? "broker" : "brokers"} & ${counts.seller} ${counts.seller === 1 ? "seller" : "sellers"} active near ${city ? city : "you"}, nearest first.`
             : `No one found near ${city || "your location"} yet, showing all active brokers & sellers (top rated first).`}
       </p>
 

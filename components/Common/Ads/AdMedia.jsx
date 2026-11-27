@@ -168,31 +168,65 @@ function useIsDesktop() {
 }
 
 /**
+ * Ad has its own media for phones / tablets (mobile image, mobile video or mobile video link)
+ */
+export const hasMobileMedia = (ad) => Boolean(ad?.mobile_image || ad?.mobile_video_file || ad?.mobile_video_url);
+
+/**
+ * Phones / tablets media: mobile image, mobile video file or mobile video link (YouTube / Vimeo)
+ */
+function MobileMedia({ ad, className = "", alt = "Advertisement" }) {
+  const target = clickTarget(ad.link_url);
+  const label = target ? `${alt} - open link` : undefined;
+
+  if (ad.mobile_image) {
+    return (
+      <AdLink target={target} label={label}>
+        <img src={ad.mobile_image} alt={alt} decoding="async" className={`mx-auto block h-auto max-h-[220px] w-full rounded-lg object-contain ${className}`} />
+      </AdLink>
+    );
+  }
+
+  // Video file / video link: same player as desktop, wide shape (full width banner)
+  const videoLink = ad.mobile_video_url || null;
+
+  return (
+    <MainMedia
+      ad={{
+        link_url: ad.link_url,
+        video_file: ad.mobile_video_file || null,
+        video_url: ad.mobile_video_file ? null : videoLink,
+      }}
+      className={className}
+      alt={alt}
+      shape="wide"
+    />
+  );
+}
+
+/**
  * One ad: image, uploaded video (autoplay, muted, loop) or video link (YouTube / Vimeo embed).
- * ad = { image, video_file, video_url, link_url, mobile_image }
+ * ad = { image, video_file, video_url, link_url, mobile_image, mobile_video_file, mobile_video_url }
  * link_url set     -> clicking the ad opens it.
- * mobile_image set -> phones / tablets show that image instead (the video is not even loaded there).
+ * mobile media set -> phones / tablets show that instead (the desktop video is not even loaded there).
  */
 export default function AdMedia({ ad, className = "", alt = "Advertisement", shape = "tall" }) {
   const desktop = useIsDesktop();
 
   if (!ad) return null;
-  if (!ad.mobile_image) return <MainMedia ad={ad} className={className} alt={alt} shape={shape} />;
+  if (!hasMobileMedia(ad)) return <MainMedia ad={ad} className={className} alt={alt} shape={shape} />;
 
-  const mobile = (
-    <AdLink target={clickTarget(ad.link_url)} label={ad.link_url ? `${alt} - open link` : undefined}>
-      <img src={ad.mobile_image} alt={alt} decoding="async" className={`mx-auto block h-auto max-h-[220px] w-full rounded-lg object-contain ${className}`} />
-    </AdLink>
-  );
+  const mobile = <MobileMedia ad={ad} className={className} alt={alt} />;
 
   // Screen known -> only the one that shows (no hidden video downloading on phones)
   if (desktop === true) return <MainMedia ad={ad} className={className} alt={alt} shape={shape} />;
   if (desktop === false) return mobile;
 
   // First paint (server HTML): pick by CSS until the screen size is known
+  // (no video yet: a mobile video waits for the screen size, so desktops never download it)
   return (
     <>
-      <div className="lg:hidden">{mobile}</div>
+      <div className="lg:hidden">{ad.mobile_image ? mobile : null}</div>
       <div className="hidden lg:block">
         <MainMedia ad={{ ...ad, video_file: null, video_url: ad.image ? null : ad.video_url }} className={className} alt={alt} shape={shape} />
       </div>

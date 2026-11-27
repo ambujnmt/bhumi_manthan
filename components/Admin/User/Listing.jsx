@@ -18,6 +18,21 @@ import { FaRegTrashCan } from "react-icons/fa6";
 import Tmodal from "../../Tmodal/Tmodal";
 import DetailModal from "./DetailModal";
 import UserUpdate from "./Update";
+import ModerationModal from "./ModerationModal";
+import { FaBan, FaLock, FaLockOpen, FaTrashRestore } from "react-icons/fa";
+
+// Seller / broker can be blocked (temporary) or banned (permanent)
+const MODERATED_ROLES = ["seller", "broker"];
+
+const ACCOUNT_BADGES = {
+    blocked: "bg-amber-100 text-amber-800",
+    banned: "bg-red-600 text-white",
+};
+
+const formatUntil = (value) =>
+    value
+        ? new Date(value).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+        : "";
 
 // Roles that can get admin panel access through an admin role
 const PANEL_ROLES = ["staff", "seller", "broker"];
@@ -34,6 +49,9 @@ const USER_TABS = [
     { key: "customers", label: "Customers", match: (u) => u?.role === "customer" },
     { key: "team", label: "Broker / Seller / Staff", match: (u) => u?.role !== "customer" },
 ];
+
+// Rows per page when a tab opens (Customers and Broker / Seller / Staff)
+const defaultPageSize = () => 20;
 
 const initialStaffForm = {
     name: "",
@@ -59,6 +77,8 @@ export default function Listing() {
     const [roleUser, setRoleUser] = useState(null);
     const [viewUser, setViewUser] = useState(null); // View -> detail modal
     const [editUser, setEditUser] = useState(null); // Edit user in a modal (Customers + Seller / Broker / Staff tabs)
+    // Block / unblock / ban / unban / restore: { action, user }
+    const [moderation, setModeration] = useState(null);
     const [roleForm, setRoleForm] = useState({ role: "customer", admin_role_id: "" });
     const [staffModalOpen, setStaffModalOpen] = useState(false);
     const [staffForm, setStaffForm] = useState(initialStaffForm);
@@ -92,6 +112,7 @@ const [deleteLoading, setDeleteLoading] = useState(false);
     useEffect(() => {
         setTab(urlTab);
         setPageIndex(0);
+        setPageSize(defaultPageSize(urlTab));
     }, [urlTab]);
 
     // Download buyers (customers) as CSV: all, one city, or one buyer (row icon)
@@ -126,7 +147,8 @@ const [deleteLoading, setDeleteLoading] = useState(false);
         }
     };
 
-    const handleBuyerDownload = async () => {
+    // format: "csv" | "xlsx" (Excel)
+    const handleBuyerDownload = async (format = "csv") => {
         if (buyerScope === "city" && !buyerCity) {
             showToast("Please select a city.", "error");
             return;
@@ -137,12 +159,13 @@ const [deleteLoading, setDeleteLoading] = useState(false);
             return;
         }
 
-        setBuyerDownloading(true);
+        setBuyerDownloading(format);
 
         try {
-            const fileName = await downloadBuyersCsv(
-                buyerScope === "city" ? { city: buyerCity } : buyerScope === "one" ? { user_id: buyerId } : {}
-            );
+            const fileName = await downloadBuyersCsv({
+                ...(buyerScope === "city" ? { city: buyerCity } : buyerScope === "one" ? { user_id: buyerId } : {}),
+                format,
+            });
             showToast(`Downloaded ${fileName}`);
             setBuyerModalOpen(false);
         } catch (error) {
@@ -168,15 +191,16 @@ const [deleteLoading, setDeleteLoading] = useState(false);
     const changeTab = (key) => {
         setTab(key);
         setPageIndex(0);
+        setPageSize(defaultPageSize(key));
 
         // Keep the URL in sync (sidebar shows the matching menu item as active)
         const basePath = router.asPath.split(/[?#]/)[0];
         router.replace(key === "team" ? `${basePath}?tab=team` : basePath, undefined, { shallow: true });
     };
 
-    // pagination state
+    // pagination state (20 rows per page on both tabs)
     const [pageIndex, setPageIndex] = useState(0);
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(() => defaultPageSize(urlTab));
 
 useEffect(() => {
     const fetchUsers = async () => {
@@ -239,8 +263,9 @@ const filteredUsers = useMemo(() => {
 
     const sizePerPageList = [
         { text: "10", value: 10 },
-        { text: "25", value: 25 },
+        { text: "20", value: 20 },
         { text: "50", value: 50 },
+        { text: "100", value: 100 },
     ];
 
 
@@ -359,7 +384,7 @@ const handleDeleteConfirm = async () => {
         }
     };
 
-    const colCount = 5;
+    const colCount = tab === "team" ? 4 : 5;
 
 
     const modalFooter = (onCancel, onSave) => (
@@ -520,8 +545,9 @@ const handleDeleteConfirm = async () => {
                     <thead className="bg-gray-100">
                         <tr>
                             {/* w-full: Name / Email takes the extra width */}
-                            <th className="px-4 py-3 text-left whitespace-nowrap w-full">Name / Email</th>
-                            <th className="px-4 py-3 text-left whitespace-nowrap">Phone</th>
+                            {/* Broker / Seller / Staff tab: phone sits under the email (no Phone column) */}
+                            <th className="px-4 py-3 text-left whitespace-nowrap w-full">{tab === "team" ? "Name / Contact" : "Name / Email"}</th>
+                            {tab !== "team" && <th className="px-4 py-3 text-left whitespace-nowrap">Phone</th>}
                             <th className="px-4 py-3 text-left whitespace-nowrap">Role</th>
                             <th className="px-4 py-3 text-left whitespace-nowrap">Status</th>
                             <th className="px-4 py-3 text-left whitespace-nowrap">Action</th>
@@ -555,13 +581,21 @@ const handleDeleteConfirm = async () => {
                                                         <p className="mb-0 mt-0.5 max-w-[280px] truncate text-xs text-[#62748E]" title={user.email}>
                                                             {user.email || "-"}
                                                         </p>
+                                                        {tab === "team" && (
+                                                            <p className="mb-0 mt-0.5 text-xs text-[#62748E]">
+                                                                {user.phone || "-"}
+                                                                {user.city && <span className="text-[#94A3B8]"> · {user.city}</span>}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-2.5 whitespace-nowrap text-[#62748E]">
-                                                <p className="mb-0">{user.phone || "-"}</p>
-                                                {user.city && <p className="mb-0 mt-0.5 text-xs">{user.city}</p>}
-                                            </td>
+                                            {tab !== "team" && (
+                                                <td className="px-4 py-2.5 whitespace-nowrap text-[#62748E]">
+                                                    <p className="mb-0">{user.phone || "-"}</p>
+                                                    {user.city && <p className="mb-0 mt-0.5 text-xs">{user.city}</p>}
+                                                </td>
+                                            )}
                                             <td className="px-4 py-2.5 whitespace-nowrap">
                                                 <div className="flex items-center gap-1.5">
                                                     <span
@@ -583,6 +617,24 @@ const handleDeleteConfirm = async () => {
                                             </td>
                                             {/* ✅ STATUS BADGE */}
                                             <td className="px-4 py-2.5 whitespace-nowrap">
+                                                {ACCOUNT_BADGES[user.account_status] ? (
+                                                    <Tooltip
+                                                        content={
+                                                            <div className="max-w-[260px] p-1 text-xs">
+                                                                {user.account_status === "blocked" && (
+                                                                    <p className="mb-1 font-semibold">
+                                                                        {user.blocked_until ? `Blocked until ${formatUntil(user.blocked_until)}` : "Blocked until unblocked"}
+                                                                    </p>
+                                                                )}
+                                                                <p className="mb-0">Reason: {user.account_status_reason || "-"}</p>
+                                                            </div>
+                                                        }
+                                                    >
+                                                        <span className={`cursor-help rounded-full px-3 py-1 text-xs font-semibold capitalize ${ACCOUNT_BADGES[user.account_status]}`}>
+                                                            {user.account_status}
+                                                        </span>
+                                                    </Tooltip>
+                                                ) : (
                                                 <span
                                                     className={`px-3 py-1 rounded-full text-xs font-semibold capitalize
                 ${user.status === "active"
@@ -595,6 +647,7 @@ const handleDeleteConfirm = async () => {
                                                 >
                                                     {user.status}
                                                 </span>
+                                                )}
                                             </td>
                                             <td className="px-4 py-2.5 whitespace-nowrap">
                                                 <div className="flex items-center gap-2">
@@ -627,6 +680,17 @@ const handleDeleteConfirm = async () => {
 
                                                 {showDeleted ? (
                                                     can('users.delete') && (
+                                                    <>
+                                                    <Tooltip content="Restore User">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setModeration({ action: "restore", user })}
+                                                            aria-label={`Restore ${user.name || user.email}`}
+                                                            className={actionButtonClass}
+                                                        >
+                                                            <FaTrashRestore size={13} />
+                                                        </button>
+                                                    </Tooltip>
                                                     <Tooltip content="Permanently Delete User">
                                                         <button
                                                             type="button"
@@ -636,6 +700,7 @@ const handleDeleteConfirm = async () => {
                                                             <FaRegTrashCan size={14} />
                                                         </button>
                                                     </Tooltip>
+                                                    </>
                                                     )
                                                 ) : (
                                                     <>
@@ -660,6 +725,33 @@ const handleDeleteConfirm = async () => {
                                                                 className={actionButtonClass}
                                                             >
                                                                 <FaPen size={13} />
+                                                            </button>
+                                                        </Tooltip>
+                                                        )}
+
+                                                        {/* Seller / broker: block (temporary) / ban (permanent) */}
+                                                        {can('users.edit') && MODERATED_ROLES.includes(user.role) && user.account_status !== "banned" && (
+                                                        <Tooltip content={user.account_status === "blocked" ? "Unblock Account" : "Block Account"}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setModeration({ action: user.account_status === "blocked" ? "unblock" : "block", user })}
+                                                                aria-label={`${user.account_status === "blocked" ? "Unblock" : "Block"} ${user.name || user.email}`}
+                                                                className={user.account_status === "blocked" ? "flex h-8 w-8 items-center justify-center rounded-lg border border-amber-300 bg-amber-50 text-amber-700 transition hover:bg-amber-100" : actionButtonClass}
+                                                            >
+                                                                {user.account_status === "blocked" ? <FaLockOpen size={13} /> : <FaLock size={13} />}
+                                                            </button>
+                                                        </Tooltip>
+                                                        )}
+
+                                                        {can('users.edit') && MODERATED_ROLES.includes(user.role) && (
+                                                        <Tooltip content={user.account_status === "banned" ? "Unban Account" : "Ban Account (Permanent)"}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setModeration({ action: user.account_status === "banned" ? "unban" : "ban", user })}
+                                                                aria-label={`${user.account_status === "banned" ? "Unban" : "Ban"} ${user.name || user.email}`}
+                                                                className={user.account_status === "banned" ? "flex h-8 w-8 items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-600 transition hover:bg-red-100" : dangerActionButtonClass}
+                                                            >
+                                                                <FaBan size={13} />
                                                             </button>
                                                         </Tooltip>
                                                         )}
@@ -709,6 +801,22 @@ const handleDeleteConfirm = async () => {
 
             {/* View User Modal */}
             <DetailModal user={viewUser} onClose={() => setViewUser(null)} />
+
+            {/* Block / Unblock / Ban / Unban / Restore */}
+            <ModerationModal
+                action={moderation?.action}
+                user={moderation?.user}
+                onClose={() => setModeration(null)}
+                onDone={(saved, action) => {
+                    if (action === "restore") {
+                        // Restored user leaves the deleted list
+                        setUsers((prev) => prev.filter((u) => u.id !== moderation.user.id));
+                    } else if (saved) {
+                        setUsers((prev) => prev.map((u) => (u.id === saved.id ? { ...u, ...saved } : u)));
+                    }
+                    setModeration(null);
+                }}
+            />
 
             {/* Assign Role Modal */}
             <Tmodal
@@ -799,23 +907,33 @@ const handleDeleteConfirm = async () => {
                 size="lg"
                 title="Download Buyers Data"
                 footer={
-                    <div className="flex gap-3">
+                    <div className="flex gap-2">
                         <button
                             type="button"
                             onClick={() => setBuyerModalOpen(false)}
-                            disabled={buyerDownloading}
-                            className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700"
+                            disabled={Boolean(buyerDownloading)}
+                            className="whitespace-nowrap rounded-lg border border-gray-300 px-3.5 py-2 text-sm text-gray-700"
                         >
                             Cancel
                         </button>
+                        {/* Same data, two formats */}
                         <button
                             type="button"
-                            onClick={handleBuyerDownload}
-                            disabled={buyerDownloading || (buyerScope === "city" && !buyerCity) || (buyerScope === "one" && !buyerId)}
-                            className="flex items-center gap-2 rounded-lg bg-[rgb(232,119,34)] px-4 py-2 text-white disabled:opacity-60"
+                            onClick={() => handleBuyerDownload("csv")}
+                            disabled={Boolean(buyerDownloading) || (buyerScope === "city" && !buyerCity) || (buyerScope === "one" && !buyerId)}
+                            className="flex items-center gap-2 whitespace-nowrap rounded-lg border border-[rgb(232,119,34)] bg-white px-3.5 py-2 text-sm text-[rgb(232,119,34)] transition hover:bg-orange-50 disabled:opacity-60"
                         >
-                            {buyerDownloading ? <Spinner size="sm" color="white" /> : <FiDownload size={15} />}
-                            {buyerDownloading ? "Preparing..." : "Download CSV"}
+                            {buyerDownloading === "csv" ? <Spinner size="sm" /> : <FiDownload size={15} />}
+                            {buyerDownloading === "csv" ? "Preparing..." : "Download CSV"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleBuyerDownload("xlsx")}
+                            disabled={Boolean(buyerDownloading) || (buyerScope === "city" && !buyerCity) || (buyerScope === "one" && !buyerId)}
+                            className="flex items-center gap-2 whitespace-nowrap rounded-lg bg-[rgb(232,119,34)] px-3.5 py-2 text-sm text-white disabled:opacity-60"
+                        >
+                            {buyerDownloading === "xlsx" ? <Spinner size="sm" color="white" /> : <FiDownload size={15} />}
+                            {buyerDownloading === "xlsx" ? "Preparing..." : "Download Excel"}
                         </button>
                     </div>
                 }
@@ -1076,7 +1194,7 @@ const handleDeleteConfirm = async () => {
                     })()}
 
                     <p className="mb-0 text-xs text-[#62748E]">
-                        CSV opens in Excel / Google Sheets. You can also use the download icon in a buyer&apos;s row.
+                        Excel (.xlsx) opens with formatting in Excel / Google Sheets; CSV works everywhere. The download icon in a buyer&apos;s row gives a quick CSV.
                     </p>
                 </div>
             </Tmodal>
@@ -1175,6 +1293,13 @@ const handleDeleteConfirm = async () => {
                     </span>
                     ?
                 </p>
+
+                {!showDeleted && MODERATED_ROLES.includes(selectedUser?.role) && (
+                    <p className="mt-3 text-sm text-[#62748E]">
+                        They will be logged out and their properties hidden from the website.
+                        You can restore the account from Deleted Users.
+                    </p>
+                )}
 
                 {showDeleted && (
                     <p className="mt-3 text-sm text-red-600">

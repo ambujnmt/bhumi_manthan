@@ -8,7 +8,32 @@
 //   3. page     wrap the content between <Header /> and <Footer /> in <SideAds>...</SideAds>
 // The admin checkbox list comes from the API, so the new page shows there on its own.
 
+import { createContext, useContext } from "react";
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+const isServer = typeof window === "undefined";
+
+/**
+ * Ads loaded on the server for this page (getStaticProps) -> { placement: ad | null }.
+ * Same props on server render + browser hydration, so both render the same HTML.
+ *
+ *   <ServerAdsContext.Provider value={ads}>...</ServerAdsContext.Provider>
+ */
+export const ServerAdsContext = createContext(null);
+
+/**
+ * First-render ad of a placement: server ads of this page first, then the browser cache.
+ * ad | null (known, none) | undefined (not known yet)
+ */
+export const useInitialAd = () => {
+  const serverAds = useContext(ServerAdsContext);
+
+  return (placement) =>
+    serverAds && Object.prototype.hasOwnProperty.call(serverAds, placement)
+      ? serverAds[placement] || null
+      : peekAd(placement);
+};
 
 // Same keys as backend App\Models\Ad::placementKey()
 export const AD_PLACEMENTS = {
@@ -83,6 +108,11 @@ const resolved = new Map();
  * ad | null (known, none set) | undefined (not loaded yet)
  */
 export const peekAd = (placement) => {
+  // Server: this module cache is shared by every request (stale / other user's data)
+  // -> never read it while rendering HTML, or the browser's first render will not match.
+  // Ads loaded for this request come through ServerAdsContext instead.
+  if (isServer) return undefined;
+
   const saved = cache.get(placement);
   if (!saved || Date.now() - saved.at >= CACHE_MS) return undefined;
 
@@ -94,7 +124,8 @@ export const peekAd = (placement) => {
  * ads = { placement: ad | null }
  */
 export const primeAds = (ads) => {
-  if (!ads || typeof ads !== "object") return;
+  // Browser cache only (on the server it would leak between requests)
+  if (isServer || !ads || typeof ads !== "object") return;
 
   // Server data is the newest -> always replaces (same data on server render + browser, no mismatch)
   Object.entries(ads).forEach(([placement, ad]) => {

@@ -28,6 +28,7 @@ import PageTitle from "../../Breadcrumb/PageTitle";
 import Tmodal from "../../Tmodal/Tmodal";
 import SearchableSelect from "../PropertyManagement/SearchableSelect";
 import EventPreviewCard from "./EventPreviewCard";
+import ImageSizeNote, { PROPERTY_IMAGE_SIZES, checkImageSize } from "../PropertyManagement/ImageSizeNote";
 import {
     addAdminEvent,
     getAdminEventById,
@@ -145,6 +146,8 @@ export default function EventForm({ eventId }) {
     const [options, setOptions] = useState({ types: [], footfalls: [], highlights: [], max_images: 5 });
     // { key, path?, url, file? } - first image is the banner
     const [images, setImages] = useState([]);
+    // Real width x height of each image (key -> { width, height }), read when its thumbnail loads
+    const [imageSizes, setImageSizes] = useState({});
     const [brochure, setBrochure] = useState({ url: "", file: null, remove: false });
     const [confirmed, setConfirmed] = useState(isEdit);
 
@@ -705,6 +708,9 @@ export default function EventForm({ eventId }) {
                                             e.target.value = "";
                                         }}
                                     />
+
+                                    {/* Recommended width x height (each image shows its own size below) */}
+                                    <ImageSizeNote size={PROPERTY_IMAGE_SIZES.event} />
                                 </div>
 
                                 <div>
@@ -755,7 +761,34 @@ export default function EventForm({ eventId }) {
                                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                                     {images.map((image, index) => (
                                         <div key={image.key} className="group relative overflow-hidden rounded-lg border border-gray-200">
-                                            <img src={image.url} alt={`Event image ${index + 1}`} className="h-24 w-full object-cover" />
+                                            <img
+                                                src={image.url}
+                                                alt={`Event image ${index + 1}`}
+                                                className="h-24 w-full object-cover"
+                                                onLoad={(event) => {
+                                                    const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
+                                                    setImageSizes((previous) =>
+                                                        previous[image.key]?.width === width && previous[image.key]?.height === height
+                                                            ? previous
+                                                            : { ...previous, [image.key]: { width, height } }
+                                                    );
+                                                }}
+                                            />
+
+                                            {/* Size of this image: green = fits, red = different shape / small */}
+                                            {imageSizes[image.key] && (() => {
+                                                const actual = imageSizes[image.key];
+                                                const check = checkImageSize(PROPERTY_IMAGE_SIZES.event, actual);
+                                                return (
+                                                    <span
+                                                        title={check.offShape ? "Different shape: may look cropped" : check.tooSmall ? "Small: may look blurry" : "Good size"}
+                                                        className={`absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-white shadow ${check.ok ? "bg-green-600/90" : "bg-red-600/90"}`}
+                                                    >
+                                                        {actual.width} × {actual.height}
+                                                        {check.ok ? "" : " !"}
+                                                    </span>
+                                                );
+                                            })()}
                                             {index === 0 ? (
                                                 <span className="absolute left-1.5 top-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold text-white" style={{ backgroundColor: GOLD }}>
                                                     Banner

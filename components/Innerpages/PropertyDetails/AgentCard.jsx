@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { FaCheckCircle, FaPhoneAlt, FaUserTie } from "react-icons/fa";
 import { BsChatDotsFill } from "react-icons/bs";
+import GetNumberModal from "../../Common/GetNumberModal";
+
+// "9876543210" -> "98••••••10" (until the buyer sends a Get Number enquiry)
+const maskPhone = (phone) => {
+    const value = String(phone || "").trim();
+
+    return value.length > 4 ? `${value.slice(0, 2)}${"•".repeat(value.length - 4)}${value.slice(-2)}` : value;
+};
 
 const CREATOR_ROLES = {
     super_admin: "Admin",
@@ -12,6 +20,11 @@ const CREATOR_ROLES = {
 // Seller / broker of the property, and the user who listed it. Image and phone are optional on a listing.
 export default function AgentCard({ property, onChat }) {
     const [imageFailed, setImageFailed] = useState(false);
+
+    // Get Number: phone shown only after the buyer sends an enquiry (lead + OTP),
+    // for this page view only - a page refresh hides it again
+    const [unlocked, setUnlocked] = useState(false);
+    const [getNumberOpen, setGetNumberOpen] = useState(false);
 
     const creator = property.creator;
     const creatorRole = CREATOR_ROLES[creator?.role];
@@ -66,9 +79,20 @@ export default function AgentCard({ property, onChat }) {
                     )}
                     {details && <p className="mb-1 text-[13px] text-[#62748E]">{details}</p>}
                     {property.agent_phone && (
-                        <a href={`tel:${property.agent_phone}`} className="text-sm font-semibold text-[var(--secondary-color)] no-underline hover:text-[var(--primary-color)]">
-                            {property.agent_phone}
-                        </a>
+                        unlocked ? (
+                            <a href={`tel:${property.agent_phone}`} className="text-sm font-semibold text-[var(--secondary-color)] no-underline hover:text-[var(--primary-color)]">
+                                {property.agent_phone}
+                            </a>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => setGetNumberOpen(true)}
+                                title="Get the number"
+                                className="font-mono text-sm font-semibold tracking-wide text-[var(--secondary-color)] hover:text-[var(--primary-color)]"
+                            >
+                                {maskPhone(property.agent_phone)}
+                            </button>
+                        )
                     )}
                     {hasAgent && creator && (
                         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-gray-100 pt-2 text-[13px] text-[#62748E]">
@@ -89,14 +113,35 @@ export default function AgentCard({ property, onChat }) {
                     <BsChatDotsFill size={14} aria-hidden="true" /> Chat
                 </button>
                 {property.agent_phone && (
-                    <a
-                        href={`tel:${property.agent_phone}`}
-                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-[var(--primary-color)] px-5 py-2.5 text-sm font-semibold text-[var(--primary-color)] no-underline transition-colors hover:bg-[var(--primary-color)] hover:text-white sm:flex-none"
-                    >
-                        <FaPhoneAlt size={12} aria-hidden="true" /> Call
-                    </a>
+                    unlocked ? (
+                        <a
+                            href={`tel:${property.agent_phone}`}
+                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-[var(--primary-color)] px-5 py-2.5 text-sm font-semibold text-[var(--primary-color)] no-underline transition-colors hover:bg-[var(--primary-color)] hover:text-white sm:flex-none"
+                        >
+                            <FaPhoneAlt size={12} aria-hidden="true" /> Call
+                        </a>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setGetNumberOpen(true)}
+                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-[var(--primary-color)] px-5 py-2.5 text-sm font-semibold text-[var(--primary-color)] transition-colors hover:bg-[var(--primary-color)] hover:text-white sm:flex-none"
+                        >
+                            <FaPhoneAlt size={12} aria-hidden="true" /> Get Number
+                        </button>
+                    )
                 )}
             </div>
+
+            {/* Get Number enquiry (lead to the seller / broker who listed it) */}
+            <GetNumberModal
+                open={getNumberOpen}
+                agentId={creator?.id}
+                agentName={name}
+                phone={property.agent_phone}
+                defaultMessage={property.title ? `I am interested in "${property.title}". Please share the details.` : ""}
+                onClose={() => setGetNumberOpen(false)}
+                onUnlocked={() => setUnlocked(true)}
+            />
         </div>
     );
 }

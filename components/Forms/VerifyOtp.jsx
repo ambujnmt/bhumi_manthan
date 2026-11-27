@@ -158,7 +158,7 @@ export default function VerifyOtp() {
 
             // Go to login page
             setTimeout(() => {
-                router.push("/login");
+                router.push("/?login=1");
             }, 2000);
         } catch (error) {
             setError(
@@ -303,7 +303,7 @@ export default function VerifyOtp() {
                     ========================================== */}
                     <div className="text-center mt-3">
                         <Link
-                            href="/login"
+                            href="/?login=1"
                             className="text-sm text-gray-500 hover:text-[#001737]"
                         >
                             Back to Login

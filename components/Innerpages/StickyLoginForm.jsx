@@ -22,12 +22,13 @@ import { loginUser } from "@/utils/fetchApi";
 import { useUser } from "../../context/UserContext";
 import { adminHomePath, hasAdminAccess } from "../../utils/adminPermissions";
 import { onOpenLoginPopup } from "../../utils/loginPopup";
+import { clearPostLoginRedirect, postLoginRedirect } from "../../utils/postLoginRedirect";
 
 // "Create an account" -> sign-up popup (same as header Register)
 const RegisterModal = dynamic(() => import("../Common/RegisterModal"), { ssr: false });
 
 // Post Property button: opens the login popup (this href is only the no-JS fallback)
-const POST_PROPERTY_HREF = "/login";
+const POST_PROPERTY_HREF = "/?login=1";
 
 // Popup band karne ke baad 24 ghante tak auto-open nahi hoga
 const DISMISS_KEY = "loginPopupDismissedAt";
@@ -50,11 +51,25 @@ const markDismissed = () => {
   }
 };
 
-export default function StickyLoginForm() {
+// Page to open after login (?login=1&next=/admin/...): same-site paths only
+const safeNext = (value) =>
+  typeof value === "string" && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/login")
+    ? value
+    : "";
+
+/**
+ * Login popup - the only login screen (the /login page just opens this).
+ * Mounted once for every page in pages/_app.js.
+ * autoOpen: home page opens it by itself for guests (once a day).
+ * Anywhere: openLoginPopup() (utils/loginPopup.js) or a URL with ?login=1[&next=/path].
+ */
+export default function StickyLoginForm({ autoOpen = false }) {
   const router = useRouter();
   const { login, user, accessToken } = useUser();
 
   const [open, setOpen] = useState(false);
+  // Where to go after login (from ?next=), else the role dashboard
+  const [nextPath, setNextPath] = useState("");
   const [registerOpen, setRegisterOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -65,12 +80,14 @@ export default function StickyLoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Automatically open only when the user is NOT logged in.
+  // Automatically open (home page only) when the user is NOT logged in.
   useEffect(() => {
     if (user || accessToken) {
       setOpen(false);
       return;
     }
+
+    if (!autoOpen) return;
 
     // Agar user ne pichhle 24 ghante me popup band kiya tha to auto-open mat karo
     if (wasDismissedRecently()) return;
@@ -80,7 +97,7 @@ export default function StickyLoginForm() {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [user, accessToken]);
+  }, [user, accessToken, autoOpen]);
 
   // Header Buyer / Broker / Seller click -> open this popup (utils/loginPopup.js)
   useEffect(() => {
@@ -92,16 +109,35 @@ export default function StickyLoginForm() {
     });
   }, [user, accessToken]);
 
-  // After logout header sends "/?login=1" -> open popup (even if dismissed earlier), then clean the URL
+  // ?login=1 (old /login links, logout, protected pages) -> open popup on this page
+  // (even if dismissed earlier), keep ?next= for after login, then clean the URL
   const searchParams = useSearchParams();
   const loginParam = searchParams?.get("login");
+  const nextParam = searchParams?.get("next");
 
   useEffect(() => {
     if (!loginParam || user || accessToken) return;
 
     setError("");
+    setNextPath(safeNext(nextParam));
     setOpen(true);
-    router.replace("/", { scroll: false });
+
+    // Drop login / next from the address bar (no navigation, so a page change
+    // still in progress cannot cancel it); next is kept in state for after login
+    const timer = setTimeout(() => {
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has("login")) return;
+      url.searchParams.delete("login");
+      url.searchParams.delete("next");
+
+      const clean = `${url.pathname}${url.search}${url.hash}`;
+      const state = window.history.state && typeof window.history.state === "object" ? window.history.state : {};
+
+      window.history.replaceState({ ...state, as: clean, url: clean }, "", clean);
+    }, 300);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loginParam, user, accessToken]);
 
   // Login popup -> sign-up popup, and "Already have an account? Login" -> back to login popup
@@ -221,8 +257,17 @@ export default function StickyLoginForm() {
           dashboard = "/";
       }
 
-      // Replace the current route and navigate immediately.
-      router.replace(dashboard);
+      // Where to go:
+      //   ?next= (protected page)  >  saved page (wishlist / compare / booking / chat, customers only)
+      //   >  customer stays on this page  >  role dashboard
+      const saved = loggedInUser.role === "customer" ? postLoginRedirect() : null;
+      if (loggedInUser.role !== "customer") clearPostLoginRedirect();
+
+      const here = `${window.location.pathname}${window.location.search}`;
+      const target = nextPath || saved || (dashboard === "/" && window.location.pathname !== "/" ? here : dashboard);
+
+      setNextPath("");
+      router.replace(target);
     } catch (err) {
       setError(
         err?.message || "Something went wrong. Please try again."
@@ -480,8 +525,8 @@ export default function StickyLoginForm() {
         </div>
       )}
 
-      {/* Floating buttons: Post Property + Login */}
-      {!open && (
+      {/* Floating buttons: Post Property + Login (home page only, as before) */}
+      {!open && autoOpen && (
         <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2 sm:bottom-6 sm:right-6 sm:gap-3">
           <button
             type="button"

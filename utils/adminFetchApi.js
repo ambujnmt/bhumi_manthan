@@ -75,19 +75,24 @@ export const updateUser = async (id, payload) => {
       body: payload,
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
 
+    // 422 etc.: real reason + field errors back to the form (no throw / console.error:
+    // that opens the Next dev error overlay)
     if (!res.ok) {
-      throw new Error(data?.message);
+      return {
+        status: false,
+        message: data?.message || "Failed to update user.",
+        errors: data?.errors || {},
+      };
     }
 
     return data;
   } catch (error) {
-    console.error("Update user error:", error);
-
     return {
       status: false,
-      message: error.message,
+      message: error?.message || "Network error. Please try again.",
+      errors: {},
     };
   }
 };
@@ -1040,6 +1045,7 @@ export const saveAd = async (formData, id = null) => {
 export const getBuyerCities = () => adminJsonRequest("buyers/cities");
 
 // Downloads the buyers CSV. params: { user_id } | { city } | {} (all buyers)
+// params: { city?, user_id?, format?: "csv" | "xlsx" (Excel) }
 export const downloadBuyersCsv = async (params = {}) => {
   const token = Cookies.get("accessToken") || Cookies.get("token");
   const query = new URLSearchParams(
@@ -1049,7 +1055,7 @@ export const downloadBuyersCsv = async (params = {}) => {
   const response = await fetch(`${BASE_URL}admin/buyers/export${query ? `?${query}` : ""}`, {
     method: "GET",
     headers: {
-      Accept: "text/csv, application/json",
+      Accept: "text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json",
       Authorization: `Bearer ${token}`,
     },
     cache: "no-store",
@@ -1060,14 +1066,14 @@ export const downloadBuyersCsv = async (params = {}) => {
     throw new Error(data.message || "Download failed. Please try again.");
   }
 
-  // buyers[-id][-city]-YYYY-MM-DD.csv (Content-Disposition is not readable cross-origin)
+  // buyers[-id][-city]-YYYY-MM-DD.csv|.xlsx (Content-Disposition is not readable cross-origin)
   const slug = (text) => String(text).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const fileName = [
     "buyers",
     params.user_id && String(params.user_id),
     params.city && slug(params.city),
     new Date().toISOString().slice(0, 10),
-  ].filter(Boolean).join("-") + ".csv";
+  ].filter(Boolean).join("-") + (params.format === "xlsx" ? ".xlsx" : ".csv");
 
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
@@ -1102,3 +1108,187 @@ export const recordPlanPayment = (payload) => adminJsonRequest("plan-orders/add"
 export const markPlanOrderPaid = (id, payload) => adminJsonRequest(`plan-orders/mark-paid/${id}`, "POST", payload);
 
 export const cancelAdminPlanOrder = (id, payload = {}) => adminJsonRequest(`plan-orders/cancel/${id}`, "POST", payload);
+
+// bhumi-admin-property-requests (seller / broker properties waiting for approval)
+// status: pending | changes_requested | rejected | approved
+export const getPropertyRequests = (status = "pending") =>
+  adminJsonRequest(`property-requests/all?status=${encodeURIComponent(status)}`);
+
+export const approvePropertyRequest = (propertyId, note = "") =>
+  adminJsonRequest(`property-requests/approve/${propertyId}`, "POST", { note });
+
+export const rejectPropertyRequest = (propertyId, note) =>
+  adminJsonRequest(`property-requests/reject/${propertyId}`, "POST", { note });
+
+export const requestPropertyChanges = (propertyId, note) =>
+  adminJsonRequest(`property-requests/request-changes/${propertyId}`, "POST", { note });
+
+// bhumi-my-notifications (logged in user: property approved / rejected / changes requested)
+const userJsonRequest = async (path, method = "GET") => {
+  const token = Cookies.get("accessToken") || Cookies.get("token");
+
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data.status !== true) {
+    throw new Error(data.message || "Something went wrong.");
+  }
+
+  return data;
+};
+
+export const getMyNotifications = (limit = 20) => userJsonRequest(`notifications?limit=${limit}`);
+
+export const markNotificationRead = (id) => userJsonRequest(`notifications/read/${id}`, "POST");
+
+export const markAllNotificationsRead = () => userJsonRequest("notifications/read-all", "POST");
+
+// bhumi-admin-user-moderation (seller / broker): block (temporary) / ban (permanent) / restore deleted
+// blocked_until: "YYYY-MM-DDTHH:mm" India time, empty = until unblocked
+export const blockUser = (userId, reason, blockedUntil = "") =>
+  adminJsonRequest(`users/block/${userId}`, "POST", { reason, blocked_until: blockedUntil || null });
+
+export const unblockUser = (userId) => adminJsonRequest(`users/unblock/${userId}`, "POST");
+
+export const banUser = (userId, reason) => adminJsonRequest(`users/ban/${userId}`, "POST", { reason });
+
+export const unbanUser = (userId) => adminJsonRequest(`users/unban/${userId}`, "POST");
+
+export const restoreUser = (userId) => adminJsonRequest(`users/restore/${userId}`, "POST");
+
+// bhumi-admin-reviews (buyer ratings of sellers / brokers): status = pending | approved | rejected
+export const getAdminReviews = (status = "pending") =>
+  adminJsonRequest(`reviews/all?status=${encodeURIComponent(status)}`);
+
+export const approveReview = (reviewId) => adminJsonRequest(`reviews/approve/${reviewId}`, "POST", {});
+
+export const rejectReview = (reviewId, note = "") => adminJsonRequest(`reviews/reject/${reviewId}`, "POST", { note });
+
+export const deleteReview = (reviewId) => adminJsonRequest(`reviews/delete/${reviewId}`, "DELETE");
+
+// bhumi-admin-leads (property / project enquiry + seller / broker "Get Number")
+export const getAdminLeads = () => adminJsonRequest("leads/all");
+
+export const updateLeadStatus = (leadId, status) => adminJsonRequest(`leads/status/${leadId}`, "POST", { status });
+
+export const deleteLead = (leadId) => adminJsonRequest(`leads/delete/${leadId}`, "DELETE");
+
+// bhumi-admin-lead-sales (sell leads to sellers / brokers + revenue)
+export const getLeadSaleOptions = () => adminJsonRequest("lead-sales/options");
+
+export const saveLeadPrices = (prices) => adminJsonRequest("lead-sales/prices", "POST", { prices });
+
+// payload: { buyer_id, amount, payment_status: "paid" | "pending", payment_method, payment_reference, note }
+export const sellLead = (leadId, payload) => adminJsonRequest(`lead-sales/sell/${leadId}`, "POST", payload);
+
+export const getLeadSales = (params = {}) => {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value)).toString();
+
+  return adminJsonRequest(`lead-sales/all${query ? `?${query}` : ""}`);
+};
+
+export const markLeadSalePaid = (saleId, payload) => adminJsonRequest(`lead-sales/mark-paid/${saleId}`, "POST", payload);
+
+export const cancelLeadSale = (saleId, note = "") => adminJsonRequest(`lead-sales/cancel/${saleId}`, "POST", { note });
+
+// period: daily (year + month) | monthly (year) | yearly
+export const getLeadRevenue = ({ period = "daily", year, month } = {}) => {
+  const query = new URLSearchParams({ period, ...(year && { year }), ...(month && { month }) }).toString();
+
+  return adminJsonRequest(`lead-sales/revenue?${query}`);
+};
+
+// bhumi-admin-lead-sales-export: same filters as the Sales tab
+// params: { format: "csv" | "xlsx", status, from, to, q }
+export const downloadLeadSales = async (params = {}) => {
+  const token = Cookies.get("accessToken") || Cookies.get("token");
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== "")
+  ).toString();
+
+  const response = await fetch(`${BASE_URL}admin/lead-sales/export${query ? `?${query}` : ""}`, {
+    method: "GET",
+    headers: {
+      Accept: "text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Download failed. Please try again.");
+  }
+
+  const fileName = `lead-sales-${new Date().toISOString().slice(0, 10)}.${params.format === "xlsx" ? "xlsx" : "csv"}`;
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+
+  return fileName;
+};
+
+// bhumi-admin-property-trash: restore a deleted property / delete it for good
+export const restoreProperty = (propertyId) => adminJsonRequest(`properties/restore/${propertyId}`, "POST");
+
+export const permanentDeleteProperty = (propertyId) => adminJsonRequest(`properties/permanent-delete/${propertyId}`, "DELETE");
+
+// bhumi-admin-leads-export: CSV / Excel with the Leads page filters
+// params: { format: "csv" | "xlsx", type, status, period: today|month|year|custom, from, to, q }
+export const downloadLeads = async (params = {}) => {
+  const token = Cookies.get("accessToken") || Cookies.get("token");
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== "" && value !== "all")
+  ).toString();
+
+  const response = await fetch(`${BASE_URL}admin/leads/export${query ? `?${query}` : ""}`, {
+    method: "GET",
+    headers: {
+      Accept: "text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Download failed. Please try again.");
+  }
+
+  const fileName = `leads${params.period && params.period !== "all" ? `-${params.period}` : ""}-${new Date().toISOString().slice(0, 10)}.${params.format === "xlsx" ? "xlsx" : "csv"}`;
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+
+  return fileName;
+};
+
+// bhumi-admin-property-badges (Card Badge master)
+export const getAdminPropertyBadges = () => adminJsonRequest("property-badges/all");
+
+// payload: { name, sort_order?, is_active? }
+export const saveAdminPropertyBadge = (payload, id = null) =>
+  adminJsonRequest(id ? `property-badges/update/${id}` : "property-badges/add", "POST", payload);
+
+export const deleteAdminPropertyBadge = (id) => adminJsonRequest(`property-badges/delete/${id}`, "DELETE");

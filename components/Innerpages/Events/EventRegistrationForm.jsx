@@ -3,6 +3,7 @@ import { Spinner } from "@heroui/react";
 import { FaCalendarCheck, FaCheckCircle } from "react-icons/fa";
 import { submitEnquiryForm } from "../../../utils/fetchApi";
 import { formatEventDateRange } from "./eventUtils";
+import PhoneOtpField, { isValidEmail, isValidMobile } from "../../Common/PhoneOtpField";
 
 const initialForm = {
     event: "",
@@ -28,6 +29,8 @@ export default function EventRegistrationForm({ events = [], fixedEvent = null, 
     const startForm = { ...initialForm, event: fixedValue };
 
     const [form, setForm] = useState(startForm);
+    // From the phone OTP (sent as phone_verification_token)
+    const [phoneToken, setPhoneToken] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [result, setResult] = useState(null);
 
@@ -40,8 +43,23 @@ export default function EventRegistrationForm({ events = [], fixedEvent = null, 
     const handleSubmit = async (event) => {
         event.preventDefault();
 
-        if (!/^[0-9+\-\s]{8,20}$/.test(form.phone.trim())) {
-            setResult({ ok: false, message: "Enter a valid phone number." });
+        if (form.name.trim().length < 2) {
+            setResult({ ok: false, message: "Please enter your full name." });
+            return;
+        }
+
+        if (!isValidEmail(form.email)) {
+            setResult({ ok: false, message: "Enter a valid email address." });
+            return;
+        }
+
+        if (!isValidMobile(form.phone)) {
+            setResult({ ok: false, message: "Enter a valid 10-digit mobile number." });
+            return;
+        }
+
+        if (!phoneToken) {
+            setResult({ ok: false, message: "Please verify your mobile number with OTP." });
             return;
         }
 
@@ -52,17 +70,21 @@ export default function EventRegistrationForm({ events = [], fixedEvent = null, 
             event: form.event || undefined,
             attendees: form.event ? Number(form.attendees) || 1 : undefined,
             name: form.name.trim(),
-            phone: form.phone.trim(),
+            phone: form.phone,
             email: form.email.trim(),
             message: form.message.trim() || undefined,
+            phone_verification_token: phoneToken,
         });
 
         setSubmitting(false);
 
         if (res?.status) {
             setForm(startForm);
+            setPhoneToken("");
             setResult({ ok: true, message: res.message });
         } else {
+            // Verification expired on the server -> verify again
+            if (res?.requires_otp) setPhoneToken("");
             setResult({ ok: false, message: res?.message || "Something went wrong. Please try again." });
         }
     };
@@ -127,20 +149,20 @@ export default function EventRegistrationForm({ events = [], fixedEvent = null, 
                     </div>
 
                     <div>
-                        <label htmlFor={`${idPrefix}_phone`} className={labelClass}>
-                            Phone <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            id={`${idPrefix}_phone`}
-                            name="phone"
-                            type="tel"
-                            required
-                            maxLength={20}
-                            value={form.phone}
-                            onChange={handleChange}
-                            placeholder="+91 98765 43210"
-                            autoComplete="tel"
-                            className={inputClass}
+                        <p className={labelClass}>
+                            Mobile Number <span className="text-red-500">*</span>
+                        </p>
+                        {/* Mobile + OTP (registration is sent only after verification) */}
+                        <PhoneOtpField
+                            phone={form.phone}
+                            onPhoneChange={(phone) => {
+                                setForm((previous) => ({ ...previous, phone }));
+                                if (result && !result.ok) setResult(null);
+                            }}
+                            token={phoneToken}
+                            onTokenChange={setPhoneToken}
+                            variant="plain"
+                            disabled={submitting}
                         />
                     </div>
 
@@ -203,7 +225,7 @@ export default function EventRegistrationForm({ events = [], fixedEvent = null, 
 
                     <button
                         type="submit"
-                        disabled={submitting}
+                        disabled={submitting || !phoneToken}
                         className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary-color)] text-[15px] font-semibold text-white transition hover:bg-[#d96818] disabled:opacity-70"
                     >
                         {submitting ? (

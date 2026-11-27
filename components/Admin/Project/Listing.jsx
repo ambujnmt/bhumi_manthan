@@ -9,10 +9,12 @@ import { Spinner, Tooltip } from "@heroui/react";
 import { deleteProject, getAdminProjects, saveProject } from "../../../utils/adminFetchApi";
 import { showToast } from "../../../store/toast";
 import Pagination from "../../Pagination/Pagination";
-import { FaPen } from "react-icons/fa";
+import { FaPen, FaRegImage } from "react-icons/fa";
+import { LuBuilding2, LuEye, LuLayoutGrid, LuMapPin } from "react-icons/lu";
 import { FaRegTrashCan } from "react-icons/fa6";
-import { FiPlus } from "react-icons/fi";
+import { FiPlus, FiSearch } from "react-icons/fi";
 import Tmodal from "../../Tmodal/Tmodal";
+import ImageSizeNote, { PROPERTY_IMAGE_SIZES } from "../PropertyManagement/ImageSizeNote";
 
 const initialForm = {
     name: "",
@@ -62,7 +64,7 @@ export default function Listing() {
 
     // Pagination
     const [pageIndex, setPageIndex] = useState(0);
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(48);
 
     // Add / Edit Modal
     const [formModalOpen, setFormModalOpen] = useState(false);
@@ -133,9 +135,9 @@ export default function Listing() {
     };
 
     const sizePerPageList = [
-        { text: "10", value: 10 },
-        { text: "25", value: 25 },
-        { text: "50", value: 50 },
+        { text: "12", value: 12 },
+        { text: "24", value: 24 },
+        { text: "48", value: 48 },
     ];
 
     // Open Add Modal
@@ -308,165 +310,209 @@ export default function Listing() {
                 title="New Launch & Premium Projects"
             />
 
-            {/* Search + Add */}
-            <div className="flex justify-between items-center gap-3 mt-6 mb-4">
-                <input
-                    type="text"
-                    placeholder="Search by project, builder, location..."
-                    value={search}
-                    onChange={(e) => {
-                        setSearch(e.target.value);
-                        setPageIndex(0);
-                    }}
-                    className="w-full sm:w-1/3 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[rgb(232,119,34)]"
-                />
+            {/* Search + Add (same as Property Management) */}
+            <div className="mt-4 mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="relative w-full sm:max-w-sm">
+                    <FiSearch
+                        size={16}
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    />
+                    <input
+                        type="text"
+                        placeholder="Search by project, builder, location..."
+                        value={search}
+                        onChange={(e) => {
+                            setSearch(e.target.value);
+                            setPageIndex(0);
+                        }}
+                        className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm text-[#1A1F36] outline-none transition focus:border-[#E87722] focus:ring-2 focus:ring-orange-100"
+                    />
+                </div>
 
                 {can('projects.create') && (
-                <button
-                    type="button"
-                    onClick={openAddModal}
-                    className="flex h-10 shrink-0 items-center gap-2 rounded-lg bg-[#E87722] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#d96818]"
-                >
-                    <FiPlus size={16} />
-                    <span className="hidden sm:inline">Add Project</span>
-                </button>
+                    <button
+                        type="button"
+                        onClick={openAddModal}
+                        className="flex h-10 shrink-0 items-center gap-2 rounded-lg bg-[#E87722] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#d96818]"
+                    >
+                        <FiPlus size={16} />
+                        <span className="hidden sm:inline">Add Project</span>
+                    </button>
                 )}
             </div>
 
-            <div className="w-full bg-white rounded-xl shadow overflow-auto">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-100">
-                        <tr>
-                            <th className="px-4 py-3 text-left whitespace-nowrap">Project</th>
-                            <th className="px-4 py-3 text-left whitespace-nowrap">Location</th>
-                            <th className="px-4 py-3 text-left whitespace-nowrap">Starting Price</th>
-                            <th className="px-4 py-3 text-left whitespace-nowrap">Status</th>
-                            <th className="px-4 py-3 text-left whitespace-nowrap">Added By</th>
-                            {/* Action column stays visible on the right while the table scrolls sideways */}
-                            <th className="sticky right-0 z-10 bg-gray-100 px-4 py-3 text-left whitespace-nowrap shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)]">Action</th>
-                        </tr>
-                    </thead>
+            {/* Count */}
+            {!loading && filteredProjects.length > 0 && (
+                <p className="mb-2 text-sm text-[#62748E]">
+                    Showing {pageIndex * pageSize + 1}–{Math.min((pageIndex + 1) * pageSize, filteredProjects.length)} of {filteredProjects.length} projects
+                </p>
+            )}
 
-                    <tbody>
-                        {loading ? (
-                            <tr>
-                                <td colSpan="6">
-                                    <div className="flex justify-center items-center py-16">
-                                        <Spinner size="md" />
-                                    </div>
-                                </td>
-                            </tr>
-                        ) : currentPageProjects.length > 0 ? (
-                            currentPageProjects.map((project) => (
-                                <tr key={project.id} className="border-t hover:bg-gray-50/60">
+            {/* Project cards (same layout as property cards) */}
+            {loading ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    {[1, 2, 3, 4, 5, 6].map((key) => (
+                        <div key={key} className="animate-pulse overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+                            <div className="h-44 bg-gray-200" />
+                            <div className="space-y-3 p-4">
+                                <div className="h-5 w-1/3 rounded bg-gray-200" />
+                                <div className="h-4 w-4/5 rounded bg-gray-200" />
+                                <div className="h-3 w-2/3 rounded bg-gray-100" />
+                                <div className="h-9 rounded bg-gray-100" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : currentPageProjects.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    {currentPageProjects.map((project) => {
+                        const address = [project.location, project.city, project.state].filter(Boolean).join(", ");
+                        const price = project.price_label || (project.starting_price ? `${formatPrice(project.starting_price)} onwards` : "");
+                        const isReady = project.launch_status?.toLowerCase().includes("ready");
 
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-3">
-                                            <img
-                                                src={project.image}
-                                                alt={project.name}
-                                                className="h-14 w-20 shrink-0 rounded-lg object-cover border"
-                                            />
-                                            <div className="min-w-0">
-                                                <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 truncate max-w-[220px]">
-                                                    {project.builder_name || "-"}
-                                                </div>
-                                                <div className="font-semibold text-[#1A1F36] truncate max-w-[220px]">
-                                                    {project.name}
-                                                </div>
-                                                <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
-                                                    <span className="truncate max-w-[140px]">{project.configuration || "-"}</span>
-                                                    {project.launch_status && (
-                                                        <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
-                                                            {project.launch_status}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
+                        return (
+                            <div
+                                key={project.id}
+                                className={`flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md ${project.is_active ? "" : "opacity-80"}`}
+                            >
+                                {/* Image + badges */}
+                                <div className="relative h-44 w-full shrink-0 bg-gray-100">
+                                    {project.image ? (
+                                        <img src={project.image} alt={project.name || "Project"} className="h-full w-full object-cover" />
+                                    ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-gray-300">
+                                            <FaRegImage size={36} />
                                         </div>
-                                    </td>
+                                    )}
 
-                                    <td className="px-4 py-3 whitespace-nowrap">
-                                        <div>{project.location || "-"}</div>
-                                        <div className="text-xs text-gray-500">
-                                            {project.city || "-"}
-                                            {project.state ? `, ${project.state}` : ""}
-                                        </div>
-                                    </td>
+                                    {project.launch_status && (
+                                        <span className={`absolute left-2.5 top-2.5 max-w-[60%] truncate rounded-full px-2.5 py-0.5 text-xs font-semibold text-white shadow ${isReady ? "bg-green-700" : "bg-[#E87722]"}`}>
+                                            {project.launch_status}
+                                        </span>
+                                    )}
 
-                                    <td className="px-4 py-3 whitespace-nowrap font-semibold text-[#E87722]">
-                                        {project.price_label || (project.starting_price ? `${formatPrice(project.starting_price)} onwards` : "-")}
-                                    </td>
+                                    {/* Active / Inactive: click to switch */}
+                                    <Tooltip content={can('projects.edit') ? (project.is_active ? "Click to deactivate" : "Click to activate") : (project.is_active ? "Shown on website" : "Hidden from website")}>
+                                        <button
+                                            type="button"
+                                            onClick={() => can('projects.edit') && handleToggleActive(project)}
+                                            disabled={!can('projects.edit')}
+                                            className={`absolute right-2.5 top-2.5 rounded-full px-2.5 py-0.5 text-xs font-semibold shadow ${
+                                                project.is_active ? "bg-white text-green-700" : "bg-red-600 text-white"
+                                            }`}
+                                        >
+                                            {project.is_active ? "● Active" : "Inactive"}
+                                        </button>
+                                    </Tooltip>
+                                </div>
 
-                                    <td className="px-4 py-3 whitespace-nowrap">
-                                        <Tooltip content={project.is_active ? "Click to deactivate" : "Click to activate"}>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleToggleActive(project)}
-                                                disabled={!can('projects.edit')}
-                                                className={`px-3 py-1 rounded-full text-xs font-semibold
-                                                ${project.is_active
-                                                        ? "bg-green-100 text-green-700"
-                                                        : "bg-red-100 text-red-700"
-                                                    }`}
-                                            >
-                                                {project.is_active ? "Active" : "Inactive"}
-                                            </button>
-                                        </Tooltip>
-                                    </td>
+                                <div className="flex flex-1 flex-col px-4 pt-3 pb-3">
+                                    {/* Price */}
+                                    <p className="mb-0 truncate text-base font-bold leading-tight text-[#1A1F36]" title={price}>
+                                        {price || "Price on request"}
+                                    </p>
 
-                                    {/* Added By (created_by) */}
-                                    <td className="px-4 py-3 whitespace-nowrap">
+                                    {/* Builder + name */}
+                                    {project.builder_name && (
+                                        <p className="mb-0 mt-1 truncate text-[10px] font-semibold uppercase tracking-wide text-[#62748E]">
+                                            {project.builder_name}
+                                        </p>
+                                    )}
+                                    <p className="mb-0 mt-0.5 flex items-center gap-1.5 text-sm font-medium text-[#001737]" title={project.name || ""}>
+                                        <LuBuilding2 size={14} className="shrink-0 text-[#E87722]" />
+                                        <span className="truncate">{project.name || "-"}</span>
+                                    </p>
+
+                                    {/* Address */}
+                                    <p className="mb-0 mt-1.5 flex items-center gap-1.5 text-[13px] text-[#62748E]" title={address}>
+                                        <LuMapPin size={14} className="shrink-0 text-[#E87722]" />
+                                        <span className="truncate">{address || "-"}</span>
+                                    </p>
+
+                                    {/* Configuration */}
+                                    {project.configuration && (
+                                        <p className="mb-0 mt-1.5 flex items-center gap-1.5 text-[13px] text-[#62748E]" title={project.configuration}>
+                                            <LuLayoutGrid size={14} className="shrink-0 text-[#62748E]" />
+                                            <span className="truncate">{project.configuration}</span>
+                                        </p>
+                                    )}
+
+                                    {/* Added by */}
+                                    <div className="mt-3 border-t border-gray-100 pt-2">
+                                        <p className="mb-0 text-[11px] text-[#62748E]">Added by</p>
                                         <AddedBy creator={project.creator} />
-                                    </td>
+                                    </div>
 
-                                    <td className="sticky right-0 z-10 bg-white px-4 py-3 whitespace-nowrap shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)]">
+                                    {/* Actions */}
+                                    <div className="mt-auto flex items-center justify-between gap-2 pt-2">
                                         <div className="flex items-center gap-2">
                                             {can('projects.edit') && (
-                                            <Tooltip content="Update Project">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => openEditModal(project)}
-                                                    className={actionButtonClass}
-                                                >
-                                                    <FaPen size={13} />
-                                                </button>
-                                            </Tooltip>
+                                                <Tooltip content="Update Project">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openEditModal(project)}
+                                                        className={actionButtonClass}
+                                                        aria-label={`Update ${project.name}`}
+                                                    >
+                                                        <FaPen size={13} />
+                                                    </button>
+                                                </Tooltip>
                                             )}
 
                                             {can('projects.delete') && (
-                                            <Tooltip content="Delete Project">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDeleteClick(project)}
-                                                    className={actionButtonClass}
-                                                >
-                                                    <FaRegTrashCan size={14} />
-                                                </button>
-                                            </Tooltip>
+                                                <Tooltip content="Delete Project">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteClick(project)}
+                                                        className={actionButtonClass}
+                                                        aria-label={`Delete ${project.name}`}
+                                                    >
+                                                        <FaRegTrashCan size={14} />
+                                                    </button>
+                                                </Tooltip>
                                             )}
                                         </div>
-                                    </td>
-                                </tr>
-                            ))
-                        ) : (
-                            <tr>
-                                <td colSpan="6" className="text-center py-6 text-gray-500">
-                                    {search ? "No projects found" : 'No projects yet. Click "Add Project" to create one.'}
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
 
-                {/* Pagination */}
-                <div className="p-3 border-t">
+                                        {/* Website page of the project (new tab); inactive ones are not on the website */}
+                                        {!project.is_active ? (
+                                            <Tooltip content="Inactive: not shown on the website">
+                                                <span className="flex h-8 cursor-not-allowed items-center gap-1.5 rounded-lg bg-gray-200 px-4 text-sm font-semibold text-gray-500">
+                                                    <LuEye size={15} />
+                                                    View
+                                                </span>
+                                            </Tooltip>
+                                        ) : (
+                                        <a
+                                            href={`/web/project/projectDetail/${encodeURIComponent(project.slug || project.id)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex h-8 items-center gap-1.5 rounded-lg bg-[#E87722] px-4 text-sm font-semibold text-white no-underline transition hover:bg-[#d96818] hover:text-white"
+                                        >
+                                            <LuEye size={15} />
+                                            View
+                                        </a>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                <div className="rounded-xl border border-dashed border-gray-300 bg-white py-14 text-center text-[#62748E]">
+                    {search ? "No projects found" : 'No projects yet. Click "Add Project" to create one.'}
+                </div>
+            )}
+
+            {/* Pagination */}
+            {!loading && filteredProjects.length > 0 && (
+                <div className="mt-4 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
                     <Pagination
                         tableProps={tableProps}
                         sizePerPageList={sizePerPageList}
                     />
                 </div>
-            </div>
+            )}
 
             {/* Add / Edit Modal */}
             <Tmodal
@@ -546,6 +592,9 @@ export default function Listing() {
                             <p className="mt-1 text-xs text-[#62748E]">
                                 JPG, PNG or WEBP, max {MAX_IMAGE_KB} KB.{editingProject && " Leave empty to keep current image."}
                             </p>
+
+                            {/* Recommended width x height + chosen image size */}
+                            <ImageSizeNote size={PROPERTY_IMAGE_SIZES.project} file={imageFile} />
                         </div>
                     </div>
 

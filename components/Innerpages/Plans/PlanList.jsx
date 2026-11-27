@@ -38,6 +38,7 @@ import {
 } from "../../../utils/planFeatures";
 import { PlanIllustration } from "./PlanIllustrations";
 import SideAds from "../../Common/Ads/SideAds";
+import { openLogin } from "../../../utils/loginPopup";
 
 const NAVY = "#12305F";
 const GOLD = "#D4961C";
@@ -448,7 +449,7 @@ export default function PlanList({ initialPlans = null, initialBanner }) {
     const handleBuy = (plan) => {
         if (!user) {
             rememberPostLoginRedirect("/web/plans");
-            router.push("/login");
+            openLogin(router);
             return;
         }
 

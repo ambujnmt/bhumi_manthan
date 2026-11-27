@@ -1336,3 +1336,106 @@ export const uploadProfilePhoto = (file) => {
 };
 
 export const removeProfilePhoto = () => profilePhotoRequest("profile/photo/remove");
+
+
+/*
+|--------------------------------------------------------------------------
+| Leads API
+| Seller/Broker Get Number enquiry
+|--------------------------------------------------------------------------
+*/
+
+export const submitLead = async (payload) => {
+  try {
+    const token = Cookies.get("accessToken");
+
+    const response = await fetch(`${BASE_URL}leads`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok || result?.status !== true) {
+      const validationErrors = result?.errors
+        ? Object.values(result.errors).flat().join(" ")
+        : "";
+
+      return {
+        status: false,
+        message:
+          validationErrors ||
+          result?.message ||
+          "Unable to submit enquiry.",
+      };
+    }
+
+    return result;
+  } catch (error) {
+    console.error("Lead API error:", error);
+
+    return {
+      status: false,
+      message: "Unable to connect to the server. Please try again.",
+    };
+  }
+};
+
+
+/*
+|--------------------------------------------------------------------------
+| Phone OTP (enquiry / Get Number / event forms) - same APIs as the mobile app
+|--------------------------------------------------------------------------
+| sendPhoneOtp(phone)        -> { status, message, data: { resend_in, expires_in, otp_length, debug_otp? } }
+| verifyPhoneOtp(phone, otp) -> { status, message, data: { verification_token, expires_in } }
+| Then send phone_verification_token with the form.
+*/
+
+const otpRequest = async (path, payload) => {
+  try {
+    const response = await fetch(`${BASE_URL}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (response.status === 429 && !result?.message) {
+      return { status: false, message: "Too many requests. Please try again in a minute." };
+    }
+
+    return response.ok && result?.status === true
+      ? result
+      : { ...result, status: false, message: result?.message || "Something went wrong. Please try again." };
+  } catch (error) {
+    console.error("OTP request error:", error);
+
+    return { status: false, message: "Network error. Please check your connection and try again." };
+  }
+};
+
+export const sendPhoneOtp = (phone) => otpRequest("otp/phone/send", { phone });
+
+export const verifyPhoneOtp = (phone, otp) => otpRequest("otp/phone/verify", { phone, otp });
+
+// Card Badge options for the property add / edit form (Admin -> Card Badges, active only)
+// -> ["FEATURED", "PREMIUM", ...]; [] when the request fails (form still works)
+export const getPropertyBadges = async () => {
+  try {
+    const response = await fetch(`${BASE_URL}property-badges`, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+
+    return Array.isArray(data?.data?.badges) ? data.data.badges.map((badge) => badge.name) : [];
+  } catch {
+    return [];
+  }
+};

@@ -13,6 +13,9 @@ import LocationFields from "./LocationFields";
 import CategoryFields from "./CategoryFields";
 import PropertyVideoField, { appendVideo, emptyVideo } from "./PropertyVideoField";
 import PropertySeoFields from "./PropertySeoFields";
+import ReraField, { validateRera } from "./ReraField";
+import CardBadgeField from "./CardBadgeField";
+import ImageSizeNote, { PROPERTY_IMAGE_SIZES } from "./ImageSizeNote";
 import {
     TYPE_FIELD_DEFAULTS,
     applyFieldRules,
@@ -41,6 +44,7 @@ const initialForm = {
     price_per_sqft: "",
     location: "",
     city: "",
+    rera_number: "",
     state: "",
     description: "",
     super_area: "",
@@ -156,7 +160,7 @@ const fieldSections = [
 const allSections = withTypeFields(fieldSections);
 
 const otherImageFields = [
-    { name: "floor_plan_image", label: "Floor Plan Image" },
+    { name: "floor_plan_image", label: "Floor Plan Image", size: PROPERTY_IMAGE_SIZES.floor },
 ];
 
 const fileInputClass =
@@ -217,6 +221,7 @@ export default function Create() {
     const [message, setMessage] = useState("");
     const [messageType, setMessageType] = useState("");
     const [geoStatus, setGeoStatus] = useState(""); // "", loading, found, error
+    const [reraSubmitted, setReraSubmitted] = useState(false); // show RERA error after a submit try
     const formRef = useRef(null);
 
     // Category + Property Type + Listing Type -> fields to show / required
@@ -336,6 +341,17 @@ export default function Create() {
     if (limitReached) {
         setMessage(`Your free listing limit (${quota.limit}) is used. Please buy a plan or contact admin.`);
         setMessageType("error");
+        return;
+    }
+
+    // RERA format (optional field): stop here and show the error under the box
+    const reraError = validateRera(form.rera_number);
+
+    if (reraError) {
+        setReraSubmitted(true);
+        showToast(reraError, "error");
+        document.getElementById("rera_number")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        document.getElementById("rera_number")?.focus({ preventScroll: true });
         return;
     }
 
@@ -627,19 +643,34 @@ Object.entries(cleanHiddenFields(form, rules)).forEach(([key, value]) => {
                                             </div>
                                         ))}
 
-                                        <div className="flex items-end pb-2.5 text-xs">
-                                            {geoStatus === "loading" && (
-                                                <span className="text-[#62748E]">Finding location...</span>
-                                            )}
-                                            {geoStatus === "found" && (
-                                                <span className="text-green-700">✓ Location found</span>
-                                            )}
-                                            {geoStatus === "error" && (
-                                                <span className="text-red-600">
-                                                    Location not found. Check locality / city / state.
-                                                </span>
-                                            )}
-                                        </div>
+                                        {/* RERA Number: own column, formatted + validated */}
+                                        <ReraField
+                                            value={form.rera_number}
+                                            onChange={(rera_number) =>
+                                                setForm((previous) => ({ ...previous, rera_number }))
+                                            }
+                                            state={form.state}
+                                            inputClass={inputClass}
+                                            labelClass={labelClass}
+                                            showError={reraSubmitted}
+                                        />
+
+                                        {/* Location lookup status (below latitude / longitude) */}
+                                        {geoStatus && (
+                                            <div className="-mt-3 text-xs sm:col-span-2 lg:col-span-3">
+                                                {geoStatus === "loading" && (
+                                                    <span className="text-[#62748E]">Finding location...</span>
+                                                )}
+                                                {geoStatus === "found" && (
+                                                    <span className="text-green-700">✓ Location found</span>
+                                                )}
+                                                {geoStatus === "error" && (
+                                                    <span className="text-red-600">
+                                                        Location not found. Check locality / city / state.
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -698,21 +729,8 @@ Object.entries(cleanHiddenFields(form, rules)).forEach(([key, value]) => {
                                     Premium Luxury Listings
                                 </label>
 
-                                <div>
-                                    <label htmlFor="badge" className={labelClass}>Card Badge</label>
-                                    <select
-                                        id="badge"
-                                        name="badge"
-                                        value={form.badge}
-                                        onChange={handleChange}
-                                        className={inputClass}
-                                    >
-                                        <option value="">Auto</option>
-                                        {["FEATURED", "PREMIUM", "NEW", "ULTRA LUXURY"].map((option) => (
-                                            <option key={option} value={option}>{option}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                {/* Options from Admin -> Card Badges */}
+                                <CardBadgeField value={form.badge} onChange={handleChange} labelClass={labelClass} inputClass={inputClass} />
                             </div>
                         </section>
 
@@ -756,12 +774,17 @@ Object.entries(cleanHiddenFields(form, rules)).forEach(([key, value]) => {
                                             Selected: {images.main_image.name}
                                         </p>
                                     )}
+
+                                    <ImageSizeNote size={PROPERTY_IMAGE_SIZES.main} file={images.main_image} />
                                 </div>
                             </div>
 
                             {/* Add More Images */}
                             <div className="mt-6">
                                 <label className={labelClass}>More Images</label>
+                                <p className="mb-0 mt-1 text-xs text-[#62748E]">
+                                    Recommended: {PROPERTY_IMAGE_SIZES.gallery.width} × {PROPERTY_IMAGE_SIZES.gallery.height} px ({PROPERTY_IMAGE_SIZES.gallery.ratio}) for every image.
+                                </p>
 
                                 {extraImages.length > 0 && (
                                     <div className="mt-1.5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -804,6 +827,8 @@ Object.entries(cleanHiddenFields(form, rules)).forEach(([key, value]) => {
                                                         Selected: {slot.file.name}
                                                     </p>
                                                 )}
+
+                                                <ImageSizeNote size={PROPERTY_IMAGE_SIZES.gallery} file={slot.file} />
                                             </div>
                                         ))}
                                     </div>
@@ -851,6 +876,8 @@ Object.entries(cleanHiddenFields(form, rules)).forEach(([key, value]) => {
                                                 {images[imageField.name].name}
                                             </p>
                                         )}
+
+                                        <ImageSizeNote size={imageField.size} file={images[imageField.name]} />
                                     </div>
                                 ))}
                             </div>

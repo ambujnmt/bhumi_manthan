@@ -11,7 +11,6 @@ import YoutuberVideos from './HomeSections/YoutuberVideos';
 import UpcomingEvents from './HomeSections/UpcomingEvents';
 import Blogs from './HomeSections/Blogs';
 import MobileApp from './HomeSections/MobileApp';
-import StickyLoginForm from '../../Innerpages/StickyLoginForm';
 import useHomeListings from '../../../utils/useHomeListings';
 
 
@@ -25,7 +24,7 @@ export default function Body({ banners = null, listings = null, youtuberVideos =
 
   return (
     <>
-      <StickyLoginForm />
+      {/* Login popup + floating buttons now come from pages/_app.js (every page) */}
       <HeroCarousel initialBanners={banners} />
       <PropertySearchBar />
       <FeaturedProperties loading={loading} properties={featured.items} nearby={featured.nearby} />

@@ -70,7 +70,7 @@ export default function ListingOffer({ canEdit, className = "" }) {
             .finally(() => setLoading(false));
     }, []);
 
-    const usePreset = (days) => {
+    const applyPreset = (days) => {
         const start = new Date();
         start.setSeconds(0, 0);
         const end = new Date(start.getTime() + days * 86400000);
@@ -205,7 +205,7 @@ export default function ListingOffer({ canEdit, className = "" }) {
                             <button
                                 key={label}
                                 type="button"
-                                onClick={() => usePreset(days)}
+                                onClick={() => applyPreset(days)}
                                 disabled={loading}
                                 className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-[#283A86] transition hover:border-[#E87722] hover:text-[#E87722]"
                             >
