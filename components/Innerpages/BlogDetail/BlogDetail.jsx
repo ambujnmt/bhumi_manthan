@@ -301,7 +301,7 @@ export default function BlogDetail({ blog = null, moreBlogs = [] }) {
                                 <Link
                                     key={item.id}
                                     href={`/web/blog/${item.slug}`}
-                                    className="group flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-[var(--primary-color)] hover:shadow-lg"
+                                    className="group flex h-full flex-col items-stretch overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-[var(--primary-color)] hover:shadow-lg"
                                 >
                                     <div className="relative overflow-hidden">
                                         <img

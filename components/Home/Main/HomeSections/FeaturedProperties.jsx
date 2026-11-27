@@ -5,16 +5,10 @@ import { FiMapPin, FiNavigation } from "react-icons/fi";
 import { cardSpecs, priceInfo, propertyTypeLabel } from "../../../Innerpages/PropertyDetails/PropertySpecs";
 import { formatDistance, formatPropertyPrice, imageFallback } from "../../../../utils/formatPrice";
 import WishlistButton from "../../../Common/WishlistButton";
+import PropertyCardBadge from "../../../Common/PropertyCardBadge";
 import AdMedia, { hasMobileMedia } from "../../../Common/Ads/AdMedia";
 import { AD_PLACEMENTS, fetchAd, useInitialAd } from "../../../../utils/ads";
 
-const badgeColors = {
-    FEATURED: "bg-[#22C55E]",
-    PREMIUM: "bg-[var(--primary-color)]",
-    NEW: "bg-[#3B82F6]",
-    "NEW LAUNCH": "bg-[#7C3AED]",
-    "ULTRA LUXURY": "bg-[#D4AF37]",
-};
 
 // Home shows 12 cards (3 rows), no pagination; "View All Properties" opens the full list
 const HOME_LIMIT = 20;
@@ -130,7 +124,6 @@ export default function FeaturedProperties({ loading = false, properties = [], n
                             ))}
 
                             {!loading && homeProperties.map((property, index) => {
-                                const badge = (property.badge || (property.is_featured ? "FEATURED" : "NEW")).toUpperCase();
                                 const distance = formatDistance(property.distance_km);
                                 const place = [property.location, property.city].filter(Boolean).join(", ");
 
@@ -138,20 +131,16 @@ export default function FeaturedProperties({ loading = false, properties = [], n
                                     <div key={property.slug} className="col-span-12 flex xl:col-span-3 lg:col-span-3 md:col-span-6">
                                         <Link
                                             href={`/web/propertyDetail/${property.slug}`}
-                                            className="relative mb-4 flex w-full flex-col overflow-hidden rounded-lg bg-white shadow-md transition-shadow hover:shadow-lg"
+                                            className="relative mb-4 flex w-full flex-col items-stretch overflow-hidden rounded-lg bg-white shadow-md transition-shadow hover:shadow-lg"
                                         >
-                                            <div className="relative">
+                                            <div className="relative w-full">
                                                 <CardImage
                                                     src={property.main_image || "/assets/img/prop-1.png"}
                                                     alt={property.title}
                                                     eager={index < 4}
                                                 />
-                                                {/* Admin "Card Badge": NONE = no badge */}
-                                                {badge !== "NONE" && (
-                                                    <div className={`absolute top-[10px] left-[10px] text-white px-2 py-1 rounded-md ${badgeColors[badge] || "bg-[var(--primary-color)]"}`}>
-                                                        <p className="text-[11px] font-bold mb-0">{badge}</p>
-                                                    </div>
-                                                )}
+                                                {/* Admin "Card Badge": None = no badge */}
+                                                <PropertyCardBadge property={property} className="absolute left-[10px] top-[10px] max-w-[60%]" />
                                                 <WishlistButton propertyId={property.id} className="absolute top-[10px] right-[10px]" />
                                                 {distance && (
                                                     <div className="absolute bottom-[10px] left-[10px] inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white">

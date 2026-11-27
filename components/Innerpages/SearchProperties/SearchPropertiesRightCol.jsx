@@ -22,6 +22,7 @@ import useSearchFilters, {
 } from "../../../utils/useSearchFilters";
 import { formatDistance } from "../../../utils/formatPrice";
 import WishlistButton from "../../Common/WishlistButton";
+import PropertyCardBadge from "../../Common/PropertyCardBadge";
 import Pagination from "../../Common/Pagination";
 import { cardSpecs, priceInfo } from "../PropertyDetails/PropertySpecs";
 
@@ -562,6 +563,9 @@ export default function SearchPropertiesRightCol() {
                         {property.status || "Verified"}
                       </span>
 
+                      {/* Admin "Card Badge" */}
+                      <PropertyCardBadge property={property} className="absolute left-3 top-10 max-w-[60%]" />
+
                       {/* Heart */}
 
                       <WishlistButton propertyId={property.id} className="absolute right-3 top-3" />
@@ -684,6 +688,9 @@ export default function SearchPropertiesRightCol() {
                       <span className="absolute left-3 top-3 rounded-md uppercase bg-[#009449] px-2 py-0.5 text-[11px] font-normal text-white">
                         {property.status || "Verified"}
                       </span>
+
+                      {/* Admin "Card Badge" */}
+                      <PropertyCardBadge property={property} className="absolute left-3 top-10 max-w-[60%]" />
 
                     </div>
 

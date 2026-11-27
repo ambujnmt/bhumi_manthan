@@ -4,6 +4,7 @@ import { FiNavigation } from "react-icons/fi";
 import { formatDistance, formatPropertyPrice, imageFallback } from "../../../../utils/formatPrice";
 import SectionSkeleton from "./SectionSkeleton";
 import WishlistButton from "../../../Common/WishlistButton";
+import { BadgePill, badgeText } from "../../../Common/PropertyCardBadge";
 import { Link } from "@heroui/react";
 
 // Amenity name -> icon (anything else gets a check mark)
@@ -87,12 +88,8 @@ export default function PremiumLuxury({ loading = false, properties = [], nearby
 
                                     {/* Content */}
                                     <div className="p-4">
-                                        {/* Admin "Card Badge": NONE = no badge */}
-                                        {String(property.badge || "").toUpperCase() !== "NONE" && (
-                                            <span className="inline-block bg-[#D4AF37] text-white text-[11px] font-bold px-3 py-1 rounded-md mb-3 uppercase">
-                                                {property.badge || "Ultra Luxury"}
-                                            </span>
-                                        )}
+                                        {/* Admin "Card Badge": None = no badge, empty = "Ultra Luxury" */}
+                                        <BadgePill text={badgeText({ ...property, badge: property.badge || "Ultra Luxury" })} className="mb-3" />
 
                                         <h2 className="text-[20px] font-bold text-[var(--text-color1)] line-clamp-1">
                                             {property.title}

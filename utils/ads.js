@@ -55,10 +55,10 @@ export const SIDE_AD_PAGES = {
   "/web/videoTour": "video_tour",
   "/web/plans": "plans",
   "/web/compare": "compare",
-  "/user/cms/contactUs": "cms",
-  "/user/cms/faqs": "cms",
-  "/user/cms/privacyPolicy": "cms",
-  "/user/cms/termsAndCondition": "cms",
+  "/user/cms/contactUs": "contact_us",
+  "/user/cms/faqs": "faqs",
+  "/user/cms/privacyPolicy": "privacy_policy",
+  "/user/cms/termsAndCondition": "terms",
 };
 
 export const sideAdPage = (pathname) => SIDE_AD_PAGES[pathname] || null;

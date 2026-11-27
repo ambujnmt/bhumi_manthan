@@ -9,7 +9,6 @@ import { useWishlist } from "../../../context/WishlistContext";
 import { subscribeChatUnread } from "../../../utils/firebaseChat";
 import { getMyEnquiryCount } from "../../../utils/fetchApi";
 import LogoutConfirm from "../../Common/LogoutConfirm";
-import SideAds from "../../Common/Ads/SideAds";
 import UserAvatar from "../../Common/UserAvatar";
 
 const Badge = ({ count }) =>
@@ -187,8 +186,8 @@ function DashboardShell({ children }) {
           </div>
         </aside>
 
-        <div data-dashboard-content className={`min-h-0 min-w-0 w-full flex-1 px-[16px] pb-[24px] pt-[20px] lg:px-[24px] lg:pt-[24px] ${isChatPage ? "overflow-hidden" : "overflow-y-auto"}`}>{/* Side ads (Admin -> Ads, Customer Dashboard). Chat keeps the full width */}
-          {isChatPage ? children : <SideAds page="user_dashboard" top="top-0" wrapClass="">{children}</SideAds>}
+        <div data-dashboard-content className={`min-h-0 min-w-0 w-full flex-1 px-[16px] pb-[24px] pt-[20px] lg:px-[24px] lg:pt-[24px] ${isChatPage ? "overflow-hidden" : "overflow-y-auto"}`}>
+          {children}
         </div>
       </div>
 

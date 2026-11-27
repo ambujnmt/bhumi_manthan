@@ -30,15 +30,16 @@ export default function CardBadgeField({ value, onChange, labelClass, inputClass
         };
     }, []);
 
-    const current = String(value || "").toUpperCase();
-    const options = current && current !== "NONE" && !badges.includes(current) ? [...badges, current] : badges;
+    const current = String(value || "");
+    const isNone = current.toLowerCase() === "none";
+    const options = current && !isNone && !badges.includes(current) ? [...badges, current] : badges;
 
     return (
         <div>
             <label htmlFor={name} className={labelClass}>
                 Card Badge <span className="text-xs font-normal text-[#62748E]">(optional)</span>
             </label>
-            <select id={name} name={name} value={value || ""} onChange={onChange} className={inputClass} aria-busy={loading}>
+            <select id={name} name={name} value={isNone ? "NONE" : value || ""} onChange={onChange} className={inputClass} aria-busy={loading}>
                 <option value="">Auto (Featured / New / Ultra Luxury)</option>
                 <option value="NONE">No badge</option>
                 {options.map((option) => (
