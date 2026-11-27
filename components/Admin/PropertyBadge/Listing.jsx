@@ -8,6 +8,7 @@ import { FiPlus, FiSearch } from "react-icons/fi";
 import { actionButtonClass } from "../actionButtonClass";
 import PageTitle from "../../Breadcrumb/PageTitle";
 import Tmodal from "../../Tmodal/Tmodal";
+import { BadgePill } from "../../Common/PropertyCardBadge";
 import { showToast } from "../../../store/toast";
 import { deleteAdminPropertyBadge, getAdminPropertyBadges, saveAdminPropertyBadge } from "../../../utils/adminFetchApi";
 import { useAdminPermission } from "../../../utils/adminPermissions";
@@ -21,14 +22,12 @@ const inputClass =
 
 const labelClass = "block text-sm font-medium text-[#283A86]";
 
-// Same look as the badge on the website property card
+// Same look as the badge on the website property card (and "Ready to Move" on Admin -> Property List)
 function BadgeChip({ name }) {
-    return (
-        <span className="inline-block max-w-full truncate rounded bg-[#E87722] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-sm">
-            {name || "BADGE"}
-        </span>
-    );
+    return <BadgePill text={name || "Badge"} />;
 }
+
+const cleanName = (value) => String(value || "").replace(/\s+/g, " ").trim();
 
 const sortBadges = (list) => [...list].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
 
@@ -64,8 +63,8 @@ export default function Listing() {
     }, []);
 
     const visible = useMemo(() => {
-        const term = search.trim().toUpperCase();
-        return term ? badges.filter((badge) => badge.name.includes(term)) : badges;
+        const term = search.trim().toLowerCase();
+        return term ? badges.filter((badge) => badge.name.toLowerCase().includes(term)) : badges;
     }, [badges, search]);
 
     const replaceBadge = (saved) => setBadges((previous) => sortBadges([...previous.filter((item) => item.id !== saved.id), saved]));
@@ -90,19 +89,19 @@ export default function Listing() {
     const handleSave = async (event) => {
         event?.preventDefault();
 
-        const name = form.name.replace(/\s+/g, " ").trim().toUpperCase();
+        const name = cleanName(form.name);
 
         if (!name) {
             setFormError("Please enter the badge text.");
             return;
         }
 
-        if (name === "NONE") {
-            setFormError('"NONE" is reserved for "No badge". Use a different text.');
+        if (name.toLowerCase() === "none") {
+            setFormError('"None" is reserved for "No badge". Use a different text.');
             return;
         }
 
-        if (badges.some((badge) => badge.name === name && badge.id !== editing?.id)) {
+        if (badges.some((badge) => badge.name.toLowerCase() === name.toLowerCase() && badge.id !== editing?.id)) {
             setFormError("This badge already exists.");
             return;
         }
@@ -159,7 +158,7 @@ export default function Listing() {
         }
     };
 
-    const renamed = editing && form.name.replace(/\s+/g, " ").trim().toUpperCase() !== editing.name;
+    const renamed = editing && cleanName(form.name) !== editing.name;
 
     return (
         <div className="min-h-screen">
@@ -317,23 +316,23 @@ export default function Listing() {
                             id="badge_name"
                             value={form.name}
                             onChange={(event) => {
-                                setForm((previous) => ({ ...previous, name: event.target.value.toUpperCase() }));
+                                setForm((previous) => ({ ...previous, name: event.target.value }));
                                 setFormError("");
                             }}
                             maxLength={MAX_NAME}
-                            placeholder="e.g. HOT DEAL"
+                            placeholder="e.g. Hot Deal"
                             aria-invalid={Boolean(formError)}
                             className={inputClass}
                             autoFocus
                         />
                         <p className="mb-0 mt-1 text-xs text-[#62748E]">
-                            Shown in capital letters, max {MAX_NAME} characters.
+                            Shown exactly as typed (e.g. "Hot Deal"), max {MAX_NAME} characters.
                         </p>
                     </div>
 
                     <div>
                         <p className="mb-1.5 text-sm font-medium text-[#283A86]">Preview</p>
-                        <BadgeChip name={form.name.replace(/\s+/g, " ").trim()} />
+                        <BadgeChip name={cleanName(form.name)} />
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

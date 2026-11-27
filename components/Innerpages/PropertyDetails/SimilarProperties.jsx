@@ -3,6 +3,7 @@ import { Link } from "@heroui/react";
 import { LuBuilding2 } from "react-icons/lu";
 import { formatPropertyPrice, imageFallback } from "../../../utils/formatPrice";
 import WishlistButton from "../../Common/WishlistButton";
+import PropertyCardBadge from "../../Common/PropertyCardBadge";
 
 export default function SimilarProperties({ properties = [] }) {
     if (!properties.length) return null;
@@ -38,6 +39,7 @@ export default function SimilarProperties({ properties = [] }) {
                                             alt={property.title}
                                             className="h-40 w-full rounded-lg object-cover"
                                         />
+                                        <PropertyCardBadge property={property} className="absolute left-[8px] top-[8px] max-w-[60%]" />
                                         <WishlistButton propertyId={property.id} className="absolute top-[8px] right-[8px]" />
                                     </div>
                                     <div className="p-[10px]">

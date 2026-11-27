@@ -86,7 +86,7 @@ export default function ContactUs() {
                 <div className="container">
 
                     {/* Heading + form. Ads (Admin -> Ads, "Contact Us / FAQs / Policies") sit left / right of it; contact boxes + map below keep the full width */}
-                    <SideAds page="cms" sticky={false} railClass="lg:mt-0" wrapClass="">
+                    <SideAds page="contact_us" sticky={false} railClass="lg:mt-0" wrapClass="">
                         <div>
                             <div className="text-center max-w-3xl mx-auto">
 

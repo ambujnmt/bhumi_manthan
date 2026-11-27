@@ -289,8 +289,10 @@ export const getYoutuberVideos = async () => {
 
 // bhumi-project-list (frontend - New Launch & Premium Projects)
 // filters (optional): { launch_status, builder, city }
-export const getProjects = async (limit = 5, filters = {}) => {
+// page (optional): limit = per page -> data.pagination { page, per_page, total, last_page }
+export const getProjects = async (limit = 5, filters = {}, page = null) => {
   const params = new URLSearchParams({ limit: String(limit) });
+  if (page) params.set("page", String(page));
 
   Object.entries(filters).forEach(([key, value]) => {
     if (value) params.set(key, String(value));

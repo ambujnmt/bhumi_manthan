@@ -4,9 +4,13 @@ import { useRouter } from "next/router";
 import { FiX } from "react-icons/fi";
 import { getProjects } from "../../../utils/fetchApi";
 import { imageFallback } from "../../../utils/formatPrice";
+import Pagination from "../../Common/Pagination";
 import { PROJECT_DEVELOPERS, PROJECT_STAGES, projectsHref } from "../../../utils/projectFilters";
 
 const FALLBACK_IMAGE = "/assets/img/pro-1.png";
+
+// Projects per page (?page=2 in the URL)
+const PER_PAGE = 40;
 
 // ₹2.45 Cr onwards / ₹42.00 Lakh onwards (same as home "New Projects")
 const priceText = (project) => {
@@ -34,10 +38,12 @@ export default function ProjectList() {
     city: text(router.query.city),
   };
   const filterKey = JSON.stringify(filters);
+  const requestedPage = Math.max(1, parseInt(text(router.query.page), 10) || 1);
 
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [pagination, setPagination] = useState({ page: 1, last_page: 1, total: 0 });
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -45,15 +51,18 @@ export default function ProjectList() {
     let active = true;
     setLoading(true);
 
-    getProjects(50, filters)
+    getProjects(PER_PAGE, filters, requestedPage)
       .then((res) => {
         if (!active) return;
-        setProjects(res?.data?.projects || []);
+        const list = res?.data?.projects || [];
+        setProjects(list);
+        setPagination(res?.data?.pagination || { page: 1, last_page: 1, total: list.length });
         setFailed(false);
       })
       .catch(() => {
         if (!active) return;
         setProjects([]);
+        setPagination({ page: 1, last_page: 1, total: 0 });
         setFailed(true);
       })
       .finally(() => active && setLoading(false));
@@ -62,7 +71,19 @@ export default function ProjectList() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.isReady, filterKey]);
+  }, [router.isReady, filterKey, requestedPage]);
+
+  // Page change: same filters + ?page=N (page 1 = no param), back to the top
+  const goToPage = (page) => {
+    const query = { ...router.query };
+    if (page > 1) query.page = String(page);
+    else delete query.page;
+
+    router.push({ pathname: router.pathname, query }, undefined, { scroll: false, shallow: true });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const firstShown = (pagination.page - 1) * PER_PAGE + 1;
 
   const stageLabel = PROJECT_STAGES.find((item) => item.value.toLowerCase() === filters.launch_status.toLowerCase())?.label;
   const builderLabel = PROJECT_DEVELOPERS.find((item) => item.value.toLowerCase() === filters.builder.toLowerCase())?.label || filters.builder;
@@ -90,7 +111,9 @@ export default function ProjectList() {
     <section className="container py-10">
       <h1 className="text-[28px] font-bold text-[var(--text-color1)]">{title}</h1>
       <p className="mb-6 text-[15px] text-[var(--text-color2)]">
-        {loading ? "Loading projects..." : `${projects.length} ${projects.length === 1 ? "project" : "projects"} from trusted builders`}
+        {loading
+          ? "Loading projects..."
+          : `${pagination.total} ${pagination.total === 1 ? "project" : "projects"} from trusted builders`}
       </p>
 
       {/* Stage filter */}
@@ -181,6 +204,15 @@ export default function ProjectList() {
               </div>
             </NextLink>
           ))}
+        </div>
+      )}
+
+      {!loading && !failed && pagination.last_page > 1 && (
+        <div className="mt-8 flex flex-col items-center justify-between gap-3 sm:flex-row">
+          <p className="mb-0 text-sm text-[var(--text-color2)]">
+            Showing {firstShown}–{firstShown + projects.length - 1} of {pagination.total} projects
+          </p>
+          <Pagination page={pagination.page} totalPages={pagination.last_page} onChange={goToPage} label="Project pages" />
         </div>
       )}
     </section>
